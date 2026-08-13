@@ -1,10 +1,10 @@
 ---
 name: Bushel Incremental Plan
-overview: Create a new Flutter app in `bushel/` as its own git repo (mock data first, Firebase later), then grow Bushel one small feature at a time across a seven-screen volunteer/coordinator ecosystem.
+overview: Build the existing Flutter app in `bushel/super-giggle/` (the git root; mock data first, Firebase later), then grow Bushel one small feature at a time across a seven-screen volunteer/coordinator ecosystem.
 todos:
   - id: slice-0-repo
-    content: Create Flutter project in bushel/, theme as Bushel, git init + remote to super-duper-sniffle
-    status: in_progress
+    content: Verify the Flutter scaffold at the existing super-giggle git root and theme it as Bushel
+    status: completed
   - id: slice-1-discover
     content: Replace counter with mock food bank Discover list (3-5 banks)
     status: pending
@@ -20,8 +20,8 @@ isProject: false
 
 Bushel is a family-friendly food bank volunteering app: discover nearby banks on a live map, view calendars/shifts, sign up, QR check-in at stations, coordinator dashboard, gamification, and Kid Mode. Target: five-minute onboarding, better child retention.
 
-- **Code lives in** [`bushel/`](bushel/) (new folder at workspace root). That folder **is** the git repository.
-- **Do not** reuse [`app/`](app/) (profile-card demo) or [`super-giggle/`](super-giggle/) (plant app).
+- **Repository root:** `bushel/super-giggle/`. It is the existing git repository; do not create another nested project or run `git init` inside it.
+- **Code lives directly in the repository**, with the Flutter entry point at `lib/main.dart` and this plan at `docs/plan.md`.
 - **v1 data:** in-memory / local mock models. No Firebase, no auth backend.
 - **Later (out of scope now):** Firebase (auth, live map/shifts, realtime coordinator updates) and a free AI onboarding assistant.
 
@@ -54,20 +54,18 @@ A role switcher on the profile/onboarding flow unlocks the coordinator view with
 
 When you approve this plan, the first build step is **only** setup + the smallest useful screen:
 
-1. `flutter create bushel` in [`Jack/`](c:\Users\jackh\Desktop\Coding Minds Project\Highschool Project\Jack).
+1. Verify that the existing `bushel/super-giggle/` git root contains a valid Flutter scaffold. If Flutter platform files are missing, generate them in place from the repository root; do not create another `bushel/` or `super-giggle/` directory.
 2. Rename app title/theme to Bushel (warm green, family-friendly Material 3).
-3. Add a short [`bushel/README.md`](bushel/README.md) describing mock-first + future Firebase/AI.
-4. In `bushel/`: `git init`, first commit of the Flutter scaffold, then  
-   `git remote add origin https://github.com/john232014lemon-lang/super-duper-sniffle.git`  
-   (no push unless you ask).
+3. Add a short `README.md` at the git root describing mock-first + future Firebase/AI.
+4. Keep the repository's existing Git history and remote configuration. Do not run `git init`, replace the remote, or push unless explicitly asked.
 5. Replace the default counter with **Discover: a list of 3–5 mock food banks** (name, distance, next shift). That is Feature 1.
 
 Suggested layout after setup:
 
-- [`bushel/lib/main.dart`](bushel/lib/main.dart) — `MaterialApp`, theme, home
-- [`bushel/lib/models/`](bushel/lib/models/) — `FoodBank`, `Shift`, `Volunteer` (added as features need them)
-- [`bushel/lib/data/mock_food_banks.dart`](bushel/lib/data/mock_food_banks.dart) — static sample data
-- [`bushel/lib/screens/`](bushel/lib/screens/) — one screen file per feature
+- `lib/main.dart` — `MaterialApp`, theme, home
+- `lib/models/` — `FoodBank`, `Shift`, `Volunteer` (added as features need them)
+- `lib/data/mock_food_banks.dart` — static sample data
+- `lib/screens/` — one screen file per feature
 
 ## Incremental feature order
 
@@ -75,7 +73,7 @@ Follow your loop for **each** row: plan → prompt → test → fix → commit.
 
 | Slice | Smallest useful feature | Done when |
 | --- | --- | --- |
-| 0 | Flutter project + git + remote + Bushel theme | App runs; repo exists in `bushel/` |
+| 0 | Existing Flutter scaffold + Bushel theme | App runs from the `super-giggle` git root |
 | 1 | Mock food bank list (Discover) | 3–5 banks with name, area, next opening |
 | 2 | Food bank detail + mock calendar | Tap a bank → shifts with time, station, spots |
 | 3 | Sign up / cancel a shift (local state) | My Shifts shows signed-up items |
@@ -95,9 +93,9 @@ Follow your loop for **each** row: plan → prompt → test → fix → commit.
 2. Prompt Cursor with that slice only.
 3. Run the app and tap through the new path.
 4. Fix bugs.
-5. Commit in `bushel/` with a short why-focused message.
+5. Commit from the `super-giggle` repository root with a short why-focused message.
 6. Stop. Do not start the next slice in the same change.
 
 ## First prompt after this plan is approved
 
-Implement Slice 0 + Slice 1 only: create `bushel/`, init git + remote, Bushel theme, mock food bank list. Do not build map, QR, Kid Mode, or Firebase yet.
+Implement Slice 0 + Slice 1 only in the existing `bushel/super-giggle/` git root: verify the Flutter scaffold, add the Bushel theme, and build the mock food bank list. Preserve the existing Git repository and remote. Do not build map, QR, Kid Mode, or Firebase yet.
