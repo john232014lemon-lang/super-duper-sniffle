@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../data/mock_food_banks.dart';
+import 'food_bank_detail_screen.dart';
+
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key, required this.name});
 
@@ -67,7 +70,13 @@ class _HomeScreenState extends State<HomeScreen> {
                               distance: '0.8 mi',
                               accent: const Color(0xFFEF5269),
                               icon: Icons.inventory_2_outlined,
-                              onTap: () => _comingSoon('Food bank details'),
+                              onTap: () => Navigator.of(context).push(
+                                MaterialPageRoute<void>(
+                                  builder: (_) => FoodBankDetailScreen(
+                                    foodBank: mockFoodBanks[0],
+                                  ),
+                                ),
+                              ),
                             ),
                             const SizedBox(width: 12),
                             _FoodBankCard(
@@ -76,7 +85,28 @@ class _HomeScreenState extends State<HomeScreen> {
                               distance: '1.4 mi',
                               accent: const Color(0xFF23B65E),
                               icon: Icons.groups_outlined,
-                              onTap: () => _comingSoon('Food bank details'),
+                              onTap: () => Navigator.of(context).push(
+                                MaterialPageRoute<void>(
+                                  builder: (_) => FoodBankDetailScreen(
+                                    foodBank: mockFoodBanks[1],
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            _FoodBankCard(
+                              name: 'Martha’s Kitchen',
+                              status: 'Open · 2 shifts open',
+                              distance: '2.1 mi',
+                              accent: const Color(0xFF2D8FC7),
+                              icon: Icons.soup_kitchen_outlined,
+                              onTap: () => Navigator.of(context).push(
+                                MaterialPageRoute<void>(
+                                  builder: (_) => FoodBankDetailScreen(
+                                    foodBank: mockFoodBanks[2],
+                                  ),
+                                ),
+                              ),
                             ),
                           ],
                         ),

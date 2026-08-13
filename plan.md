@@ -7,7 +7,7 @@ todos:
     status: completed
   - id: slice-1-discover
     content: Replace counter with mock food bank Discover list (3-5 banks)
-    status: pending
+    status: completed
   - id: later-slices
     content: After first commit, continue slices 2-10 one feature at a time (detail, signup, map, onboarding, QR, rewards, Kid Mode, coordinator, leaderboard)
     status: pending
