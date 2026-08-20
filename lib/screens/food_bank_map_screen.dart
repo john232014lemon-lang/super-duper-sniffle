@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
@@ -86,6 +88,35 @@ class _FoodBankMapScreenState extends State<FoodBankMapScreen> {
                         ),
                     ],
                   ),
+                  Builder(
+                    builder: (context) {
+                      final camera = MapCamera.of(context);
+                      return Stack(
+                        children: [
+                          Positioned(
+                            top: 82,
+                            left: 14,
+                            child: _MapKey(
+                              directions: [
+                                for (
+                                  var index = 0;
+                                  index < mockFoodBanks.length;
+                                  index++
+                                )
+                                  _directionTo(
+                                    camera.latLngToScreenOffset(
+                                      mockFoodBanks[index].location,
+                                    ),
+                                    index,
+                                  ),
+                              ],
+                              onBankSelected: _selectBank,
+                            ),
+                          ),
+                        ],
+                      );
+                    },
+                  ),
                   const RichAttributionWidget(
                     attributions: [
                       TextSourceAttribution('OpenStreetMap contributors'),
@@ -119,11 +150,6 @@ class _FoodBankMapScreenState extends State<FoodBankMapScreen> {
               ),
               Positioned(
                 top: 82,
-                left: 14,
-                child: _MapKey(onBankSelected: _selectBank),
-              ),
-              Positioned(
-                top: 82,
                 right: 14,
                 child: FloatingActionButton.small(
                   heroTag: 'find-location',
@@ -151,11 +177,18 @@ class _FoodBankMapScreenState extends State<FoodBankMapScreen> {
       bottomNavigationBar: const BushelNavigationBar(selectedIndex: 1),
     );
   }
+
+  double _directionTo(Offset destination, int index) {
+    final arrowCenter = Offset(28, 121 + (index * 28));
+    final delta = destination - arrowCenter;
+    return math.atan2(delta.dy, delta.dx);
+  }
 }
 
 class _MapKey extends StatelessWidget {
-  const _MapKey({required this.onBankSelected});
+  const _MapKey({required this.directions, required this.onBankSelected});
 
+  final List<double> directions;
   final ValueChanged<FoodBank> onBankSelected;
 
   @override
@@ -179,19 +212,26 @@ class _MapKey extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 4),
-            for (final bank in mockFoodBanks)
+            for (var index = 0; index < mockFoodBanks.length; index++)
               InkWell(
-                onTap: () => onBankSelected(bank),
+                onTap: () => onBankSelected(mockFoodBanks[index]),
                 borderRadius: BorderRadius.circular(8),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(vertical: 3),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.arrow_right, color: bank.accent, size: 22),
+                      Transform.rotate(
+                        angle: directions[index],
+                        child: Icon(
+                          Icons.arrow_right_alt_rounded,
+                          color: mockFoodBanks[index].accent,
+                          size: 22,
+                        ),
+                      ),
                       const SizedBox(width: 3),
                       Text(
-                        bank.shortName,
+                        mockFoodBanks[index].shortName,
                         style: const TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w800,

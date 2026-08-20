@@ -145,6 +145,26 @@
 
 **Modifications:** Changed map markers to colored location arrows, kept the bank preview behavior, and made Home, Banks, and Shifts consistently accessible from Home, Map, Shifts, and food-bank detail pages. Scan and Community remain visible placeholders for future slices.
 
+### Improvement: Map Key Leader Arrows
+
+**Prompt:**
+
+> Make the key arrows point to map locations.
+
+**Result:** Connected each map-key entry to its corresponding food-bank marker with a matching colored leader arrow.
+
+**Modifications:** The arrow endpoints are calculated from each bank’s geographic coordinate and repaint as the interactive map moves. The overlay ignores pointer input so map panning, zooming, and marker taps continue working normally.
+
+### Improvement: Directional Map Key Icons
+
+**Prompt:**
+
+> remove the lines, point the color arrow icons next to each name of food bank towards where its location is on the map. so if you were looking off way to the left of Houston all 3 icons would be pointing to the rightside of screen
+
+**Result:** Removed the map-spanning leader lines and converted the colored key icons into live directional arrows.
+
+**Modifications:** Each icon calculates its direction from the key to the bank’s projected screen coordinate. The arrows rotate as the map moves, including pointing right when the food banks are off-screen to the right.
+
 ## Challenges & Solutions
 
 ### Challenge 1: Flutter SDK Cache Lock
