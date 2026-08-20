@@ -135,6 +135,16 @@
 
 **Modifications:** Added Houston-area coordinates to each mock food bank, preserved tappable branded markers and detail previews, included map attribution, and added a Find my location button that only displays a coming-soon message without requesting location access.
 
+### Feature: Map Key and Persistent Navigation
+
+**Prompt:**
+
+> i want there to be a key to the map. this key will show different banks by having an arrow point to the bank locations. i want to fix the navigation bar because make the navagation bar stick in all pages
+
+**Result:** Added a map key that pairs every food bank with its marker color and lets users select a bank directly. Added the shared Bushel navigation bar to the main post-onboarding screens.
+
+**Modifications:** Changed map markers to colored location arrows, kept the bank preview behavior, and made Home, Banks, and Shifts consistently accessible from Home, Map, Shifts, and food-bank detail pages. Scan and Community remain visible placeholders for future slices.
+
 ## Challenges & Solutions
 
 ### Challenge 1: Flutter SDK Cache Lock

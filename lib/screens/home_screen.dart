@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../data/mock_food_banks.dart';
 import 'food_bank_detail_screen.dart';
 import 'food_bank_map_screen.dart';
-import 'shifts_screen.dart';
+import '../widgets/bushel_navigation_bar.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key, required this.name});
@@ -15,35 +15,12 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  int _navigationIndex = 0;
-
   void _comingSoon(String destination) {
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(
         SnackBar(content: Text('$destination is coming in a future update.')),
       );
-  }
-
-  void _selectNavigation(int index) {
-    if (index == 0) return;
-    if (index == 1) {
-      Navigator.of(context).push(
-        MaterialPageRoute<void>(builder: (_) => const FoodBankMapScreen()),
-      );
-      return;
-    }
-    if (index == 3) {
-      Navigator.of(
-        context,
-      ).push(MaterialPageRoute<void>(builder: (_) => const ShiftsScreen()));
-      return;
-    }
-    setState(() => _navigationIndex = index);
-    _comingSoon(['Home', 'Banks', 'Scan', 'Shifts', 'Community'][index]);
-    Future<void>.delayed(const Duration(milliseconds: 250), () {
-      if (mounted) setState(() => _navigationIndex = 0);
-    });
   }
 
   @override
@@ -161,26 +138,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
       ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _navigationIndex,
-        onDestinationSelected: _selectNavigation,
-        destinations: const [
-          NavigationDestination(icon: Icon(Icons.home_rounded), label: 'Home'),
-          NavigationDestination(icon: Icon(Icons.map_outlined), label: 'Banks'),
-          NavigationDestination(
-            icon: Icon(Icons.qr_code_scanner),
-            label: 'Scan',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.calendar_month_outlined),
-            label: 'Shifts',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.favorite_outline),
-            label: 'Community',
-          ),
-        ],
-      ),
+      bottomNavigationBar: BushelNavigationBar(selectedIndex: 0, onHome: () {}),
     );
   }
 }

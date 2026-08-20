@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../data/mock_food_banks.dart';
 import '../data/shift_store.dart';
 import '../models/food_bank.dart';
+import '../widgets/bushel_navigation_bar.dart';
 
 class FoodBankDetailScreen extends StatefulWidget {
   const FoodBankDetailScreen({super.key, required this.foodBank});
@@ -131,6 +132,7 @@ class _FoodBankDetailScreenState extends State<FoodBankDetailScreen> {
           ),
         ),
       ),
+      bottomNavigationBar: const BushelNavigationBar(selectedIndex: 1),
     );
   }
 

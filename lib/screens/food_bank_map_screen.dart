@@ -4,6 +4,7 @@ import 'package:latlong2/latlong.dart';
 
 import '../data/mock_food_banks.dart';
 import '../models/food_bank.dart';
+import '../widgets/bushel_navigation_bar.dart';
 import 'food_bank_detail_screen.dart';
 
 class FoodBankMapScreen extends StatefulWidget {
@@ -118,6 +119,11 @@ class _FoodBankMapScreenState extends State<FoodBankMapScreen> {
               ),
               Positioned(
                 top: 82,
+                left: 14,
+                child: _MapKey(onBankSelected: _selectBank),
+              ),
+              Positioned(
+                top: 82,
                 right: 14,
                 child: FloatingActionButton.small(
                   heroTag: 'find-location',
@@ -140,6 +146,62 @@ class _FoodBankMapScreenState extends State<FoodBankMapScreen> {
                 ),
             ],
           ),
+        ),
+      ),
+      bottomNavigationBar: const BushelNavigationBar(selectedIndex: 1),
+    );
+  }
+}
+
+class _MapKey extends StatelessWidget {
+  const _MapKey({required this.onBankSelected});
+
+  final ValueChanged<FoodBank> onBankSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      elevation: 3,
+      borderRadius: BorderRadius.circular(16),
+      color: Colors.white.withValues(alpha: 0.96),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 10, 14, 10),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'MAP KEY',
+              style: TextStyle(
+                color: Color(0xFF718078),
+                fontSize: 10,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 0.8,
+              ),
+            ),
+            const SizedBox(height: 4),
+            for (final bank in mockFoodBanks)
+              InkWell(
+                onTap: () => onBankSelected(bank),
+                borderRadius: BorderRadius.circular(8),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 3),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.arrow_right, color: bank.accent, size: 22),
+                      const SizedBox(width: 3),
+                      Text(
+                        bank.shortName,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+          ],
         ),
       ),
     );
@@ -167,20 +229,14 @@ class _MapPin extends StatelessWidget {
         child: AnimatedScale(
           duration: const Duration(milliseconds: 180),
           scale: selected ? 1.12 : 1,
-          child: Container(
-            decoration: BoxDecoration(
-              color: foodBank.accent,
-              shape: BoxShape.circle,
-              border: Border.all(color: Colors.white, width: 4),
-              boxShadow: const [
-                BoxShadow(
-                  color: Color(0x44000000),
-                  blurRadius: 10,
-                  offset: Offset(0, 5),
-                ),
-              ],
-            ),
-            child: Icon(foodBank.icon, color: Colors.white, size: 27),
+          child: Icon(
+            Icons.location_on,
+            color: foodBank.accent,
+            size: 58,
+            shadows: const [
+              Shadow(color: Colors.white, blurRadius: 5),
+              Shadow(color: Color(0x55000000), blurRadius: 10),
+            ],
           ),
         ),
       ),

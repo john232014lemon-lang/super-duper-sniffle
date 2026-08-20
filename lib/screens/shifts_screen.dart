@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../data/shift_store.dart';
+import '../widgets/bushel_navigation_bar.dart';
 
 class ShiftsScreen extends StatefulWidget {
   const ShiftsScreen({super.key});
@@ -113,6 +114,7 @@ class _ShiftsScreenState extends State<ShiftsScreen> {
           ),
         ),
       ),
+      bottomNavigationBar: const BushelNavigationBar(selectedIndex: 3),
     );
   }
 }

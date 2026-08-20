@@ -44,6 +44,11 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('About this food bank'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.text('Upcoming shifts'),
+      250,
+      scrollable: find.byType(Scrollable).first,
+    );
     expect(find.text('Upcoming shifts'), findsOneWidget);
     expect(find.text('Sorting & Packing Line'), findsOneWidget);
     await tester.scrollUntilVisible(
@@ -87,6 +92,11 @@ void main() {
     await tester.tap(find.text('Second Harvest'));
     await tester.pumpAndSettle();
 
+    await tester.scrollUntilVisible(
+      find.text('Add shift'),
+      250,
+      scrollable: find.byType(Scrollable).first,
+    );
     await tester.tap(find.text('Add shift'));
     await tester.pumpAndSettle();
     final fields = find.byType(TextFormField);
@@ -133,12 +143,16 @@ void main() {
     expect(find.text('Food banks nearby'), findsOneWidget);
     expect(find.text('Houston, TX'), findsOneWidget);
     expect(find.byTooltip('Find my location'), findsOneWidget);
+    expect(find.text('MAP KEY'), findsOneWidget);
+    expect(find.text('Martha’s Kitchen'), findsOneWidget);
+    expect(find.byType(NavigationBar), findsOneWidget);
     await tester.tap(find.bySemanticsLabel('Second Harvest map marker'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Second Harvest'), findsOneWidget);
+    expect(find.text('Second Harvest'), findsWidgets);
     await tester.tap(find.text('View'));
     await tester.pumpAndSettle();
     expect(find.text('About this food bank'), findsOneWidget);
+    expect(find.byType(NavigationBar), findsOneWidget);
   });
 }
