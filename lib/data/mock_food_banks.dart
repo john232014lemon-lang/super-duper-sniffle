@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:latlong2/latlong.dart';
 
 import '../models/food_bank.dart';
 
@@ -11,6 +12,7 @@ const mockFoodBanks = <FoodBank>[
     address: '4001 North First Street, San Jose',
     hours: 'Mon–Sat · 8:00 AM–5:00 PM',
     distance: '0.8 mi',
+    location: LatLng(29.7607, -95.3695),
     accent: Color(0xFFEF5269),
     icon: Icons.inventory_2_outlined,
     shifts: [
@@ -45,6 +47,7 @@ const mockFoodBanks = <FoodBank>[
     address: '1500 Berger Drive, San Jose',
     hours: 'Mon–Fri · 9:00 AM–6:00 PM',
     distance: '1.4 mi',
+    location: LatLng(29.7497, -95.3584),
     accent: Color(0xFF23B65E),
     icon: Icons.groups_outlined,
     shifts: [
@@ -72,6 +75,7 @@ const mockFoodBanks = <FoodBank>[
     address: '311 Willow Street, San Jose',
     hours: 'Tue–Sat · 10:00 AM–7:00 PM',
     distance: '2.1 mi',
+    location: LatLng(29.7714, -95.3901),
     accent: Color(0xFF2D8FC7),
     icon: Icons.soup_kitchen_outlined,
     shifts: [

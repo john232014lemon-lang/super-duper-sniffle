@@ -18,7 +18,8 @@
 8. Recommended food banks on detail pages - **Status: Complete**
 9. Local custom shift creation and sideways shift carousel - **Status: Complete**
 10. Available shift signup and My Shifts schedule - **Status: Complete**
-11. Full calendar, real map, QR check-in, rewards, Kid Mode, and coordinator dashboard - **Status: Not Started**
+11. Mock map with tappable food bank markers - **Status: Complete**
+12. Full calendar, real map provider, QR check-in, rewards, Kid Mode, and coordinator dashboard - **Status: Not Started**
 
 ## Prompts Used
 
@@ -114,6 +115,26 @@
 
 **Modifications:** Connected the home bottom navigation to the Shifts page and reused the signup flow on food-bank detail cards. The date strip is intentionally a calendar placeholder until the full available-shift calendar is implemented.
 
+### Feature: Slice 4 Mock Food Bank Map
+
+**Prompt:**
+
+> I want to implement the next step can you help me.
+
+**Result:** Implemented Slice 4 as a lightweight mock map containing all three food banks, a current-location marker, selectable bank pins, a bank preview, and navigation to food bank details.
+
+**Modifications:** Connected both the Banks bottom-navigation destination and the home screen’s See map action. The map is drawn locally without API keys, network access, or a map SDK so it remains consistent with the mock-first plan.
+
+### Feature: Interactive Houston Map
+
+**Prompt:**
+
+> Implement fluttermap, latlong2, and geolocator. for the map make sure it is centered around Houston to start. have a find my location button but don't implement functionality yet. use a simple ui that matches the rest of the project.
+
+**Result:** Replaced the illustrated map with an interactive `flutter_map` centered on Houston, backed by `latlong2` coordinates and OpenStreetMap tiles. Added `geolocator` for the future location feature.
+
+**Modifications:** Added Houston-area coordinates to each mock food bank, preserved tappable branded markers and detail previews, included map attribution, and added a Find my location button that only displays a coming-soon message without requesting location access.
+
 ## Challenges & Solutions
 
 ### Challenge 1: Flutter SDK Cache Lock
@@ -169,7 +190,7 @@
 - [ ] Persist custom shifts between app launches.
 - [ ] Implement volunteer signup and cancellation for available shifts.
 - [ ] Add a My Shifts screen using the selected mock shifts.
-- [ ] Add a simple map view for the three mock food banks.
+- [ ] Replace the mock map illustration with a real map provider and live coordinates.
 - [ ] Persist onboarding choices locally between app launches.
 - [ ] Add QR check-in simulation and volunteer points.
 - [ ] Add rewards, badges, family challenges, and a leaderboard.

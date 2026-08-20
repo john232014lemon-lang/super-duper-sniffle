@@ -1,4 +1,5 @@
 import 'package:bushel/main.dart';
+import 'package:bushel/screens/food_bank_map_screen.dart';
 import 'package:bushel/screens/shifts_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -122,5 +123,22 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Your upcoming shifts'), findsOneWidget);
     expect(find.text('Sorting & Packing Line'), findsOneWidget);
+  });
+
+  testWidgets('map marker opens a bank preview and details', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(const MaterialApp(home: FoodBankMapScreen()));
+
+    expect(find.text('Food banks nearby'), findsOneWidget);
+    expect(find.text('Houston, TX'), findsOneWidget);
+    expect(find.byTooltip('Find my location'), findsOneWidget);
+    await tester.tap(find.bySemanticsLabel('Second Harvest map marker'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Second Harvest'), findsOneWidget);
+    await tester.tap(find.text('View'));
+    await tester.pumpAndSettle();
+    expect(find.text('About this food bank'), findsOneWidget);
   });
 }

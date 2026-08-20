@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:latlong2/latlong.dart';
 
 class FoodBankShift {
   const FoodBankShift({
@@ -24,6 +25,7 @@ class FoodBank {
     required this.address,
     required this.hours,
     required this.distance,
+    required this.location,
     required this.accent,
     required this.icon,
     required this.shifts,
@@ -35,6 +37,7 @@ class FoodBank {
   final String address;
   final String hours;
   final String distance;
+  final LatLng location;
   final Color accent;
   final IconData icon;
   final List<FoodBankShift> shifts;

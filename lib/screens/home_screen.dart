@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../data/mock_food_banks.dart';
 import 'food_bank_detail_screen.dart';
+import 'food_bank_map_screen.dart';
 import 'shifts_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -26,6 +27,12 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _selectNavigation(int index) {
     if (index == 0) return;
+    if (index == 1) {
+      Navigator.of(context).push(
+        MaterialPageRoute<void>(builder: (_) => const FoodBankMapScreen()),
+      );
+      return;
+    }
     if (index == 3) {
       Navigator.of(
         context,
@@ -63,7 +70,11 @@ class _HomeScreenState extends State<HomeScreen> {
                       _SectionHeader(
                         title: 'Food banks near you',
                         action: 'See map',
-                        onPressed: () => _comingSoon('Map'),
+                        onPressed: () => Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) => const FoodBankMapScreen(),
+                          ),
+                        ),
                       ),
                       const SizedBox(height: 12),
                       SizedBox(
