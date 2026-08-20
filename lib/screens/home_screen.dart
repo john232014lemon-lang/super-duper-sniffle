@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../data/mock_food_banks.dart';
 import 'food_bank_detail_screen.dart';
+import 'shifts_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key, required this.name});
@@ -25,6 +26,12 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _selectNavigation(int index) {
     if (index == 0) return;
+    if (index == 3) {
+      Navigator.of(
+        context,
+      ).push(MaterialPageRoute<void>(builder: (_) => const ShiftsScreen()));
+      return;
+    }
     setState(() => _navigationIndex = index);
     _comingSoon(['Home', 'Banks', 'Scan', 'Shifts', 'Community'][index]);
     Future<void>.delayed(const Duration(milliseconds: 250), () {

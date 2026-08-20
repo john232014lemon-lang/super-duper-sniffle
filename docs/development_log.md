@@ -16,8 +16,9 @@
 6. Food bank detail pages with descriptions and operating information - **Status: Complete**
 7. Mock bank shifts with dates, stations, and remaining capacity - **Status: Complete**
 8. Recommended food banks on detail pages - **Status: Complete**
-9. Local shift signup and cancellation - **Status: Not Started**
-10. Real map, QR check-in, rewards, Kid Mode, and coordinator dashboard - **Status: Not Started**
+9. Local custom shift creation and sideways shift carousel - **Status: Complete**
+10. Available shift signup and My Shifts schedule - **Status: Complete**
+11. Full calendar, real map, QR check-in, rewards, Kid Mode, and coordinator dashboard - **Status: Not Started**
 
 ## Prompts Used
 
@@ -90,6 +91,29 @@
 
 **Modifications:** Added current statuses, implementation notes, resolved challenges, lessons learned, and planned improvements.
 
+### Feature: Slice 3 Custom Shifts
+
+**Prompt:**
+
+> Begin work on slice 3
+> Add the following features:
+> - Give people the ability to add their own shifts
+> - Shifts should pop up in the sideways scroll bar like they already were
+
+**Result:** Added a local custom-shift form to each food bank detail screen. Newly created shifts appear immediately in the horizontally scrolling upcoming-shifts row.
+
+**Modifications:** Added required validation for shift name, date, time, station, and available spots. Custom shifts remain in memory for the current detail-screen session, and automated coverage verifies creation and horizontal-list display.
+
+### Feature: Shift Signup and My Shifts
+
+**Prompt:**
+
+> shifts should be viewable as a list of different times and show available slots with a button to sign up. if you click that button and then confirm the shift is added to your shifts, viewable on the shifts page. shifts page will eventually show a calendar populated with available shifts.
+
+**Result:** Added a schedule screen with Available and My shifts views, a mock date strip, time-based shift cards, remaining slot counts, signup confirmation, and shared local signup state.
+
+**Modifications:** Connected the home bottom navigation to the Shifts page and reused the signup flow on food-bank detail cards. The date strip is intentionally a calendar placeholder until the full available-shift calendar is implemented.
+
 ## Challenges & Solutions
 
 ### Challenge 1: Flutter SDK Cache Lock
@@ -142,7 +166,8 @@
 
 ## Future Improvements
 
-- [ ] Implement local shift signup and cancellation.
+- [ ] Persist custom shifts between app launches.
+- [ ] Implement volunteer signup and cancellation for available shifts.
 - [ ] Add a My Shifts screen using the selected mock shifts.
 - [ ] Add a simple map view for the three mock food banks.
 - [ ] Persist onboarding choices locally between app launches.

@@ -76,7 +76,7 @@ Follow your loop for **each** row: plan → prompt → test → fix → commit.
 | 0 | Existing Flutter scaffold + Bushel theme | App runs from the `super-giggle` git root |
 | 1 | Mock food bank list (Discover) | 3–5 banks with name, area, next opening |
 | 2 | Food bank detail + mock calendar | Tap a bank → shifts with time, station, spots |
-| 3 | Sign up / cancel a shift (local state) | My Shifts shows signed-up items |
+| 3 | Add shifts and sign up locally | Confirmed shifts appear on the My Shifts page |
 | 4 | Simple map of mock banks | Pins or placeholders; tap → detail |
 | 5 | Onboarding + role (volunteer / coordinator / kid) | Choice persists in memory for the session |
 | 6 | QR check-in (camera or “simulate scan”) | Check-in marks shift done + adds points |
