@@ -22,6 +22,7 @@
 12. Full calendar, real map provider, rewards, Kid Mode, and coordinator dashboard - **Status: Not Started**
 13. Simulated station QR check-in with points - **Status: Complete**
 14. Rewards progress with three point-based badges - **Status: Complete**
+15. Kid Mode with simplified check-in and 25 selectable badges - **Status: Complete**
 
 ## Prompts Used
 
@@ -198,6 +199,16 @@
 **Result:** Added a Rewards screen driven by the shared check-in points total, with Harvesting Hero at 500 points, Family Feeder at 2,000 points, and Material Mover at 10,000 points.
 
 **Modifications:** Replaced the Community navigation placeholder with Rewards. Added total points, next-badge progress, earned count, individual badge progress bars, locked and earned visual states, and live updates when points change.
+
+### Feature: Slice 8 Kid Mode
+
+**Prompt:**
+
+> implement slice 8. for kid mode make 25 kid friendly badges with different animals, plants, fruits, and veggies as the icons / name : example donkey badge, carrot badge, bunny badge, kids get to choose the badges to unlock after every check in. make a simple profile page accessible from clicking icon in top right on home: this shows your badge, and has a 3 way radio button toggle between volunteer, coordinator, and kid mode. which will change the rest of the app. implement all of kid mode simplified ui and check in process
+
+**Result:** Added a complete Kid Mode presentation with a simplified home, large check-in controls, a three-destination navigation bar, a 25-item animal/plant/fruit/vegetable badge garden, and badge choice after successful check-in.
+
+**Modifications:** Added a shared Volunteer/Coordinator/Kid role to session state and a profile screen opened from the home avatar. The profile displays the featured Kid badge and switches app modes. Kid check-in uses simpler language and larger controls, then requires the child to choose one locked badge. Coordinator selection changes the home presentation while its full dashboard remains reserved for Slice 9.
 
 ## Challenges & Solutions
 

@@ -1,5 +1,7 @@
 import 'package:bushel/main.dart';
 import 'package:bushel/data/shift_store.dart';
+import 'package:bushel/data/session_store.dart';
+import 'package:bushel/models/kid_badge.dart';
 import 'package:bushel/models/reward_badge.dart';
 import 'package:bushel/screens/check_in_screen.dart';
 import 'package:bushel/screens/food_bank_map_screen.dart';
@@ -10,6 +12,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test('Kid Mode provides exactly 25 unique badges', () {
+    expect(kidBadges, hasLength(25));
+    expect(kidBadges.map((badge) => badge.id).toSet(), hasLength(25));
+    expect(kidBadges.map((badge) => badge.name), contains('Donkey Badge'));
+    expect(kidBadges.map((badge) => badge.name), contains('Carrot Badge'));
+    expect(kidBadges.map((badge) => badge.name), contains('Bunny Badge'));
+  });
+
   test('reward badge thresholds unlock at the required points', () {
     expect(rewardBadges[0].isUnlockedAt(499), isFalse);
     expect(rewardBadges[0].isUnlockedAt(500), isTrue);
@@ -193,7 +203,7 @@ void main() {
     await tester.tap(find.text('Confirm station check-in'));
     await tester.pumpAndSettle();
     expect(find.text('Confirm check-in?'), findsOneWidget);
-    await tester.tap(find.text('Check in'));
+    await tester.tap(find.widgetWithText(FilledButton, 'Check in'));
     await tester.pumpAndSettle();
 
     expect(find.text('You’re checked in!'), findsOneWidget);
@@ -242,5 +252,39 @@ void main() {
     expect(find.text('Family Feeder'), findsOneWidget);
     expect(find.text('Material Mover'), findsOneWidget);
     expect(find.text('10000 pts'), findsOneWidget);
+  });
+
+  testWidgets('profile switches to Kid Mode and check-in unlocks a badge', (
+    WidgetTester tester,
+  ) async {
+    SessionStore.instance.setRole(BushelRole.volunteer);
+    await tester.pumpWidget(const MaterialApp(home: HomeScreen(name: 'Sam')));
+
+    await tester.tap(find.byTooltip('Open profile'));
+    await tester.pumpAndSettle();
+    expect(find.text('Choose your experience'), findsOneWidget);
+    await tester.tap(find.text('Kid'));
+    await tester.tap(find.text('Use this mode'));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('kid-home')), findsOneWidget);
+    expect(find.text('CHECK IN & PICK A BADGE'), findsOneWidget);
+    expect(find.byType(NavigationBar), findsOneWidget);
+    await tester.tap(find.text('CHECK IN & PICK A BADGE'));
+    await tester.pumpAndSettle();
+    await tester.drag(find.byType(ListView), const Offset(0, -320));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('simulate-scan')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('YES, CHECK ME IN!'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'Check in'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Pick a new badge! 🎉'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('choose-donkey')));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Donkey Badge'), findsOneWidget);
+    expect(SessionStore.instance.unlockedKidBadges, contains('donkey'));
   });
 }

@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 
 import '../data/mock_food_banks.dart';
+import '../data/session_store.dart';
+import '../models/kid_badge.dart';
 import 'food_bank_detail_screen.dart';
 import 'food_bank_map_screen.dart';
 import 'check_in_screen.dart';
+import 'profile_screen.dart';
 import '../widgets/bushel_navigation_bar.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -16,6 +19,22 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  final _session = SessionStore.instance;
+
+  @override
+  void initState() {
+    super.initState();
+    _session.addListener(_refresh);
+  }
+
+  @override
+  void dispose() {
+    _session.removeListener(_refresh);
+    super.dispose();
+  }
+
+  void _refresh() => setState(() {});
+
   void _comingSoon(String destination) {
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
@@ -26,6 +45,13 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_session.role == BushelRole.kid) {
+      return _KidHomeScreen(
+        name: widget.name,
+        onProfile: _openProfile,
+        onCheckIn: _openCheckIn,
+      );
+    }
     return Scaffold(
       key: const ValueKey('home'),
       body: SafeArea(
@@ -39,15 +65,17 @@ class _HomeScreenState extends State<HomeScreen> {
                   padding: const EdgeInsets.fromLTRB(20, 20, 20, 110),
                   sliver: SliverList.list(
                     children: [
-                      _HomeHeader(name: widget.name),
-                      const SizedBox(height: 20),
-                      _NextShiftCard(
-                        onCheckIn: () => Navigator.of(context).push(
-                          MaterialPageRoute<void>(
-                            builder: (_) => const CheckInScreen(),
-                          ),
-                        ),
+                      _HomeHeader(
+                        name: widget.name,
+                        role: _session.role,
+                        onProfile: _openProfile,
                       ),
+                      if (_session.role == BushelRole.coordinator) ...[
+                        const SizedBox(height: 14),
+                        const _CoordinatorNotice(),
+                      ],
+                      const SizedBox(height: 20),
+                      _NextShiftCard(onCheckIn: _openCheckIn),
                       const SizedBox(height: 18),
                       const _ImpactStats(),
                       const SizedBox(height: 26),
@@ -148,12 +176,30 @@ class _HomeScreenState extends State<HomeScreen> {
       bottomNavigationBar: BushelNavigationBar(selectedIndex: 0, onHome: () {}),
     );
   }
+
+  void _openCheckIn() {
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute<void>(builder: (_) => const CheckInScreen()));
+  }
+
+  void _openProfile() {
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute<void>(builder: (_) => const ProfileScreen()));
+  }
 }
 
 class _HomeHeader extends StatelessWidget {
-  const _HomeHeader({required this.name});
+  const _HomeHeader({
+    required this.name,
+    required this.role,
+    required this.onProfile,
+  });
 
   final String name;
+  final BushelRole role;
+  final VoidCallback onProfile;
 
   @override
   Widget build(BuildContext context) {
@@ -194,6 +240,16 @@ class _HomeHeader extends StatelessWidget {
                   fontWeight: FontWeight.w900,
                 ),
               ),
+              Text(
+                role == BushelRole.coordinator
+                    ? 'Coordinator mode'
+                    : 'Volunteer mode',
+                style: const TextStyle(
+                  color: Color(0xFF718078),
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
             ],
           ),
         ),
@@ -203,12 +259,190 @@ class _HomeHeader extends StatelessWidget {
           icon: const Badge(child: Icon(Icons.notifications_outlined)),
         ),
         const SizedBox(width: 8),
-        const CircleAvatar(
-          radius: 23,
-          backgroundColor: Color(0xFFDCF3E3),
-          child: Icon(Icons.person, color: Color(0xFF126D3A)),
+        IconButton(
+          onPressed: onProfile,
+          tooltip: 'Open profile',
+          icon: const CircleAvatar(
+            radius: 23,
+            backgroundColor: Color(0xFFDCF3E3),
+            child: Icon(Icons.person, color: Color(0xFF126D3A)),
+          ),
         ),
       ],
+    );
+  }
+}
+
+class _CoordinatorNotice extends StatelessWidget {
+  const _CoordinatorNotice();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Card(
+      color: Color(0xFFE8F3FF),
+      child: ListTile(
+        leading: Icon(Icons.groups, color: Color(0xFF287EB5)),
+        title: Text(
+          'Coordinator mode',
+          style: TextStyle(fontWeight: FontWeight.w900),
+        ),
+        subtitle: Text('The full coordinator dashboard arrives in Slice 9.'),
+      ),
+    );
+  }
+}
+
+class _KidHomeScreen extends StatelessWidget {
+  const _KidHomeScreen({
+    required this.name,
+    required this.onProfile,
+    required this.onCheckIn,
+  });
+
+  final String name;
+  final VoidCallback onProfile;
+  final VoidCallback onCheckIn;
+
+  KidBadge? get _featured {
+    final id = SessionStore.instance.featuredKidBadge;
+    if (id == null) return null;
+    for (final badge in kidBadges) {
+      if (badge.id == id) return badge;
+    }
+    return null;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final featured = _featured;
+    return Scaffold(
+      key: const ValueKey('kid-home'),
+      body: SafeArea(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 620),
+            child: ListView(
+              padding: const EdgeInsets.all(22),
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'Hi, $name! 🌈',
+                        style: const TextStyle(
+                          fontSize: 30,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
+                    IconButton.filledTonal(
+                      tooltip: 'Open profile',
+                      onPressed: onProfile,
+                      icon: Text(
+                        featured?.emoji ?? '🌱',
+                        style: const TextStyle(fontSize: 25),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                Container(
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFFFFC83D), Color(0xFFFF8F55)],
+                    ),
+                    borderRadius: BorderRadius.circular(28),
+                  ),
+                  child: const Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'YOUR NEXT ADVENTURE',
+                        style: TextStyle(fontWeight: FontWeight.w900),
+                      ),
+                      SizedBox(height: 12),
+                      Text(
+                        'Sorting & Packing Line',
+                        style: TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      SizedBox(height: 6),
+                      Text('Saturday · 9:00 AM · Warehouse A'),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 18),
+                SizedBox(
+                  height: 74,
+                  child: FilledButton.icon(
+                    onPressed: onCheckIn,
+                    icon: const Icon(Icons.qr_code_scanner, size: 30),
+                    label: const Text(
+                      'CHECK IN & PICK A BADGE',
+                      style: TextStyle(fontSize: 17),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 24),
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(20),
+                    child: Row(
+                      children: [
+                        Text(
+                          featured?.emoji ?? '🔒',
+                          style: const TextStyle(fontSize: 52),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'My favorite badge',
+                                style: TextStyle(fontWeight: FontWeight.w900),
+                              ),
+                              Text(
+                                featured?.name ?? 'Unlock one after check-in!',
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 18),
+                const Card(
+                  color: Color(0xFFE5F8EC),
+                  child: Padding(
+                    padding: EdgeInsets.all(20),
+                    child: Row(
+                      children: [
+                        Text('⭐', style: TextStyle(fontSize: 38)),
+                        SizedBox(width: 14),
+                        Expanded(
+                          child: Text(
+                            'Help out, check in, and grow your badge garden!',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+      bottomNavigationBar: const BushelNavigationBar(selectedIndex: 0),
     );
   }
 }
