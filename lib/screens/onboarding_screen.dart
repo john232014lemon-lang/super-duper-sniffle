@@ -3,8 +3,6 @@ import 'package:flutter/material.dart';
 import '../data/session_store.dart';
 import 'home_screen.dart';
 
-enum BushelRole { volunteer, coordinator }
-
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
 
@@ -31,6 +29,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   void _completeOnboarding() {
     if (_formKey.currentState?.validate() ?? false) {
       SessionStore.instance.userName = _nameController.text.trim();
+      SessionStore.instance.setRole(_role);
       setState(() => _step = 2);
     }
   }
@@ -314,6 +313,11 @@ class _ProfileStep extends StatelessWidget {
                       value: BushelRole.coordinator,
                       icon: Icon(Icons.groups_outlined),
                       label: Text('Coordinator'),
+                    ),
+                    ButtonSegment(
+                      value: BushelRole.kid,
+                      icon: Icon(Icons.child_care),
+                      label: Text('Kid'),
                     ),
                   ],
                   selected: {role},
