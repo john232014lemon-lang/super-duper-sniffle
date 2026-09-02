@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../screens/food_bank_map_screen.dart';
+import '../screens/check_in_screen.dart';
 import '../screens/shifts_screen.dart';
 
 class BushelNavigationBar extends StatelessWidget {
@@ -30,6 +31,12 @@ class BushelNavigationBar extends StatelessWidget {
       );
       return;
     }
+    if (index == 2) {
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute<void>(builder: (_) => const CheckInScreen()),
+      );
+      return;
+    }
     if (index == 3) {
       Navigator.of(context).pushReplacement(
         MaterialPageRoute<void>(builder: (_) => const ShiftsScreen()),
@@ -39,15 +46,7 @@ class BushelNavigationBar extends StatelessWidget {
 
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
-      ..showSnackBar(
-        SnackBar(
-          content: Text(
-            index == 2
-                ? 'QR check-in is coming soon.'
-                : 'Community is coming soon.',
-          ),
-        ),
-      );
+      ..showSnackBar(SnackBar(content: Text('Community is coming soon.')));
   }
 
   @override

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../data/mock_food_banks.dart';
 import 'food_bank_detail_screen.dart';
 import 'food_bank_map_screen.dart';
+import 'check_in_screen.dart';
 import '../widgets/bushel_navigation_bar.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -40,7 +41,13 @@ class _HomeScreenState extends State<HomeScreen> {
                     children: [
                       _HomeHeader(name: widget.name),
                       const SizedBox(height: 20),
-                      _NextShiftCard(onCheckIn: () => _comingSoon('Check-in')),
+                      _NextShiftCard(
+                        onCheckIn: () => Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) => const CheckInScreen(),
+                          ),
+                        ),
+                      ),
                       const SizedBox(height: 18),
                       const _ImpactStats(),
                       const SizedBox(height: 26),

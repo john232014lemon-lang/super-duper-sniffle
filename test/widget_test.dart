@@ -1,4 +1,6 @@
 import 'package:bushel/main.dart';
+import 'package:bushel/data/shift_store.dart';
+import 'package:bushel/screens/check_in_screen.dart';
 import 'package:bushel/screens/food_bank_map_screen.dart';
 import 'package:bushel/screens/shifts_screen.dart';
 import 'package:flutter/material.dart';
@@ -154,5 +156,33 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('About this food bank'), findsOneWidget);
     expect(find.byType(NavigationBar), findsOneWidget);
+  });
+
+  testWidgets('simulated QR check-in completes a shift and awards points', (
+    WidgetTester tester,
+  ) async {
+    final store = ShiftStore.instance;
+    final listing = store.available[1];
+    store.signUp(listing.foodBank, listing.shift);
+    final shiftBeingCheckedIn = store.myShifts.firstWhere(
+      (item) => !store.isCheckedIn(item.shift),
+    );
+
+    await tester.pumpWidget(const MaterialApp(home: CheckInScreen()));
+    await tester.drag(find.byType(ListView), const Offset(0, -320));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('simulate-scan')));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Station matched:'), findsOneWidget);
+    await tester.tap(find.text('Confirm station check-in'));
+    await tester.pumpAndSettle();
+    expect(find.text('Confirm check-in?'), findsOneWidget);
+    await tester.tap(find.text('Check in'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('You’re checked in!'), findsOneWidget);
+    expect(find.textContaining('earned 100 points'), findsOneWidget);
+    expect(store.isCheckedIn(shiftBeingCheckedIn.shift), isTrue);
+    expect(store.points, 100);
   });
 }

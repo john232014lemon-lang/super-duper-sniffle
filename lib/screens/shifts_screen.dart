@@ -105,6 +105,7 @@ class _ShiftsScreenState extends State<ShiftsScreen> {
                     child: _ScheduleCard(
                       listing: listing,
                       signedUp: _store.isSignedUp(listing.shift),
+                      checkedIn: _store.isCheckedIn(listing.shift),
                       showSignup: _tab == 0,
                       onSignup: () => _confirmSignup(listing),
                     ),
@@ -190,12 +191,14 @@ class _ScheduleCard extends StatelessWidget {
   const _ScheduleCard({
     required this.listing,
     required this.signedUp,
+    required this.checkedIn,
     required this.showSignup,
     required this.onSignup,
   });
 
   final ShiftListing listing;
   final bool signedUp;
+  final bool checkedIn;
   final bool showSignup;
   final VoidCallback onSignup;
 
@@ -262,7 +265,7 @@ class _ScheduleCard extends StatelessWidget {
                     borderRadius: BorderRadius.circular(999),
                   ),
                   child: Text(
-                    '${shift.spotsLeft} slots',
+                    checkedIn ? 'Complete' : '${shift.spotsLeft} slots',
                     style: const TextStyle(
                       color: Color(0xFF12813E),
                       fontSize: 11,

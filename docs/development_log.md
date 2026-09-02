@@ -19,7 +19,8 @@
 9. Local custom shift creation and sideways shift carousel - **Status: Complete**
 10. Available shift signup and My Shifts schedule - **Status: Complete**
 11. Mock map with tappable food bank markers - **Status: Complete**
-12. Full calendar, real map provider, QR check-in, rewards, Kid Mode, and coordinator dashboard - **Status: Not Started**
+12. Full calendar, real map provider, rewards, Kid Mode, and coordinator dashboard - **Status: Not Started**
+13. Simulated station QR check-in with points - **Status: Complete**
 
 ## Prompts Used
 
@@ -164,6 +165,16 @@
 **Result:** Removed the map-spanning leader lines and converted the colored key icons into live directional arrows.
 
 **Modifications:** Each icon calculates its direction from the key to the bank’s projected screen coordinate. The arrows rotate as the map moves, including pointing right when the food banks are off-screen to the right.
+
+### Feature: Slice 6 QR Check-in
+
+**Prompt:**
+
+> Work on slice 6
+
+**Result:** Added a mock station QR scanner flow for signed-up shifts. Users simulate a scan, verify the matched station, confirm check-in, mark the shift complete, and earn 100 local points.
+
+**Modifications:** Connected the persistent Scan navigation item and the home next-shift Check in button. Added an empty state for users without eligible shifts, duplicate check-in protection, a local points counter, completion status on the Shifts page, and widget-test coverage. Real camera scanning and production station IDs remain deferred.
 
 ## Challenges & Solutions
 

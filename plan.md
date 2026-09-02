@@ -79,7 +79,7 @@ Follow your loop for **each** row: plan → prompt → test → fix → commit.
 | 3 | Add shifts and sign up locally | Confirmed shifts appear on the My Shifts page |
 | 4 | Simple map of mock banks | Complete: mock pins open bank previews and details |
 | 5 | Onboarding + role (volunteer / coordinator / kid) | Choice persists in memory for the session |
-| 6 | QR check-in (camera or “simulate scan”) | Check-in marks shift done + adds points |
+| 6 | QR check-in (simulate scan) | Complete: check-in marks shift done and adds 100 points |
 | 7 | Rewards: points + 3 badges | Profile shows total and earned badges |
 | 8 | Kid Mode shell | Simplified home: next shift, check-in, sticker |
 | 9 | Coordinator dashboard | Assign a mock task; see progress update |

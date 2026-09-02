@@ -22,12 +22,17 @@ class ShiftStore extends ChangeNotifier {
 
   final List<ShiftListing> _available;
   final List<ShiftListing> _myShifts = [];
+  final Set<FoodBankShift> _completedShifts = {};
+  int _points = 0;
 
   List<ShiftListing> get available => List.unmodifiable(_available);
   List<ShiftListing> get myShifts => List.unmodifiable(_myShifts);
+  int get points => _points;
 
   bool isSignedUp(FoodBankShift shift) =>
       _myShifts.any((listing) => identical(listing.shift, shift));
+
+  bool isCheckedIn(FoodBankShift shift) => _completedShifts.contains(shift);
 
   void addAvailable(FoodBank bank, FoodBankShift shift) {
     _available.add(ShiftListing(foodBank: bank, shift: shift));
@@ -38,5 +43,13 @@ class ShiftStore extends ChangeNotifier {
     if (isSignedUp(shift)) return;
     _myShifts.add(ShiftListing(foodBank: bank, shift: shift));
     notifyListeners();
+  }
+
+  bool checkIn(FoodBankShift shift) {
+    if (!isSignedUp(shift) || isCheckedIn(shift)) return false;
+    _completedShifts.add(shift);
+    _points += 100;
+    notifyListeners();
+    return true;
   }
 }
