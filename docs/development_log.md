@@ -21,6 +21,7 @@
 11. Mock map with tappable food bank markers - **Status: Complete**
 12. Full calendar, real map provider, rewards, Kid Mode, and coordinator dashboard - **Status: Not Started**
 13. Simulated station QR check-in with points - **Status: Complete**
+14. Rewards progress with three point-based badges - **Status: Complete**
 
 ## Prompts Used
 
@@ -175,6 +176,28 @@
 **Result:** Added a mock station QR scanner flow for signed-up shifts. Users simulate a scan, verify the matched station, confirm check-in, mark the shift complete, and earn 100 local points.
 
 **Modifications:** Connected the persistent Scan navigation item and the home next-shift Check in button. Added an empty state for users without eligible shifts, duplicate check-in protection, a local points counter, completion status on the Shifts page, and widget-test coverage. Real camera scanning and production station IDs remain deferred.
+
+### Bug Fix: Home Navigation and Check-in Consistency
+
+**Prompt:**
+
+> Bug fixes: clicking on the home button does not send you to the home screen. the check in button from the home screen does not have simulate qr, is a separate screen than then clicking scan from navigation bar
+
+**Problem:** Primary navigation used replacement routes, which could remove the original Home route. The dashboard displayed a next shift even though the shared store initially had no signed-up shift, causing its check-in route to show an empty state.
+
+**Solution:** The Home destination now rebuilds a canonical Home screen using the session’s onboarding name and clears stale primary routes. The dashboard’s displayed next shift is seeded as an initial mock signup, so both the home Check in button and Scan navigation open the same eligible simulated QR flow.
+
+**Prompt used:** The bug-fix prompt above.
+
+### Feature: Slice 7 Rewards Badges
+
+**Prompt:**
+
+> begin work on slice 7, i want to implement badges harvesting hero 500 points, family feeder 2000 points, and material mover for 10000 points
+
+**Result:** Added a Rewards screen driven by the shared check-in points total, with Harvesting Hero at 500 points, Family Feeder at 2,000 points, and Material Mover at 10,000 points.
+
+**Modifications:** Replaced the Community navigation placeholder with Rewards. Added total points, next-badge progress, earned count, individual badge progress bars, locked and earned visual states, and live updates when points change.
 
 ## Challenges & Solutions
 

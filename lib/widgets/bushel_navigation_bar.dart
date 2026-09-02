@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 
+import '../data/session_store.dart';
 import '../screens/food_bank_map_screen.dart';
 import '../screens/check_in_screen.dart';
+import '../screens/home_screen.dart';
+import '../screens/rewards_screen.dart';
 import '../screens/shifts_screen.dart';
 
 class BushelNavigationBar extends StatelessWidget {
@@ -20,7 +23,12 @@ class BushelNavigationBar extends StatelessWidget {
       if (onHome != null) {
         onHome!();
       } else {
-        Navigator.of(context).popUntil((route) => route.isFirst);
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute<void>(
+            builder: (_) => HomeScreen(name: SessionStore.instance.userName),
+          ),
+          (route) => false,
+        );
       }
       return;
     }
@@ -43,10 +51,11 @@ class BushelNavigationBar extends StatelessWidget {
       );
       return;
     }
-
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text('Community is coming soon.')));
+    if (index == 4) {
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute<void>(builder: (_) => const RewardsScreen()),
+      );
+    }
   }
 
   @override
@@ -63,8 +72,8 @@ class BushelNavigationBar extends StatelessWidget {
           label: 'Shifts',
         ),
         NavigationDestination(
-          icon: Icon(Icons.favorite_outline),
-          label: 'Community',
+          icon: Icon(Icons.emoji_events_outlined),
+          label: 'Rewards',
         ),
       ],
     );

@@ -16,7 +16,10 @@ class ShiftStore extends ChangeNotifier {
         for (final bank in mockFoodBanks)
           for (final shift in bank.shifts)
             ShiftListing(foodBank: bank, shift: shift),
-      ];
+      ] {
+    // The home dashboard presents this as the user's next confirmed shift.
+    _myShifts.add(_available.first);
+  }
 
   static final ShiftStore instance = ShiftStore._();
 

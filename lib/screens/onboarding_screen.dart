@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../data/session_store.dart';
 import 'home_screen.dart';
 
 enum BushelRole { volunteer, coordinator }
@@ -29,6 +30,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   void _completeOnboarding() {
     if (_formKey.currentState?.validate() ?? false) {
+      SessionStore.instance.userName = _nameController.text.trim();
       setState(() => _step = 2);
     }
   }

@@ -80,7 +80,7 @@ Follow your loop for **each** row: plan → prompt → test → fix → commit.
 | 4 | Simple map of mock banks | Complete: mock pins open bank previews and details |
 | 5 | Onboarding + role (volunteer / coordinator / kid) | Choice persists in memory for the session |
 | 6 | QR check-in (simulate scan) | Complete: check-in marks shift done and adds 100 points |
-| 7 | Rewards: points + 3 badges | Profile shows total and earned badges |
+| 7 | Rewards: points + 3 badges | Complete: progress and earned badges reflect check-in points |
 | 8 | Kid Mode shell | Simplified home: next shift, check-in, sticker |
 | 9 | Coordinator dashboard | Assign a mock task; see progress update |
 | 10 | Family challenge + leaderboard | One challenge + ranked mock families |

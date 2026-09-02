@@ -1,12 +1,24 @@
 import 'package:bushel/main.dart';
 import 'package:bushel/data/shift_store.dart';
+import 'package:bushel/models/reward_badge.dart';
 import 'package:bushel/screens/check_in_screen.dart';
 import 'package:bushel/screens/food_bank_map_screen.dart';
+import 'package:bushel/screens/home_screen.dart';
+import 'package:bushel/screens/rewards_screen.dart';
 import 'package:bushel/screens/shifts_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test('reward badge thresholds unlock at the required points', () {
+    expect(rewardBadges[0].isUnlockedAt(499), isFalse);
+    expect(rewardBadges[0].isUnlockedAt(500), isTrue);
+    expect(rewardBadges[1].isUnlockedAt(1999), isFalse);
+    expect(rewardBadges[1].isUnlockedAt(2000), isTrue);
+    expect(rewardBadges[2].isUnlockedAt(9999), isFalse);
+    expect(rewardBadges[2].isUnlockedAt(10000), isTrue);
+  });
+
   testWidgets('completes volunteer onboarding', (WidgetTester tester) async {
     await tester.pumpWidget(const BushelApp());
 
@@ -124,6 +136,8 @@ void main() {
   ) async {
     await tester.pumpWidget(const MaterialApp(home: ShiftsScreen()));
 
+    await tester.drag(find.byType(ListView), const Offset(0, -300));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Sign up').first);
     await tester.pumpAndSettle();
     expect(find.text('Confirm this shift?'), findsOneWidget);
@@ -131,6 +145,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Shift added to My shifts.'), findsOneWidget);
+    await tester.drag(find.byType(ListView), const Offset(0, 300));
+    await tester.pumpAndSettle();
     await tester.tap(find.textContaining('My shifts').first);
     await tester.pumpAndSettle();
     expect(find.text('Your upcoming shifts'), findsOneWidget);
@@ -184,5 +200,47 @@ void main() {
     expect(find.textContaining('earned 100 points'), findsOneWidget);
     expect(store.isCheckedIn(shiftBeingCheckedIn.shift), isTrue);
     expect(store.points, 100);
+  });
+
+  testWidgets('persistent Home navigation rebuilds the home destination', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(const MaterialApp(home: ShiftsScreen()));
+    await tester.tap(find.text('Home'));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('home')), findsOneWidget);
+    expect(find.textContaining('Hi,'), findsOneWidget);
+  });
+
+  testWidgets('home check-in opens the same simulated scanner', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(const MaterialApp(home: HomeScreen(name: 'Sam')));
+    await tester.tap(find.text('Check in'));
+    await tester.pumpAndSettle();
+    await tester.drag(find.byType(ListView), const Offset(0, -320));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('simulate-scan')), findsOneWidget);
+    expect(find.byType(NavigationBar), findsOneWidget);
+  });
+
+  testWidgets('rewards screen shows points and all badge milestones', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(const MaterialApp(home: RewardsScreen()));
+
+    expect(find.text('Rewards'), findsWidgets);
+    expect(find.text('Harvesting Hero'), findsOneWidget);
+    expect(find.text('500 pts'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.text('Material Mover'),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(find.text('Family Feeder'), findsOneWidget);
+    expect(find.text('Material Mover'), findsOneWidget);
+    expect(find.text('10000 pts'), findsOneWidget);
   });
 }
