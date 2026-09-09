@@ -82,7 +82,7 @@ Follow your loop for **each** row: plan → prompt → test → fix → commit.
 | 6 | QR check-in (simulate scan) | Complete: check-in marks shift done and adds 100 points |
 | 7 | Rewards: points + 3 badges | Complete: progress and earned badges reflect check-in points |
 | 8 | Kid Mode | Complete: simplified home/check-in, profile role switcher, and 25 selectable badges |
-| 9 | Coordinator group management | Volunteer profiles include phone numbers; coordinators can vote to remove someone from the group |
+| 9 | Shift-based group management | Complete: three separate test accounts share one shift group; coordinators browse Groups and create shifts, volunteers/kids open groups from My Shifts, per-account votes require two-thirds, and removed members lose the shift |
 | 10 | Family challenge + leaderboard | One challenge + ranked mock families |
 
 **Explicitly later:** Firebase sync, real maps API keys at scale, real QR station IDs, push notifications, AI assistant.

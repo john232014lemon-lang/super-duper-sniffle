@@ -210,6 +210,46 @@
 
 **Modifications:** Added a shared Volunteer/Coordinator/Kid role to session state and a profile screen opened from the home avatar. The profile displays the featured Kid badge and switches app modes. Kid check-in uses simpler language and larger controls, then requires the child to choose one locked badge. Coordinator selection changes the home presentation while its full dashboard remains reserved for Slice 9.
 
+### Feature: Slice 9 Coordinator Group Management
+
+**Prompt:**
+
+> Build slice nine from plan.md
+
+**Result:** Added a coordinator dashboard with a mock volunteer group, phone numbers on member profiles, and a local vote-to-remove workflow.
+
+**Modifications:** Coordinator mode now exposes a Team destination and a dashboard shortcut on Home. Coordinators can open member profiles, review contact and participation details, submit one confirmed vote per member, see vote progress, and remove a member when the two-vote threshold is reached. All state remains local and mock-first.
+
+### Change: Group-wide Removal Voting
+
+**Prompt:**
+
+> Anyone can start and vote in a group kick if they votes 2/3 of the total or more
+
+**Result:** Opened group-removal voting to every member and replaced the fixed vote count with a dynamic two-thirds threshold.
+
+**Modifications:** Added group management access to every profile. Any member may initiate or join a vote, each local user can vote once per target, and the target is removed when the yes votes reach at least two-thirds of the current group size, rounded up.
+
+### Change: Shift-based Group Workflow and Mock Accounts
+
+**Prompt:**
+
+> we need to fix the workflow of groups. for each 'profile' add a fake user so that we can test. coordinator will be sir johnny john jimmy, kid will be lil jimbo, and volunteer will be jimmerson jimmies. coordinator will have one group with all 3 of them inside. groups are connected to shifts, a group is simply everyone signed up for a shift. make it so each account has one shift, which is this group of them 3. coordinators have all their groups in a 'groups' tab which you have already set up. kids and volunteers can their group by clicking on their shifts from the shift tab -> my shifts
+
+**Result:** Reworked groups to represent the people signed up for a specific shift and added a distinct mock account for each app role.
+
+**Modifications:** Coordinator Sir Johnny John Jimmy, kid Lil Jimbo, and volunteer Jimmerson Jimmies now share the same seeded Sorting & Packing shift and group. Coordinator mode lists the group in Groups. Volunteer and Kid Mode open it by selecting the shift under My Shifts. The group contains all three profiles, phone numbers, and the existing two-thirds removal voting flow.
+
+### Change: Separate Test Accounts and Group Permissions
+
+**Prompt:**
+
+> ensure all 3 accounts are separate testing accounts with different voting capabilities. make it so the app opens up at home not the signin page since we are using these 3 testing accounts currently. once someone is removed they can no longer see that under 'my shifts'. ensure coordinators are only ones able to make new shifts on the food bank pages.
+
+**Result:** Converted the three role profiles into separate in-memory test accounts and made account membership and permissions affect the app workflow.
+
+**Modifications:** The app now opens directly on the active test account’s Home screen. Shifts, check-ins, points, and removal votes are tracked per account. Each account casts its own vote and cannot vote twice or vote for itself. Removed members lose access to the shared shift under My Shifts. Only the coordinator account sees the Add shift action on food-bank pages.
+
 ## Challenges & Solutions
 
 ### Challenge 1: Flutter SDK Cache Lock

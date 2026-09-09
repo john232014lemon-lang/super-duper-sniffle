@@ -1,17 +1,31 @@
 import 'package:bushel/main.dart';
 import 'package:bushel/data/shift_store.dart';
 import 'package:bushel/data/session_store.dart';
+import 'package:bushel/data/coordinator_store.dart';
 import 'package:bushel/models/kid_badge.dart';
 import 'package:bushel/models/reward_badge.dart';
 import 'package:bushel/screens/check_in_screen.dart';
+import 'package:bushel/screens/coordinator_screen.dart';
 import 'package:bushel/screens/food_bank_map_screen.dart';
 import 'package:bushel/screens/home_screen.dart';
+import 'package:bushel/screens/onboarding_screen.dart';
 import 'package:bushel/screens/rewards_screen.dart';
 import 'package:bushel/screens/shifts_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  testWidgets('app starts on the active testing account home', (
+    WidgetTester tester,
+  ) async {
+    SessionStore.instance.setRole(BushelRole.volunteer);
+    await tester.pumpWidget(const BushelApp());
+
+    expect(find.byKey(const ValueKey('home')), findsOneWidget);
+    expect(find.textContaining('Jimmerson Jimmies'), findsOneWidget);
+    expect(find.text('Get started'), findsNothing);
+  });
+
   test('Kid Mode provides exactly 25 unique badges', () {
     expect(kidBadges, hasLength(25));
     expect(kidBadges.map((badge) => badge.id).toSet(), hasLength(25));
@@ -29,8 +43,18 @@ void main() {
     expect(rewardBadges[2].isUnlockedAt(10000), isTrue);
   });
 
+  test('each role uses its mock account profile', () {
+    final session = SessionStore.instance;
+    session.setRole(BushelRole.coordinator);
+    expect(session.userName, 'Sir Johnny John Jimmy');
+    session.setRole(BushelRole.kid);
+    expect(session.userName, 'Lil Jimbo');
+    session.setRole(BushelRole.volunteer);
+    expect(session.userName, 'Jimmerson Jimmies');
+  });
+
   testWidgets('completes volunteer onboarding', (WidgetTester tester) async {
-    await tester.pumpWidget(const BushelApp());
+    await tester.pumpWidget(const MaterialApp(home: OnboardingScreen()));
 
     expect(find.text('One app for\nevery food bank.'), findsOneWidget);
     expect(find.text('The community food bank network'), findsOneWidget);
@@ -45,7 +69,7 @@ void main() {
     await tester.tap(find.text('Finish setup'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Hi, Sam 🌱'), findsOneWidget);
+    expect(find.text('Hi, Jimmerson Jimmies 🌱'), findsOneWidget);
     expect(find.text('Sorting & Packing Line'), findsOneWidget);
     expect(find.text('Food banks near you'), findsOneWidget);
   });
@@ -53,16 +77,12 @@ void main() {
   testWidgets('opens a food bank detail with shifts and recommendations', (
     WidgetTester tester,
   ) async {
+    SessionStore.instance.setRole(BushelRole.volunteer);
     await tester.pumpWidget(const BushelApp());
-    await tester.ensureVisible(find.text('Get started'));
-    await tester.tap(find.text('Get started'));
-    await tester.pumpAndSettle();
-    await tester.enterText(find.byType(EditableText), 'Sam');
-    await tester.ensureVisible(find.text('Finish setup'));
-    await tester.tap(find.text('Finish setup'));
-    await tester.pumpAndSettle();
 
     await tester.drag(find.byType(CustomScrollView), const Offset(0, -220));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Second Harvest'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Second Harvest'));
     await tester.pumpAndSettle();
@@ -74,6 +94,7 @@ void main() {
       scrollable: find.byType(Scrollable).first,
     );
     expect(find.text('Upcoming shifts'), findsOneWidget);
+    expect(find.text('Add shift'), findsNothing);
     expect(find.text('Sorting & Packing Line'), findsOneWidget);
     await tester.scrollUntilVisible(
       find.text('Recommended food banks'),
@@ -89,7 +110,7 @@ void main() {
   });
 
   testWidgets('requires a name', (WidgetTester tester) async {
-    await tester.pumpWidget(const BushelApp());
+    await tester.pumpWidget(const MaterialApp(home: OnboardingScreen()));
     await tester.ensureVisible(find.text('Get started'));
     await tester.tap(find.text('Get started'));
     await tester.pumpAndSettle();
@@ -103,15 +124,11 @@ void main() {
   testWidgets('adds a custom shift to the sideways shift list', (
     WidgetTester tester,
   ) async {
+    SessionStore.instance.setRole(BushelRole.coordinator);
     await tester.pumpWidget(const BushelApp());
-    await tester.ensureVisible(find.text('Get started'));
-    await tester.tap(find.text('Get started'));
-    await tester.pumpAndSettle();
-    await tester.enterText(find.byType(EditableText), 'Sam');
-    await tester.ensureVisible(find.text('Finish setup'));
-    await tester.tap(find.text('Finish setup'));
-    await tester.pumpAndSettle();
     await tester.drag(find.byType(CustomScrollView), const Offset(0, -220));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Second Harvest'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Second Harvest'));
     await tester.pumpAndSettle();
@@ -144,7 +161,9 @@ void main() {
   testWidgets('confirms signup and adds the shift to My shifts', (
     WidgetTester tester,
   ) async {
-    await tester.pumpWidget(const MaterialApp(home: ShiftsScreen()));
+    await tester.pumpWidget(
+      MaterialApp(key: UniqueKey(), home: const ShiftsScreen()),
+    );
 
     await tester.drag(find.byType(ListView), const Offset(0, -300));
     await tester.pumpAndSettle();
@@ -264,6 +283,8 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Choose your experience'), findsOneWidget);
     await tester.tap(find.text('Kid'));
+    await tester.ensureVisible(find.text('Use this mode'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Use this mode'));
     await tester.pumpAndSettle();
 
@@ -286,5 +307,76 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.textContaining('Donkey Badge'), findsOneWidget);
     expect(SessionStore.instance.unlockedKidBadges, contains('donkey'));
+  });
+
+  testWidgets('coordinator opens a shift group with all three profiles', (
+    WidgetTester tester,
+  ) async {
+    SessionStore.instance.setRole(BushelRole.coordinator);
+    expect(CoordinatorStore.instance.members, hasLength(3));
+    expect(CoordinatorStore.instance.votesNeeded, 2);
+    await tester.pumpWidget(const MaterialApp(home: CoordinatorScreen()));
+
+    expect(find.text('Your shift groups'), findsOneWidget);
+    expect(find.textContaining('3 members'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('open-shift-group')));
+    await tester.pumpAndSettle();
+    expect(find.text('Sir Johnny John Jimmy'), findsOneWidget);
+    expect(find.text('Lil Jimbo'), findsOneWidget);
+    expect(find.text('Jimmerson Jimmies'), findsOneWidget);
+    await tester.ensureVisible(find.byTooltip('View Lil Jimbo profile'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('View Lil Jimbo profile'));
+    await tester.pumpAndSettle();
+    expect(find.text('Phone number'), findsOneWidget);
+    expect(find.text('(832) 555-0188'), findsWidgets);
+    Navigator.of(tester.element(find.text('Phone number'))).pop();
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(find.byKey(const ValueKey('vote-jimbo')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('vote-jimbo')));
+    await tester.pumpAndSettle();
+    expect(find.text('Vote to remove member?'), findsOneWidget);
+    await tester.tap(find.text('Submit vote'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Lil Jimbo'), findsOneWidget);
+    SessionStore.instance.setRole(BushelRole.volunteer);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('vote-jimbo')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Submit vote'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Lil Jimbo'), findsNothing);
+    expect(
+      find.textContaining('was removed from the shift group'),
+      findsOneWidget,
+    );
+
+    SessionStore.instance.setRole(BushelRole.kid);
+    await tester.pumpWidget(
+      MaterialApp(key: UniqueKey(), home: const ShiftsScreen()),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.textContaining('My shifts').first);
+    await tester.pumpAndSettle();
+    expect(find.text('No shifts yet'), findsOneWidget);
+  });
+
+  testWidgets('volunteer opens their group from My shifts', (
+    WidgetTester tester,
+  ) async {
+    SessionStore.instance.setRole(BushelRole.volunteer);
+    await tester.pumpWidget(const MaterialApp(home: ShiftsScreen()));
+
+    await tester.tap(find.textContaining('My shifts').first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('open-my-shift-group')).first);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Shift group'), findsWidgets);
+    expect(find.text('Everyone signed up for this shift'), findsOneWidget);
   });
 }

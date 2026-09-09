@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 
 import '../data/shift_store.dart';
+import '../data/coordinator_store.dart';
 import '../widgets/bushel_navigation_bar.dart';
+import 'coordinator_screen.dart';
 
 class ShiftsScreen extends StatefulWidget {
   const ShiftsScreen({super.key});
@@ -18,11 +20,13 @@ class _ShiftsScreenState extends State<ShiftsScreen> {
   void initState() {
     super.initState();
     _store.addListener(_refresh);
+    CoordinatorStore.instance.addListener(_refresh);
   }
 
   @override
   void dispose() {
     _store.removeListener(_refresh);
+    CoordinatorStore.instance.removeListener(_refresh);
     super.dispose();
   }
 
@@ -108,6 +112,13 @@ class _ShiftsScreenState extends State<ShiftsScreen> {
                       checkedIn: _store.isCheckedIn(listing.shift),
                       showSignup: _tab == 0,
                       onSignup: () => _confirmSignup(listing),
+                      onOpenGroup: _tab == 1
+                          ? () => Navigator.of(context).push(
+                              MaterialPageRoute<void>(
+                                builder: (_) => const GroupDetailScreen(),
+                              ),
+                            )
+                          : null,
                     ),
                   ),
                 ),
@@ -194,6 +205,7 @@ class _ScheduleCard extends StatelessWidget {
     required this.checkedIn,
     required this.showSignup,
     required this.onSignup,
+    this.onOpenGroup,
   });
 
   final ShiftListing listing;
@@ -201,94 +213,100 @@ class _ScheduleCard extends StatelessWidget {
   final bool checkedIn;
   final bool showSignup;
   final VoidCallback onSignup;
+  final VoidCallback? onOpenGroup;
 
   @override
   Widget build(BuildContext context) {
     final shift = listing.shift;
     return Card(
       margin: EdgeInsets.zero,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                SizedBox(
-                  width: 70,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        shift.time.split('–').first,
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w900,
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        key: onOpenGroup == null ? null : const ValueKey('open-my-shift-group'),
+        onTap: onOpenGroup,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SizedBox(
+                    width: 70,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          shift.time.split('–').first,
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w900,
+                          ),
                         ),
-                      ),
-                      Text(
-                        shift.date,
-                        style: const TextStyle(
-                          color: Color(0xFF718078),
-                          fontSize: 11,
+                        Text(
+                          shift.date,
+                          style: const TextStyle(
+                            color: Color(0xFF718078),
+                            fontSize: 11,
+                          ),
                         ),
-                      ),
-                    ],
-                  ),
-                ),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        shift.title,
-                        style: const TextStyle(fontWeight: FontWeight.w900),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        '${listing.foodBank.shortName} · ${shift.station}',
-                        style: const TextStyle(
-                          color: Color(0xFF718078),
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 6,
-                  ),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFE7F7EC),
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                  child: Text(
-                    checkedIn ? 'Complete' : '${shift.spotsLeft} slots',
-                    style: const TextStyle(
-                      color: Color(0xFF12813E),
-                      fontSize: 11,
-                      fontWeight: FontWeight.w900,
+                      ],
                     ),
+                  ),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          shift.title,
+                          style: const TextStyle(fontWeight: FontWeight.w900),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '${listing.foodBank.shortName} · ${shift.station}',
+                          style: const TextStyle(
+                            color: Color(0xFF718078),
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE7F7EC),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Text(
+                      checkedIn ? 'Complete' : '${shift.spotsLeft} slots',
+                      style: const TextStyle(
+                        color: Color(0xFF12813E),
+                        fontSize: 11,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              if (showSignup) ...[
+                const Divider(height: 24),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: FilledButton(
+                    onPressed: signedUp ? null : onSignup,
+                    style: FilledButton.styleFrom(
+                      minimumSize: const Size(110, 44),
+                    ),
+                    child: Text(signedUp ? 'Signed up' : 'Sign up'),
                   ),
                 ),
               ],
-            ),
-            if (showSignup) ...[
-              const Divider(height: 24),
-              Align(
-                alignment: Alignment.centerRight,
-                child: FilledButton(
-                  onPressed: signedUp ? null : onSignup,
-                  style: FilledButton.styleFrom(
-                    minimumSize: const Size(110, 44),
-                  ),
-                  child: Text(signedUp ? 'Signed up' : 'Sign up'),
-                ),
-              ),
             ],
-          ],
+          ),
         ),
       ),
     );

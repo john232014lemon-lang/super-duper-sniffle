@@ -28,7 +28,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   void _completeOnboarding() {
     if (_formKey.currentState?.validate() ?? false) {
-      SessionStore.instance.userName = _nameController.text.trim();
       SessionStore.instance.setRole(_role);
       setState(() => _step = 2);
     }
@@ -53,7 +52,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               onBack: () => setState(() => _step = 0),
               onContinue: _completeOnboarding,
             ),
-            _ => HomeScreen(name: _nameController.text.trim()),
+            _ => HomeScreen(name: SessionStore.instance.userName),
           },
         ),
       ),

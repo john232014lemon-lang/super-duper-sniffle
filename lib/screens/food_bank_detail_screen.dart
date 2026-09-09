@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../data/mock_food_banks.dart';
 import '../data/shift_store.dart';
+import '../data/session_store.dart';
 import '../models/food_bank.dart';
 import '../widgets/bushel_navigation_bar.dart';
 
@@ -80,15 +81,16 @@ class _FoodBankDetailScreenState extends State<FoodBankDetailScreen> {
                       ),
                     ),
                   ),
-                  FilledButton.icon(
-                    onPressed: _addShift,
-                    style: FilledButton.styleFrom(
-                      minimumSize: const Size(0, 44),
-                      padding: const EdgeInsets.symmetric(horizontal: 14),
+                  if (SessionStore.instance.role == BushelRole.coordinator)
+                    FilledButton.icon(
+                      onPressed: _addShift,
+                      style: FilledButton.styleFrom(
+                        minimumSize: const Size(0, 44),
+                        padding: const EdgeInsets.symmetric(horizontal: 14),
+                      ),
+                      icon: const Icon(Icons.add, size: 18),
+                      label: const Text('Add shift'),
                     ),
-                    icon: const Icon(Icons.add, size: 18),
-                    label: const Text('Add shift'),
-                  ),
                 ],
               ),
               const SizedBox(height: 12),

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../data/session_store.dart';
 import '../screens/food_bank_map_screen.dart';
 import '../screens/check_in_screen.dart';
+import '../screens/coordinator_screen.dart';
 import '../screens/home_screen.dart';
 import '../screens/kid_badges_screen.dart';
 import '../screens/rewards_screen.dart';
@@ -55,9 +56,11 @@ class BushelNavigationBar extends StatelessWidget {
     if (index == 4) {
       Navigator.of(context).pushReplacement(
         MaterialPageRoute<void>(
-          builder: (_) => SessionStore.instance.role == BushelRole.kid
-              ? const KidBadgesScreen()
-              : const RewardsScreen(),
+          builder: (_) => switch (SessionStore.instance.role) {
+            BushelRole.kid => const KidBadgesScreen(),
+            BushelRole.coordinator => const CoordinatorScreen(),
+            BushelRole.volunteer => const RewardsScreen(),
+          },
         ),
       );
     }
@@ -68,17 +71,22 @@ class BushelNavigationBar extends StatelessWidget {
     if (SessionStore.instance.role == BushelRole.kid) {
       final kidIndex = switch (selectedIndex) {
         2 => 1,
-        4 => 2,
+        3 => 2,
+        4 => 3,
         _ => 0,
       };
       return NavigationBar(
         selectedIndex: kidIndex,
-        onDestinationSelected: (index) => _select(context, [0, 2, 4][index]),
+        onDestinationSelected: (index) => _select(context, [0, 2, 3, 4][index]),
         destinations: const [
           NavigationDestination(icon: Icon(Icons.home_rounded), label: 'Home'),
           NavigationDestination(
             icon: Icon(Icons.qr_code_scanner),
             label: 'Check in',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.calendar_month_outlined),
+            label: 'Shifts',
           ),
           NavigationDestination(
             icon: Icon(Icons.workspace_premium),
@@ -87,20 +95,32 @@ class BushelNavigationBar extends StatelessWidget {
         ],
       );
     }
+    final coordinator = SessionStore.instance.role == BushelRole.coordinator;
     return NavigationBar(
       selectedIndex: selectedIndex,
       onDestinationSelected: (index) => _select(context, index),
-      destinations: const [
-        NavigationDestination(icon: Icon(Icons.home_rounded), label: 'Home'),
-        NavigationDestination(icon: Icon(Icons.map_outlined), label: 'Banks'),
-        NavigationDestination(icon: Icon(Icons.qr_code_scanner), label: 'Scan'),
-        NavigationDestination(
+      destinations: [
+        const NavigationDestination(
+          icon: Icon(Icons.home_rounded),
+          label: 'Home',
+        ),
+        const NavigationDestination(
+          icon: Icon(Icons.map_outlined),
+          label: 'Banks',
+        ),
+        const NavigationDestination(
+          icon: Icon(Icons.qr_code_scanner),
+          label: 'Scan',
+        ),
+        const NavigationDestination(
           icon: Icon(Icons.calendar_month_outlined),
           label: 'Shifts',
         ),
         NavigationDestination(
-          icon: Icon(Icons.emoji_events_outlined),
-          label: 'Rewards',
+          icon: Icon(
+            coordinator ? Icons.groups_outlined : Icons.emoji_events_outlined,
+          ),
+          label: coordinator ? 'Groups' : 'Rewards',
         ),
       ],
     );

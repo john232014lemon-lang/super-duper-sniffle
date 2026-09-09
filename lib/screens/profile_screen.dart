@@ -64,6 +64,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 textAlign: TextAlign.center,
                 style: const TextStyle(color: Color(0xFF718078)),
               ),
+              const SizedBox(height: 6),
+              Text(
+                _session.phoneNumber,
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontWeight: FontWeight.w700),
+              ),
               const SizedBox(height: 32),
               const Text(
                 'Choose your experience',

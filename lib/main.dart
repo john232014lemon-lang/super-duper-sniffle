@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
-import 'screens/onboarding_screen.dart';
+import 'data/session_store.dart';
+import 'screens/home_screen.dart';
 
 void main() {
   runApp(const BushelApp());
@@ -61,7 +62,7 @@ class BushelApp extends StatelessWidget {
           ),
         ),
       ),
-      home: const OnboardingScreen(),
+      home: HomeScreen(name: SessionStore.instance.userName),
     );
   }
 }

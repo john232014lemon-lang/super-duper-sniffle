@@ -6,6 +6,7 @@ import '../models/kid_badge.dart';
 import 'food_bank_detail_screen.dart';
 import 'food_bank_map_screen.dart';
 import 'check_in_screen.dart';
+import 'coordinator_screen.dart';
 import 'profile_screen.dart';
 import '../widgets/bushel_navigation_bar.dart';
 
@@ -72,7 +73,13 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                       if (_session.role == BushelRole.coordinator) ...[
                         const SizedBox(height: 14),
-                        const _CoordinatorNotice(),
+                        _CoordinatorNotice(
+                          onTap: () => Navigator.of(context).push(
+                            MaterialPageRoute<void>(
+                              builder: (_) => const CoordinatorScreen(),
+                            ),
+                          ),
+                        ),
                       ],
                       const SizedBox(height: 20),
                       _NextShiftCard(onCheckIn: _openCheckIn),
@@ -274,19 +281,23 @@ class _HomeHeader extends StatelessWidget {
 }
 
 class _CoordinatorNotice extends StatelessWidget {
-  const _CoordinatorNotice();
+  const _CoordinatorNotice({required this.onTap});
+
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return const Card(
+    return Card(
       color: Color(0xFFE8F3FF),
       child: ListTile(
-        leading: Icon(Icons.groups, color: Color(0xFF287EB5)),
-        title: Text(
+        onTap: onTap,
+        leading: const Icon(Icons.groups, color: Color(0xFF287EB5)),
+        title: const Text(
           'Coordinator mode',
           style: TextStyle(fontWeight: FontWeight.w900),
         ),
-        subtitle: Text('The full coordinator dashboard arrives in Slice 9.'),
+        subtitle: const Text('Manage volunteer profiles and removal votes.'),
+        trailing: const Icon(Icons.arrow_forward),
       ),
     );
   }
