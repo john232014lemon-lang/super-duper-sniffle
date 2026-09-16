@@ -9,7 +9,7 @@ todos:
     content: Replace counter with mock food bank Discover list (3-5 banks)
     status: completed
   - id: later-slices
-    content: After first commit, continue slices 2-10 one feature at a time (detail, signup, map, onboarding, QR, rewards, Kid Mode, coordinator, leaderboard)
+    content: Continue slices 2-11 one feature at a time (detail, signup, map, onboarding, rewards, Kid Mode, groups, family accounts, and coordinator-managed QR attendance)
     status: pending
 isProject: false
 ---
@@ -82,10 +82,22 @@ Follow your loop for **each** row: plan → prompt → test → fix → commit.
 | 6 | QR check-in (simulate scan) | Complete: check-in marks shift done and adds 100 points |
 | 7 | Rewards: points + 3 badges | Complete: progress and earned badges reflect check-in points |
 | 8 | Kid Mode | Complete: simplified home/check-in, profile role switcher, and 25 selectable badges |
-| 9 | Shift-based group management | Complete: three separate test accounts share one shift group; coordinators browse Groups and create shifts, volunteers/kids open groups from My Shifts, per-account votes require two-thirds, and removed members lose the shift |
+| 9 | Shift-based group management | Complete: each shift creates a group for its signed-up accounts; coordinators browse Groups and create shifts, volunteers/kids open groups from My Shifts, removal needs a two-thirds vote, and removed members lose the shift |
 | 10 | Family Center + parent-managed Kid Mode | Complete: Volunteer/Coordinator signup supports family accounts, parents create and switch to kid accounts, and kids see three family challenges |
+| 11 | Per-shift QR attendance | Coordinators generate a unique mock QR code for an individual shift they lead; signed-up participants select that shift in Scan, view its generated code, and check in provisionally before coordinator confirmation |
 
-**Explicitly later:** Firebase sync, real maps API keys at scale, real QR station IDs, push notifications, AI assistant.
+### Slice 11 attendance workflow
+
+1. A shift identifies its coordinator/leader.
+2. Only that leader can generate the shift's QR code, and the generated code is tied to that individual shift rather than being a reusable account or food-bank code.
+3. The generated mock QR is stored in shared in-memory state so other signed-up users can access it from the Scan tab.
+4. In Scan, a volunteer, parent, or kid chooses one of their eligible shifts and sees that shift's generated QR code.
+5. For this slice, tapping a simulated scan/check-in action uses the displayed code; camera access and physical QR scanning are deferred.
+6. A successful simulated scan immediately marks that account as **Checked in — awaiting confirmation** for that shift only.
+7. The shift coordinator reviews everyone who checked in and confirms who is present.
+8. Confirmed attendees receive completed-shift credit and rewards; unconfirmed scans do not.
+
+**Explicitly later:** camera-based QR scanning, Firebase sync, real maps API keys at scale, production-secure QR tokens, push notifications, AI assistant.
 
 ## Build pattern (every feature)
 
