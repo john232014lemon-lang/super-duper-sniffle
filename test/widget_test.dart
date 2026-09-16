@@ -214,33 +214,55 @@ void main() {
     expect(find.byType(NavigationBar), findsOneWidget);
   });
 
-  testWidgets('simulated QR check-in completes a shift and awards points', (
-    WidgetTester tester,
-  ) async {
-    final store = ShiftStore.instance;
-    final listing = store.available[1];
-    store.signUp(listing.foodBank, listing.shift);
-    final shiftBeingCheckedIn = store.myShifts.firstWhere(
-      (item) => !store.isCheckedIn(item.shift),
-    );
+  testWidgets(
+    'shift QR creates provisional check-in until coordinator confirms',
+    (WidgetTester tester) async {
+      final store = ShiftStore.instance;
+      final session = SessionStore.instance;
+      final listing = store.available.first;
+      session.configureParent(
+        name: 'Morgan',
+        role: BushelRole.coordinator,
+        family: false,
+      );
+      expect(store.generateQrCode(listing.shift), isNotNull);
+      session.configureParent(
+        name: 'Morgan',
+        role: BushelRole.volunteer,
+        family: false,
+      );
 
-    await tester.pumpWidget(const MaterialApp(home: CheckInScreen()));
-    await tester.drag(find.byType(ListView), const Offset(0, -320));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('simulate-scan')));
-    await tester.pumpAndSettle();
-    expect(find.textContaining('Station matched:'), findsOneWidget);
-    await tester.tap(find.text('Confirm station check-in'));
-    await tester.pumpAndSettle();
-    expect(find.text('Confirm check-in?'), findsOneWidget);
-    await tester.tap(find.widgetWithText(FilledButton, 'Check in'));
-    await tester.pumpAndSettle();
+      await tester.pumpWidget(const MaterialApp(home: CheckInScreen()));
+      await tester.drag(find.byType(ListView), const Offset(0, -320));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('simulate-scan')));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('Shift matched:'), findsOneWidget);
+      await tester.tap(find.text('Confirm station check-in'));
+      await tester.pumpAndSettle();
+      expect(find.text('Confirm check-in?'), findsOneWidget);
+      await tester.tap(find.widgetWithText(FilledButton, 'Check in'));
+      await tester.pumpAndSettle();
 
-    expect(find.text('You’re checked in!'), findsOneWidget);
-    expect(find.textContaining('earned 100 points'), findsOneWidget);
-    expect(store.isCheckedIn(shiftBeingCheckedIn.shift), isTrue);
-    expect(store.points, 100);
-  });
+      expect(find.text('Check-in sent!'), findsOneWidget);
+      expect(store.isAwaitingConfirmation(listing.shift), isTrue);
+      expect(store.isCheckedIn(listing.shift), isFalse);
+      expect(store.points, 0);
+      await tester.tap(find.text('Done'));
+      await tester.pumpAndSettle();
+
+      session.setRole(BushelRole.coordinator);
+      await tester.pumpWidget(
+        MaterialApp(key: UniqueKey(), home: const GroupDetailScreen()),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Morgan'), findsWidgets);
+      await tester.tap(find.byKey(const ValueKey('confirm-parent')));
+      await tester.pumpAndSettle();
+      expect(store.isCheckedIn(listing.shift), isTrue);
+      expect(store.points, 100);
+    },
+  );
 
   testWidgets('persistent Home navigation rebuilds the home destination', (
     WidgetTester tester,
@@ -284,7 +306,7 @@ void main() {
     expect(find.text('10000 pts'), findsOneWidget);
   });
 
-  testWidgets('parent-created kid can check in and unlock a badge', (
+  testWidgets('parent-created kid can submit a provisional check-in', (
     WidgetTester tester,
   ) async {
     final session = SessionStore.instance;
@@ -312,11 +334,11 @@ void main() {
     await tester.tap(find.widgetWithText(FilledButton, 'Check in'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Pick a new badge! 🎉'), findsOneWidget);
-    await tester.tap(find.byKey(const ValueKey('choose-donkey')));
-    await tester.pumpAndSettle();
-    expect(find.textContaining('Donkey Badge'), findsOneWidget);
-    expect(SessionStore.instance.unlockedKidBadges, contains('donkey'));
+    expect(find.text('Check-in sent!'), findsOneWidget);
+    expect(
+      find.textContaining('awaiting coordinator confirmation'),
+      findsOneWidget,
+    );
   });
 
   testWidgets('family center creates kid accounts and shows challenges', (
@@ -362,6 +384,11 @@ void main() {
     expect(find.text('Your shift groups'), findsOneWidget);
     await tester.tap(find.byKey(const ValueKey('open-shift-group')));
     await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.text('Casey'),
+      250,
+      scrollable: find.byType(Scrollable).first,
+    );
     expect(find.text('Casey'), findsOneWidget);
     expect(find.text('Sir Johnny John Jimmy'), findsNothing);
     expect(find.text('Lil Jimbo'), findsNothing);

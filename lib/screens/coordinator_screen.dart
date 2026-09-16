@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 
 import '../data/coordinator_store.dart';
 import '../data/session_store.dart';
+import '../data/shift_store.dart';
 import '../models/group_member.dart';
 import '../widgets/bushel_navigation_bar.dart';
+import '../widgets/mock_qr_code.dart';
 
 class CoordinatorScreen extends StatelessWidget {
   const CoordinatorScreen({super.key});
@@ -102,12 +104,14 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
   void initState() {
     super.initState();
     _store.addListener(_refresh);
+    ShiftStore.instance.addListener(_refresh);
     SessionStore.instance.addListener(_refresh);
   }
 
   @override
   void dispose() {
     _store.removeListener(_refresh);
+    ShiftStore.instance.removeListener(_refresh);
     SessionStore.instance.removeListener(_refresh);
     super.dispose();
   }
@@ -193,6 +197,10 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
   @override
   Widget build(BuildContext context) {
     final group = CoordinatorStore.sharedShiftGroup;
+    final shiftStore = ShiftStore.instance;
+    final shift = shiftStore.available.first.shift;
+    final qrCode = shiftStore.qrCodeFor(shift);
+    final pending = shiftStore.pendingAttendance(shift);
     return Scaffold(
       appBar: AppBar(title: const Text('Shift group')),
       body: Center(
@@ -210,6 +218,79 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
               ),
               Text('${group.foodBankName} · ${group.date} · ${group.time}'),
               const SizedBox(height: 18),
+              if (shiftStore.canManageShift(shift)) ...[
+                Card(
+                  color: const Color(0xFFE8F7ED),
+                  child: Padding(
+                    padding: const EdgeInsets.all(18),
+                    child: Column(
+                      children: [
+                        const Text(
+                          'Shift check-in QR',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        if (qrCode == null)
+                          FilledButton.icon(
+                            key: const ValueKey('generate-shift-qr'),
+                            onPressed: () => shiftStore.generateQrCode(shift),
+                            icon: const Icon(Icons.qr_code_2),
+                            label: const Text('Generate QR for this shift'),
+                          )
+                        else ...[
+                          MockQrCode(value: qrCode, size: 160),
+                          const SizedBox(height: 8),
+                          const Text(
+                            'This code works only for this shift.',
+                            style: TextStyle(fontWeight: FontWeight.w700),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 18),
+                Row(
+                  children: [
+                    const Expanded(
+                      child: Text(
+                        'Awaiting confirmation',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
+                    Chip(label: Text('${pending.length}')),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                if (pending.isEmpty)
+                  const Text('No one is waiting for attendance confirmation.')
+                else
+                  for (final record in pending)
+                    Card(
+                      child: ListTile(
+                        leading: const Icon(Icons.person_pin_circle_outlined),
+                        title: Text(record.name),
+                        subtitle: const Text(
+                          'Checked in · awaiting confirmation',
+                        ),
+                        trailing: FilledButton(
+                          key: ValueKey('confirm-${record.accountId}'),
+                          onPressed: () => shiftStore.confirmAttendance(
+                            shift,
+                            record.accountId,
+                          ),
+                          child: const Text('Confirm'),
+                        ),
+                      ),
+                    ),
+                const SizedBox(height: 22),
+              ],
               const Text(
                 'Everyone signed up for this shift',
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),

@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../data/shift_store.dart';
 import '../data/session_store.dart';
-import '../models/kid_badge.dart';
 import '../widgets/bushel_navigation_bar.dart';
+import '../widgets/mock_qr_code.dart';
 import 'shifts_screen.dart';
 
 class CheckInScreen extends StatefulWidget {
@@ -19,7 +19,11 @@ class _CheckInScreenState extends State<CheckInScreen> {
   bool _scanned = false;
 
   List<ShiftListing> get _eligibleShifts => _store.myShifts
-      .where((listing) => !_store.isCheckedIn(listing.shift))
+      .where(
+        (listing) =>
+            !_store.isCheckedIn(listing.shift) &&
+            !_store.isAwaitingConfirmation(listing.shift),
+      )
       .toList();
 
   @override
@@ -40,7 +44,10 @@ class _CheckInScreenState extends State<CheckInScreen> {
   }
 
   void _simulateScan() {
-    if (_selectedShift == null) return;
+    if (_selectedShift == null ||
+        _store.qrCodeFor(_selectedShift!.shift) == null) {
+      return;
+    }
     setState(() => _scanned = true);
   }
 
@@ -68,11 +75,8 @@ class _CheckInScreenState extends State<CheckInScreen> {
     );
     if (confirmed != true) return;
 
-    _store.checkIn(listing.shift);
-    KidBadge? earnedBadge;
-    if (SessionStore.instance.role == BushelRole.kid && mounted) {
-      earnedBadge = await _pickKidBadge();
-    }
+    final submitted = _store.checkIn(listing.shift);
+    if (!submitted) return;
     if (!mounted) return;
     setState(() {
       _scanned = false;
@@ -86,11 +90,9 @@ class _CheckInScreenState extends State<CheckInScreen> {
           color: Color(0xFF20B85A),
           size: 58,
         ),
-        title: const Text('You’re checked in!'),
-        content: Text(
-          earnedBadge == null
-              ? 'Your shift is marked complete and you earned 100 points.'
-              : 'You earned 100 points and unlocked the ${earnedBadge.name} ${earnedBadge.emoji}',
+        title: const Text('Check-in sent!'),
+        content: const Text(
+          'You are checked in and awaiting coordinator confirmation. Points and rewards are added after attendance is confirmed.',
           textAlign: TextAlign.center,
         ),
         actions: [
@@ -101,68 +103,6 @@ class _CheckInScreenState extends State<CheckInScreen> {
         ],
       ),
     );
-  }
-
-  Future<KidBadge?> _pickKidBadge() async {
-    final locked = kidBadges
-        .where(
-          (badge) =>
-              !SessionStore.instance.unlockedKidBadges.contains(badge.id),
-        )
-        .toList();
-    if (locked.isEmpty) return null;
-    final badge = await showDialog<KidBadge>(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        title: const Text('Pick a new badge! 🎉'),
-        content: SizedBox(
-          width: 520,
-          height: 390,
-          child: GridView.builder(
-            itemCount: locked.length,
-            gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-              maxCrossAxisExtent: 130,
-              mainAxisSpacing: 8,
-              crossAxisSpacing: 8,
-              childAspectRatio: 0.9,
-            ),
-            itemBuilder: (context, index) {
-              final option = locked[index];
-              return Card(
-                child: InkWell(
-                  key: ValueKey('choose-${option.id}'),
-                  onTap: () => Navigator.pop(context, option),
-                  child: Padding(
-                    padding: const EdgeInsets.all(8),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          option.emoji,
-                          style: const TextStyle(fontSize: 36),
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          option.name,
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              );
-            },
-          ),
-        ),
-      ),
-    );
-    if (badge != null) SessionStore.instance.unlockKidBadge(badge.id);
-    return badge;
   }
 
   @override
@@ -201,7 +141,12 @@ class _CheckInScreenState extends State<CheckInScreen> {
                 style: TextStyle(color: Color(0xFF718078), fontSize: 15),
               ),
               const SizedBox(height: 24),
-              _ScannerFrame(scanned: _scanned),
+              _ScannerFrame(
+                scanned: _scanned,
+                qrCode: _selectedShift == null
+                    ? null
+                    : _store.qrCodeFor(_selectedShift!.shift),
+              ),
               const SizedBox(height: 24),
               if (_eligibleShifts.isEmpty)
                 _NoEligibleShift(
@@ -242,7 +187,9 @@ class _CheckInScreenState extends State<CheckInScreen> {
                   height: kidMode ? 70 : null,
                   child: FilledButton.icon(
                     key: const ValueKey('simulate-scan'),
-                    onPressed: _scanned ? _confirmCheckIn : _simulateScan,
+                    onPressed: _store.qrCodeFor(_selectedShift!.shift) == null
+                        ? null
+                        : (_scanned ? _confirmCheckIn : _simulateScan),
                     icon: Icon(_scanned ? Icons.check : Icons.qr_code_scanner),
                     label: Text(
                       _scanned
@@ -255,9 +202,11 @@ class _CheckInScreenState extends State<CheckInScreen> {
                 ),
                 const SizedBox(height: 12),
                 Text(
-                  _scanned
-                      ? 'Station matched: ${_selectedShift!.shift.station}'
-                      : 'Camera scanning will be added later.',
+                  _store.qrCodeFor(_selectedShift!.shift) == null
+                      ? 'The shift coordinator has not generated a QR code yet.'
+                      : (_scanned
+                            ? 'Shift matched: ${_selectedShift!.shift.title}'
+                            : 'This mock QR belongs only to the selected shift. Camera scanning will be added later.'),
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     color: _scanned
@@ -277,9 +226,10 @@ class _CheckInScreenState extends State<CheckInScreen> {
 }
 
 class _ScannerFrame extends StatelessWidget {
-  const _ScannerFrame({required this.scanned});
+  const _ScannerFrame({required this.scanned, required this.qrCode});
 
   final bool scanned;
+  final String? qrCode;
 
   @override
   Widget build(BuildContext context) {
@@ -301,11 +251,15 @@ class _ScannerFrame extends StatelessWidget {
             ),
             borderRadius: BorderRadius.circular(24),
           ),
-          child: Icon(
-            scanned ? Icons.check_circle : Icons.qr_code_2,
-            color: scanned ? const Color(0xFF20B85A) : Colors.white,
-            size: 108,
-          ),
+          child: scanned
+              ? const Icon(
+                  Icons.check_circle,
+                  color: Color(0xFF20B85A),
+                  size: 108,
+                )
+              : qrCode == null
+              ? const Icon(Icons.qr_code_2, color: Colors.white, size: 108)
+              : MockQrCode(value: qrCode!),
         ),
       ),
     );

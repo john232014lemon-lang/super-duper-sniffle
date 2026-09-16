@@ -55,3 +55,5 @@ app.*.map.json
 .env
 .env.*
 !.env.example
+# Local standalone development tools
+/tools/firebase/firebase.exe

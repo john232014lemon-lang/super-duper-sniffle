@@ -260,6 +260,24 @@
 
 **Modifications:** Removed the three named testing identities. Signup now offers only Volunteer and Coordinator roles, with the family option opening Family Center after setup. Parents can create kid accounts and custom challenges; kids can only enter Kid Mode through a parent-created account and can switch back to the parent. Three starter challenges are included and visible in both parent and kid Family Center views.
 
+### Feature: Slice 11 Per-shift QR Attendance
+
+**Prompt:**
+
+> build slice 11
+
+**Result:** Added a mock per-shift QR attendance workflow with coordinator generation, participant selection and provisional check-in, and coordinator confirmation.
+
+**Modifications:** Shift listings now record their leader. Only the coordinator who leads a shift can generate its deterministic in-app QR code. Signed-up users choose an eligible shift in Scan, see that shift’s code, and submit a check-in awaiting confirmation. The coordinator’s shift group shows pending attendees and confirms them individually; only confirmation completes the shift and awards 100 points. Physical camera scanning remains deferred.
+
+### Documentation: Firebase Phase Plan (2026-09-15)
+
+**Prompt:** Update the plan after the completed mock slices with separate Firebase setup, Authentication, Firestore, and app-area migration slices; do not implement Firebase yet.
+
+**Result:** Marked mock slices 0-11 complete and added planned slices 12-21 with explicit completion criteria for FlutterFire/core initialization, Email/Password auth, a restricted Firestore smoke test, and separate profile, bank, shift, group, family, attendance, and rewards migrations.
+
+**Modifications:** Updated the YAML todos and queued next implementation prompt. Kept physical QR scanning, push, AI, and other deferred scope explicitly later. This documentation update installs no packages, configures no Firebase resources, and changes no app code.
+
 ## Challenges & Solutions
 
 ### Challenge 1: Flutter SDK Cache Lock
