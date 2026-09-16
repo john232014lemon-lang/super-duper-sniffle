@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../data/session_store.dart';
 import '../models/kid_badge.dart';
 import 'home_screen.dart';
+import 'family_center_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -76,31 +77,39 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
               ),
               const SizedBox(height: 12),
-              SegmentedButton<BushelRole>(
-                segments: const [
-                  ButtonSegment(
-                    value: BushelRole.volunteer,
-                    icon: Icon(Icons.volunteer_activism_outlined),
-                    label: Text('Volunteer'),
+              if (!_session.isKidAccount)
+                SegmentedButton<BushelRole>(
+                  segments: const [
+                    ButtonSegment(
+                      value: BushelRole.volunteer,
+                      icon: Icon(Icons.volunteer_activism_outlined),
+                      label: Text('Volunteer'),
+                    ),
+                    ButtonSegment(
+                      value: BushelRole.coordinator,
+                      icon: Icon(Icons.groups_outlined),
+                      label: Text('Coordinator'),
+                    ),
+                  ],
+                  selected: {_session.parentRole},
+                  showSelectedIcon: false,
+                  onSelectionChanged: (roles) => setState(() {
+                    _session.setRole(roles.first);
+                  }),
+                ),
+              const SizedBox(height: 20),
+              if (_session.familyAccount) ...[
+                OutlinedButton.icon(
+                  onPressed: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => const FamilyCenterScreen(),
+                    ),
                   ),
-                  ButtonSegment(
-                    value: BushelRole.coordinator,
-                    icon: Icon(Icons.groups_outlined),
-                    label: Text('Coordinator'),
-                  ),
-                  ButtonSegment(
-                    value: BushelRole.kid,
-                    icon: Icon(Icons.child_care),
-                    label: Text('Kid'),
-                  ),
-                ],
-                selected: {_session.role},
-                showSelectedIcon: false,
-                onSelectionChanged: (roles) => setState(() {
-                  _session.setRole(roles.first);
-                }),
-              ),
-              const SizedBox(height: 28),
+                  icon: const Icon(Icons.family_restroom),
+                  label: const Text('Open Family Center'),
+                ),
+                const SizedBox(height: 20),
+              ],
               Card(
                 child: Padding(
                   padding: const EdgeInsets.all(18),

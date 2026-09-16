@@ -250,6 +250,16 @@
 
 **Modifications:** The app now opens directly on the active test account’s Home screen. Shifts, check-ins, points, and removal votes are tracked per account. Each account casts its own vote and cannot vote twice or vote for itself. Removed members lose access to the shared shift under My Shifts. Only the coordinator account sees the Add shift action on food-bank pages.
 
+### Feature: Slice 10 Family Center
+
+**Prompt:**
+
+> Begin work on slice 10. for this slice we are going to further work on family/kids accounts. remove the 3 test accounts and reinstate the signup. kids can only be added by their parents so the two options for signup are coordinator or volunteer. if you signup with a 'family' account you get a new page -> family center. here you can signup your kids for their kids accounts and swap between parent/kid account. parents can also create challenges for their kids that will be visible for the kids in the 'family center'. for now add 3 basic challenges for example (signup for 3 shifts!)
+
+**Result:** Restored signup and added a parent-managed Family Center for creating kid accounts, switching between family profiles, and sharing challenges.
+
+**Modifications:** Removed the three named testing identities. Signup now offers only Volunteer and Coordinator roles, with the family option opening Family Center after setup. Parents can create kid accounts and custom challenges; kids can only enter Kid Mode through a parent-created account and can switch back to the parent. Three starter challenges are included and visible in both parent and kid Family Center views.
+
 ## Challenges & Solutions
 
 ### Challenge 1: Flutter SDK Cache Lock

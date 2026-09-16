@@ -20,9 +20,6 @@ class ShiftStore extends ChangeNotifier {
             ShiftListing(foodBank: bank, shift: shift),
       ] {
     // The home dashboard presents this as the user's next confirmed shift.
-    for (final accountId in ['johnny', 'jimbo', 'jimmerson']) {
-      _myShiftsByAccount[accountId] = [_available.first];
-    }
   }
 
   static final ShiftStore instance = ShiftStore._();
@@ -35,7 +32,10 @@ class ShiftStore extends ChangeNotifier {
   List<ShiftListing> get available => List.unmodifiable(_available);
   List<ShiftListing> get myShifts {
     final accountId = SessionStore.instance.accountId;
-    final shifts = _myShiftsByAccount[accountId] ?? const [];
+    final shifts = _myShiftsByAccount.putIfAbsent(
+      accountId,
+      () => [_available.first],
+    );
     return List.unmodifiable(
       shifts.where(
         (listing) =>

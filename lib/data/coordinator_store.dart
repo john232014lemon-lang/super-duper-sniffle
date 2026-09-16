@@ -18,24 +18,24 @@ class CoordinatorStore extends ChangeNotifier {
 
   final List<GroupMember> _members = [
     const GroupMember(
-      id: 'johnny',
-      name: 'Sir Johnny John Jimmy',
+      id: 'parent',
+      name: 'Maya',
       phoneNumber: '(713) 555-0142',
       role: 'Coordinator',
       shiftsCompleted: 12,
       voteCount: 0,
     ),
     const GroupMember(
-      id: 'jimbo',
-      name: 'Lil Jimbo',
+      id: 'riley',
+      name: 'Riley Chen',
       phoneNumber: '(832) 555-0188',
-      role: 'Kid',
+      role: 'Volunteer',
       shiftsCompleted: 8,
       voteCount: 0,
     ),
     const GroupMember(
-      id: 'jimmerson',
-      name: 'Jimmerson Jimmies',
+      id: 'sam',
+      name: 'Sam Patel',
       phoneNumber: '(281) 555-0164',
       role: 'Volunteer',
       shiftsCompleted: 17,
@@ -55,6 +55,39 @@ class CoordinatorStore extends ChangeNotifier {
       currentAccountIsMember &&
       id != SessionStore.instance.accountId &&
       !hasVotedFor(id);
+
+  void configureParent(String name, BushelRole role) {
+    final index = _members.indexWhere((member) => member.id == 'parent');
+    final updated = GroupMember(
+      id: 'parent',
+      name: name,
+      phoneNumber: '(713) 555-0100',
+      role: role == BushelRole.coordinator ? 'Coordinator' : 'Volunteer',
+      shiftsCompleted: 1,
+      voteCount: index < 0 ? 0 : _members[index].voteCount,
+    );
+    if (index < 0) {
+      _members.insert(0, updated);
+    } else {
+      _members[index] = updated;
+    }
+    notifyListeners();
+  }
+
+  void addFamilyChild(FamilyChild child) {
+    if (containsAccount(child.id)) return;
+    _members.add(
+      GroupMember(
+        id: child.id,
+        name: child.name,
+        phoneNumber: 'Managed by parent',
+        role: 'Kid',
+        shiftsCompleted: 0,
+        voteCount: 0,
+      ),
+    );
+    notifyListeners();
+  }
 
   bool voteToRemove(String id) {
     final voterId = SessionStore.instance.accountId;

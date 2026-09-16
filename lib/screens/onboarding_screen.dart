@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../data/session_store.dart';
+import '../data/coordinator_store.dart';
+import 'family_center_screen.dart';
 import 'home_screen.dart';
 
 class OnboardingScreen extends StatefulWidget {
@@ -28,7 +30,15 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   void _completeOnboarding() {
     if (_formKey.currentState?.validate() ?? false) {
-      SessionStore.instance.setRole(_role);
+      SessionStore.instance.configureParent(
+        name: _nameController.text.trim(),
+        role: _role,
+        family: _familyMode,
+      );
+      CoordinatorStore.instance.configureParent(
+        _nameController.text.trim(),
+        _role,
+      );
       setState(() => _step = 2);
     }
   }
@@ -52,7 +62,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               onBack: () => setState(() => _step = 0),
               onContinue: _completeOnboarding,
             ),
-            _ => HomeScreen(name: SessionStore.instance.userName),
+            _ =>
+              _familyMode
+                  ? const FamilyCenterScreen()
+                  : HomeScreen(name: SessionStore.instance.userName),
           },
         ),
       ),
@@ -312,11 +325,6 @@ class _ProfileStep extends StatelessWidget {
                       value: BushelRole.coordinator,
                       icon: Icon(Icons.groups_outlined),
                       label: Text('Coordinator'),
-                    ),
-                    ButtonSegment(
-                      value: BushelRole.kid,
-                      icon: Icon(Icons.child_care),
-                      label: Text('Kid'),
                     ),
                   ],
                   selected: {role},
