@@ -318,6 +318,24 @@
 
 **Validation:** All 27 tests pass and the Web demo release build succeeds. Tests cover Firebase-free demo onboarding/reset, calendar signup and filtering, year/leap-day boundaries, invalid dates, and custom-shift visibility. Static analysis is clean. Android execution remains unverified because this machine lacks its SDK/device.
 
+### Feature: Slice 16 Firestore in Texas (2026-09-26)
+
+**Prompt:** Build step 16 with the database in Texas.
+
+**Result:** Enabled the Firestore API and created the Standard Native `(default)` database in Dallas (`us-south1`) for `bushel-volunteer-20260925`. Added `cloud_firestore`, versioned rules/index configuration, and deployed owner-only rules for temporary test documents. All other app collections stay denied; no stores were migrated.
+
+**Modifications:** Added a separate authenticated Flutter connection-check entry point and a Python emulator/live test using end-user tokens, not admin access. The test creates and cleans up temporary users/documents. Added loopback Auth/Firestore emulator configuration and used a checksum-verified portable Java 21 runtime without changing system Java.
+
+**Validation:** 20 ownership/schema checks passed in the Emulator Suite and all 20 passed live, including write/read/delete and denial of signed-out/cross-user access. All 29 Flutter tests, static analysis, and the diagnostic Web build pass. Live Email/Password signup now works; earlier Authentication setup errors no longer block the backend test. Interactive Flutter auth verification and Android execution remain pending; Windows native plugin setup reports a Developer Mode/symlink requirement.
+
+### Feature: Slice 17 adult profiles (2026-09-26)
+
+**Prompt:** Set up Slice 17.
+
+**Result:** Adult onboarding saves name, experience preference, and family setting to `profiles/{auth UID}` in the existing Dallas database. Sign-in restores the profile; missing profiles onboard, and read/write failures allow retry. Profile mode changes save before being applied. Account changes clear navigation and local data; stale responses cannot restore the old session. Demo and all other app areas remain local.
+
+**Security and validation:** Deployed owner-only profile rules with an allowlisted schema. Coordinator preference grants no backend permissions. Static analysis is clean, the normal Web build succeeds, and all 35 Flutter tests and 45 emulator/45 live Firestore checks pass; temporary test users/documents were removed. Interactive Android/Web verification remains pending.
+
 ## Challenges & Solutions
 
 ### Challenge 1: Flutter SDK Cache Lock

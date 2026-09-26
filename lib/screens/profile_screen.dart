@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../data/session_store.dart';
 import '../models/kid_badge.dart';
 import '../services/auth_service.dart';
+import '../services/profile_service.dart';
+import '../data/coordinator_store.dart';
 import 'home_screen.dart';
 import 'family_center_screen.dart';
 
@@ -16,6 +18,8 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen> {
   final _session = SessionStore.instance;
   bool _signingOut = false;
+  bool _saving = false;
+  late BushelRole _selectedRole = _session.parentRole;
 
   Future<void> _signOut(AuthService auth) async {
     setState(() => _signingOut = true);
@@ -38,7 +42,34 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return kidBadges.where((badge) => badge.id == id).firstOrNull;
   }
 
-  void _finish() {
+  Future<void> _finish() async {
+    if (_saving) return;
+    final scope = ProfileScope.maybeOf(context);
+    if (!_session.isKidAccount) {
+      final profile = AdultProfile(
+        name: _session.parentName,
+        role: _selectedRole,
+        family: _session.familyAccount,
+      );
+      setState(() => _saving = true);
+      try {
+        if (scope != null) await scope.save(profile);
+        if (!mounted || (scope != null && !scope.isCurrent())) return;
+        _session.setRole(profile.role);
+        CoordinatorStore.instance.configureParent(profile.name, profile.role);
+      } catch (_) {
+        if (mounted) {
+          setState(() => _saving = false);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Could not save your profile. Please try again.'),
+            ),
+          );
+        }
+        return;
+      }
+    }
+    if (!mounted) return;
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute<void>(
         builder: (_) => HomeScreen(name: _session.userName),
@@ -109,11 +140,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       label: Text('Coordinator'),
                     ),
                   ],
-                  selected: {_session.parentRole},
+                  selected: {_selectedRole},
                   showSelectedIcon: false,
-                  onSelectionChanged: (roles) => setState(() {
-                    _session.setRole(roles.first);
-                  }),
+                  onSelectionChanged: _saving
+                      ? null
+                      : (roles) => setState(() {
+                          _selectedRole = roles.first;
+                        }),
                 ),
               const SizedBox(height: 20),
               if (_session.familyAccount) ...[
@@ -155,8 +188,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
               const SizedBox(height: 28),
               FilledButton(
-                onPressed: _finish,
-                child: const Text('Use this mode'),
+                onPressed: _saving ? null : _finish,
+                child: Text(_saving ? 'Saving...' : 'Use this mode'),
               ),
               if (auth != null) ...[
                 const SizedBox(height: 16),

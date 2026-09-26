@@ -10,7 +10,8 @@ import 'data/shift_store.dart';
 import 'firebase_options.dart';
 import 'main.dart';
 import 'screens/auth_screen.dart';
-import 'screens/onboarding_screen.dart';
+import 'profile_app.dart';
+import 'services/profile_service.dart';
 import 'services/auth_service.dart';
 
 typedef AuthInitializer = Future<AuthService> Function();
@@ -24,8 +25,12 @@ class FirebaseBootstrap extends StatefulWidget {
   const FirebaseBootstrap({
     super.key,
     this.initialize = initializeFirebaseAuth,
+    this.signedInHome,
+    this.profiles,
   });
   final AuthInitializer initialize;
+  final Widget? signedInHome;
+  final ProfileRepository? profiles;
 
   @override
   State<FirebaseBootstrap> createState() => _FirebaseBootstrapState();
@@ -56,15 +61,26 @@ class _FirebaseBootstrapState extends State<FirebaseBootstrap> {
         );
       }
       if (!snapshot.hasData) return const BushelApp(home: _LoadingScreen());
-      return AuthGate(auth: snapshot.requireData);
+      return AuthGate(
+        auth: snapshot.requireData,
+        signedInHome: widget.signedInHome,
+        profiles: widget.profiles,
+      );
     },
   );
 }
 
 /// Owns the entire Navigator so logout also removes pushed/replaced routes.
 class AuthGate extends StatefulWidget {
-  const AuthGate({super.key, required this.auth});
+  const AuthGate({
+    super.key,
+    required this.auth,
+    this.signedInHome,
+    this.profiles,
+  });
   final AuthService auth;
+  final Widget? signedInHome;
+  final ProfileRepository? profiles;
 
   @override
   State<AuthGate> createState() => _AuthGateState();
@@ -87,7 +103,7 @@ class _AuthGateState extends State<AuthGate> {
       (uid) {
         if (!mounted) return;
         if (_waiting || uid != _uid) {
-          // Mock IDs are still local (Slice 15 owns profile persistence).
+          // Restore adult profiles after clearing local account data.
           // Clear all three stores before a different authenticated session.
           SessionStore.instance.reset();
           CoordinatorStore.instance.reset();
@@ -130,13 +146,21 @@ class _AuthGateState extends State<AuthGate> {
       );
     }
     if (_waiting) return const BushelApp(home: _LoadingScreen());
+    final uid = _uid;
     return AuthScope(
       service: widget.auth,
-      child: BushelApp(
+      child: KeyedSubtree(
         key: ValueKey(_uid),
-        home: _uid == null
-            ? AuthScreen(auth: widget.auth)
-            : const OnboardingScreen(),
+        child: _uid == null
+            ? BushelApp(home: AuthScreen(auth: widget.auth))
+            : widget.signedInHome != null
+            ? BushelApp(home: widget.signedInHome!)
+            : ProfileApp(
+                uid: _uid!,
+                repository: widget.profiles ?? FirestoreProfileRepository(),
+                isCurrent: () =>
+                    mounted && _uid == uid && !_waiting && !_failed,
+              ),
       ),
     );
   }

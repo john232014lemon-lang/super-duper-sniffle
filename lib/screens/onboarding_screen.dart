@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../data/session_store.dart';
+import '../services/profile_service.dart';
 import '../data/coordinator_store.dart';
 import 'family_center_screen.dart';
 import 'home_screen.dart';
@@ -28,18 +29,39 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   void _showProfileSetup() => setState(() => _step = 1);
 
-  void _completeOnboarding() {
-    if (_formKey.currentState?.validate() ?? false) {
+  bool _saving = false;
+  String? _saveError;
+  Future<void> _completeOnboarding() async {
+    if (_saving || !(_formKey.currentState?.validate() ?? false)) return;
+    final profile = AdultProfile(
+      name: _nameController.text.trim(),
+      role: _role,
+      family: _familyMode,
+    );
+    final scope = ProfileScope.maybeOf(context);
+    setState(() {
+      _saving = true;
+      _saveError = null;
+    });
+    try {
+      if (scope != null) await scope.save(profile);
+      if (!mounted || (scope != null && !scope.isCurrent())) return;
       SessionStore.instance.configureParent(
-        name: _nameController.text.trim(),
-        role: _role,
-        family: _familyMode,
+        name: profile.name,
+        role: profile.role,
+        family: profile.family,
       );
-      CoordinatorStore.instance.configureParent(
-        _nameController.text.trim(),
-        _role,
-      );
+      CoordinatorStore.instance.configureParent(profile.name, profile.role);
       setState(() => _step = 2);
+    } catch (_) {
+      if (mounted) {
+        setState(
+          () => _saveError =
+              'Could not save your profile. Check your connection and try again.',
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
     }
   }
 
@@ -51,16 +73,21 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           duration: const Duration(milliseconds: 300),
           child: switch (_step) {
             0 => _WelcomeStep(onContinue: _showProfileSetup),
-            1 => _ProfileStep(
-              formKey: _formKey,
-              nameController: _nameController,
-              role: _role,
-              familyMode: _familyMode,
-              onRoleChanged: (role) => setState(() => _role = role),
-              onFamilyModeChanged: (value) =>
-                  setState(() => _familyMode = value),
-              onBack: () => setState(() => _step = 0),
-              onContinue: _completeOnboarding,
+            1 => AbsorbPointer(
+              absorbing: _saving,
+              child: _ProfileStep(
+                saving: _saving,
+                error: _saveError,
+                formKey: _formKey,
+                nameController: _nameController,
+                role: _role,
+                familyMode: _familyMode,
+                onRoleChanged: (role) => setState(() => _role = role),
+                onFamilyModeChanged: (value) =>
+                    setState(() => _familyMode = value),
+                onBack: () => setState(() => _step = 0),
+                onContinue: _completeOnboarding,
+              ),
             ),
             _ =>
               _familyMode
@@ -219,8 +246,10 @@ class _WelcomeStep extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 16),
-              const Text(
-                'No account required · Takes less than 2 minutes',
+              Text(
+                ProfileScope.maybeOf(context) != null
+                    ? 'Set up your profile in a few moments'
+                    : 'No account required · Takes less than 2 minutes',
                 style: TextStyle(color: Color(0xFF728078)),
               ),
             ],
@@ -232,8 +261,12 @@ class _WelcomeStep extends StatelessWidget {
 }
 
 class _ProfileStep extends StatelessWidget {
+  final bool saving;
+  final String? error;
   const _ProfileStep({
     required this.formKey,
+    required this.saving,
+    this.error,
     required this.nameController,
     required this.role,
     required this.familyMode,
@@ -299,6 +332,7 @@ class _ProfileStep extends StatelessWidget {
                 const SizedBox(height: 10),
                 TextFormField(
                   controller: nameController,
+                  maxLength: 80,
                   textInputAction: TextInputAction.done,
                   decoration: const InputDecoration(
                     hintText: 'Your first name',
@@ -360,11 +394,20 @@ class _ProfileStep extends StatelessWidget {
                 const SizedBox(height: 30),
                 FilledButton(
                   onPressed: onContinue,
-                  child: const Text('Finish setup'),
+                  child: Text(saving ? 'Saving...' : 'Finish setup'),
                 ),
                 const SizedBox(height: 12),
-                const Text(
-                  'Your choices stay on this device for now.',
+                if (error != null)
+                  Text(
+                    error!,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.error,
+                    ),
+                  ),
+                Text(
+                  ProfileScope.maybeOf(context) == null
+                      ? 'Your choices stay on this device for now.'
+                      : 'Your profile is saved to your account.',
                   textAlign: TextAlign.center,
                   style: TextStyle(color: Color(0xFF728078)),
                 ),

@@ -6,6 +6,7 @@ import 'package:bushel/data/shift_store.dart';
 import 'package:bushel/firebase_bootstrap.dart';
 import 'package:bushel/main.dart';
 import 'package:bushel/screens/auth_screen.dart';
+import 'package:bushel/screens/onboarding_screen.dart';
 import 'package:bushel/screens/profile_screen.dart';
 import 'package:bushel/services/auth_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -115,7 +116,9 @@ void main() {
   testWidgets('registration validates password then opens adult onboarding', (
     tester,
   ) async {
-    await tester.pumpWidget(AuthGate(auth: auth));
+    await tester.pumpWidget(
+      AuthGate(auth: auth, signedInHome: const OnboardingScreen()),
+    );
     await tester.pumpAndSettle();
     await tester.tap(find.text('New to Bushel? Create an account'));
     await tester.pumpAndSettle();
@@ -141,7 +144,9 @@ void main() {
     'restored session skips login; logout clears routes and mock data',
     (tester) async {
       auth.uid = 'restored-adult';
-      await tester.pumpWidget(AuthGate(auth: auth));
+      await tester.pumpWidget(
+        AuthGate(auth: auth, signedInHome: const OnboardingScreen()),
+      );
       await tester.pumpAndSettle();
       expect(find.text('Get started'), findsOneWidget);
       expect(find.text('Sign in'), findsNothing);
@@ -196,7 +201,9 @@ void main() {
     'failed logout keeps signed-in routes and shows retryable error',
     (tester) async {
       auth.uid = 'adult';
-      await tester.pumpWidget(AuthGate(auth: auth));
+      await tester.pumpWidget(
+        AuthGate(auth: auth, signedInHome: const OnboardingScreen()),
+      );
       await tester.pumpAndSettle();
       tester
           .state<NavigatorState>(find.byType(Navigator))

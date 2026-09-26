@@ -1,0 +1,37 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /profiles/{uid} {
+      function isOwner() {
+        return request.auth != null && request.auth.uid == uid;
+      }
+      // preferredRole changes presentation only; no permissions live here.
+      allow get, delete: if isOwner();
+      allow create, update: if isOwner()
+        && request.resource.data.keys().hasOnly(['name', 'preferredRole', 'familyAccount', 'updatedAt'])
+        && request.resource.data.name is string
+        && request.resource.data.name.size() > 0
+        && request.resource.data.name.size() <= 80
+        && request.resource.data.name.matches('.*[^ ].*')
+        && request.resource.data.preferredRole in ['volunteer', 'coordinator']
+        && request.resource.data.familyAccount is bool
+        && request.resource.data.updatedAt == request.time;
+    }
+    // Slice 16 only: each authenticated adult can test their own connection.
+    match /smokeTests/{uid}/runs/{runId} {
+      function isOwner() {
+        return request.auth != null && request.auth.uid == uid;
+      }
+
+      allow get, delete: if isOwner();
+      allow create: if isOwner()
+        && request.resource.data.keys().hasOnly(['message', 'createdAt'])
+        && request.resource.data.message == 'Bushel connection test'
+        && request.resource.data.createdAt == request.time;
+      // Diagnostic updates and queries remain closed.
+    }
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

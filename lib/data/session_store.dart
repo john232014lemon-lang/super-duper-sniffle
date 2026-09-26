@@ -63,6 +63,7 @@ class SessionStore extends ChangeNotifier {
   final Set<String> _unlockedKidBadges = {};
   String? _featuredKidBadge;
 
+  String get parentName => _parentName;
   String get userName => activeChild?.name ?? _parentName;
   BushelRole get role => activeChild == null ? _parentRole : BushelRole.kid;
   BushelRole get parentRole => _parentRole;
