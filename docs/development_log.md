@@ -288,6 +288,36 @@
 
 **Remaining setup:** Firebase CLI requires `firebase login`; the intended project and platforms must be selected before FlutterFire configuration and enabling Email/Password. The options file currently reports missing configuration rather than supplying fake credentials. Live signup/login/restart verification remains pending. Flutter also reported that Windows Developer Mode is required for native plugin symlinks. Both slices remain in progress in `plan.md`.
 
+### Slices 12-13: Android and Web Firebase Configuration (2026-09-25)
+
+**Prompt:** Finish slices 12 and 13; configure Android and Web.
+
+**Result:** Connected both platforms to `bushel-volunteer-20260925` with FlutterFire. Replaced the options placeholder, generated the Android service file and `firebase.json`, added the Google Services Gradle plugin, and selected Bushel in `.firebaserc`. Added an opt-in live authentication smoke test that cleans up its temporary accounts.
+
+**Validation:** Dependency resolution, static analysis, all 23 local tests, and the Web release build pass. The live Auth check returns `CONFIGURATION_NOT_FOUND`; first-time console Authentication setup and Email/Password enablement are still needed. Console/UI automation has no connected browser. Android build/launch verification is blocked by the missing Android SDK and device/emulator. Updated README and plan with these precise remaining steps; no Firestore work was started.
+
+### Documentation: Simpler Plan and Local Work While Firebase Is Blocked
+
+**Prompt:** Simplify the plan and add one or two slices before further Firestore work while login is unavailable.
+
+**Result:** Condensed `plan.md` into status and completion tables. Added Slice 14 (explicit local demo mode without Firebase login) and Slice 15 (a working mock shift calendar). Moved Firestore setup and migrations from 14-21 to 16-23, and updated YAML todos. Kept 12-13 incomplete with the school-account access restriction and Android verification gap recorded. This update changes documentation only.
+
+### Documentation: Plan Proofreading
+
+**Prompt:** Proofread the plan and make sure all steps are included.
+
+**Result:** Checked slices 0-23 and their order. Clarified remaining Firebase setup/verification, demo launch documentation, database region selection, calendar migration, child shift participation, and kid badge persistence. Corrected README references to Firestore Slice 16 and profile Slice 17. Documentation only; no features implemented.
+
+### Features: Slices 14-15 Local Demo and Shift Calendar
+
+**Prompt:** Build slices 14 and 15.
+
+**Result:** Added `BUSHEL_DEMO=true` startup without Firebase initialization, a persistent demo label, and a full mock-data/navigation reset. Replaced the placeholder date strip with month navigation, selectable days, shift markers, date-filtered Available/My Shifts, and empty-day guidance.
+
+**Modifications:** Shift models now store real dates; mock shifts span three days starting at launch. Custom shifts accept a date picker or validated ISO date and remain visible when bank details reopen. Existing tests now isolate store state and scroll the calendar reliably. Updated README launch commands and marked 14-15 complete; Firebase 12-13 remains blocked and Firestore is untouched.
+
+**Validation:** All 27 tests pass and the Web demo release build succeeds. Tests cover Firebase-free demo onboarding/reset, calendar signup and filtering, year/leap-day boundaries, invalid dates, and custom-shift visibility. Static analysis is clean. Android execution remains unverified because this machine lacks its SDK/device.
+
 ## Challenges & Solutions
 
 ### Challenge 1: Flutter SDK Cache Lock

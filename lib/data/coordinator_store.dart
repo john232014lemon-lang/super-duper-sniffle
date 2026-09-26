@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 
 import '../models/group_member.dart';
 import 'session_store.dart';
+import 'mock_food_banks.dart';
 
 class CoordinatorStore extends ChangeNotifier {
   CoordinatorStore._();
@@ -16,12 +17,12 @@ class CoordinatorStore extends ChangeNotifier {
     notifyListeners();
   }
 
-  static const ShiftGroup sharedShiftGroup = ShiftGroup(
+  static final ShiftGroup sharedShiftGroup = ShiftGroup(
     id: 'sorting-packing-jun-20',
     shiftTitle: 'Sorting & Packing Line',
     foodBankName: 'Second Harvest Food Bank',
-    date: 'Sat, Jun 20',
-    time: '9:00–12:00 AM',
+    date: mockFoodBanks.first.shifts.first.date,
+    time: mockFoodBanks.first.shifts.first.time,
     station: 'Warehouse A',
   );
 

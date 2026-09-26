@@ -3,7 +3,9 @@ import 'package:latlong2/latlong.dart';
 
 import '../models/food_bank.dart';
 
-const mockFoodBanks = <FoodBank>[
+final _seedDay = DateUtils.dateOnly(DateTime.now());
+
+final mockFoodBanks = <FoodBank>[
   FoodBank(
     name: 'Second Harvest Food Bank',
     shortName: 'Second Harvest',
@@ -18,21 +20,25 @@ const mockFoodBanks = <FoodBank>[
     shifts: [
       FoodBankShift(
         title: 'Sorting & Packing Line',
-        date: 'Sat, Jun 20',
+        scheduledDate: _seedDay,
         time: '9:00 AM–12:00 PM',
         station: 'Warehouse A',
         spotsLeft: 6,
       ),
       FoodBankShift(
         title: 'Delivery Drivers',
-        date: 'Sat, Jun 20',
+        scheduledDate: _seedDay,
         time: '2:00–4:00 PM',
         station: 'Loading Bay',
         spotsLeft: 3,
       ),
       FoodBankShift(
         title: 'Family Grocery Packing',
-        date: 'Sun, Jun 21',
+        scheduledDate: DateTime(
+          _seedDay.year,
+          _seedDay.month,
+          _seedDay.day + 1,
+        ),
         time: '10:00 AM–12:00 PM',
         station: 'Community Room',
         spotsLeft: 9,
@@ -53,14 +59,18 @@ const mockFoodBanks = <FoodBank>[
     shifts: [
       FoodBankShift(
         title: 'Produce Sorting',
-        date: 'Today',
+        scheduledDate: _seedDay,
         time: '3:00–5:00 PM',
         station: 'Produce Station',
         spotsLeft: 3,
       ),
       FoodBankShift(
         title: 'Dinner Service',
-        date: 'Tomorrow',
+        scheduledDate: DateTime(
+          _seedDay.year,
+          _seedDay.month,
+          _seedDay.day + 1,
+        ),
         time: '4:30–7:00 PM',
         station: 'Family Kitchen',
         spotsLeft: 5,
@@ -81,14 +91,22 @@ const mockFoodBanks = <FoodBank>[
     shifts: [
       FoodBankShift(
         title: 'Meal Prep Crew',
-        date: 'Fri, Jun 19',
+        scheduledDate: DateTime(
+          _seedDay.year,
+          _seedDay.month,
+          _seedDay.day + 2,
+        ),
         time: '1:00–3:30 PM',
         station: 'Main Kitchen',
         spotsLeft: 4,
       ),
       FoodBankShift(
         title: 'Community Meal Service',
-        date: 'Fri, Jun 19',
+        scheduledDate: DateTime(
+          _seedDay.year,
+          _seedDay.month,
+          _seedDay.day + 2,
+        ),
         time: '4:00–6:30 PM',
         station: 'Dining Hall',
         spotsLeft: 7,

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "375797641238",
+    "project_id": "bushel-volunteer-20260925",
+    "storage_bucket": "bushel-volunteer-20260925.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:375797641238:android:10c26f6d62420805db0537",
+        "android_client_info": {
+          "package_name": "com.bushel.bushel"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA0Leawq2c0ZA8EvCXZFQt6lAk3Ceeptvk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

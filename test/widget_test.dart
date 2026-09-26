@@ -16,6 +16,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  setUp(() {
+    SessionStore.instance.reset();
+    CoordinatorStore.instance.reset();
+    ShiftStore.instance.reset();
+  });
   testWidgets('app starts with signup', (WidgetTester tester) async {
     await tester.pumpWidget(const BushelApp());
 
@@ -153,7 +158,7 @@ void main() {
     await tester.pumpAndSettle();
     final fields = find.byType(TextFormField);
     await tester.enterText(fields.at(0), 'Garden Pickup');
-    await tester.enterText(fields.at(1), 'Sat, Jun 27');
+    await tester.enterText(fields.at(1), '2026-06-27');
     await tester.enterText(fields.at(2), '9:00–11:00 AM');
     await tester.enterText(fields.at(3), 'Loading Bay B');
     await tester.enterText(fields.at(4), '4');
@@ -176,20 +181,35 @@ void main() {
       MaterialApp(key: UniqueKey(), home: const ShiftsScreen()),
     );
 
-    await tester.drag(find.byType(ListView), const Offset(0, -300));
+    final signup = find.byKey(const ValueKey('signup-Delivery Drivers'));
+    await tester.scrollUntilVisible(signup, 200);
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Sign up').first);
+    await tester.tap(signup);
     await tester.pumpAndSettle();
     expect(find.text('Confirm this shift?'), findsOneWidget);
     await tester.tap(find.text('Confirm signup'));
     await tester.pumpAndSettle();
 
     expect(find.text('Shift added to My shifts.'), findsOneWidget);
-    await tester.drag(find.byType(ListView), const Offset(0, 300));
+    await tester.scrollUntilVisible(
+      find.descendant(
+        of: find.byType(SegmentedButton<int>),
+        matching: find.textContaining('My shifts'),
+      ),
+      -200,
+    );
     await tester.pumpAndSettle();
-    await tester.tap(find.textContaining('My shifts').first);
+    await tester.tap(
+      find
+          .descendant(
+            of: find.byType(SegmentedButton<int>),
+            matching: find.textContaining('My shifts'),
+          )
+          .first,
+    );
     await tester.pumpAndSettle();
-    expect(find.text('Your upcoming shifts'), findsOneWidget);
+    await tester.scrollUntilVisible(find.text('Sorting & Packing Line'), 200);
+    await tester.pumpAndSettle();
     expect(find.text('Sorting & Packing Line'), findsOneWidget);
   });
 
@@ -278,6 +298,11 @@ void main() {
   testWidgets('home check-in opens the same simulated scanner', (
     WidgetTester tester,
   ) async {
+    SessionStore.instance.setRole(BushelRole.coordinator);
+    ShiftStore.instance.generateQrCode(
+      ShiftStore.instance.available.first.shift,
+    );
+    SessionStore.instance.setRole(BushelRole.volunteer);
     await tester.pumpWidget(const MaterialApp(home: HomeScreen(name: 'Sam')));
     await tester.tap(find.text('Check in'));
     await tester.pumpAndSettle();
@@ -316,6 +341,11 @@ void main() {
       family: true,
     );
     session.addChild('Ari');
+    session.setRole(BushelRole.coordinator);
+    ShiftStore.instance.generateQrCode(
+      ShiftStore.instance.available.first.shift,
+    );
+    session.setRole(BushelRole.volunteer);
     CoordinatorStore.instance.addFamilyChild(session.children.last);
     session.switchToChild(session.children.last.id);
     await tester.pumpWidget(const MaterialApp(home: HomeScreen(name: 'Ari')));
@@ -401,7 +431,16 @@ void main() {
     SessionStore.instance.setRole(BushelRole.volunteer);
     await tester.pumpWidget(const MaterialApp(home: ShiftsScreen()));
 
-    await tester.tap(find.textContaining('My shifts').first);
+    await tester.tap(
+      find
+          .descendant(
+            of: find.byType(SegmentedButton<int>),
+            matching: find.textContaining('My shifts'),
+          )
+          .first,
+    );
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(find.text('Sorting & Packing Line'), 200);
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('open-my-shift-group')).first);
     await tester.pumpAndSettle();

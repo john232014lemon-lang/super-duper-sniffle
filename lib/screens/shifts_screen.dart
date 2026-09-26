@@ -3,10 +3,12 @@ import 'package:flutter/material.dart';
 import '../data/shift_store.dart';
 import '../data/coordinator_store.dart';
 import '../widgets/bushel_navigation_bar.dart';
+import '../widgets/shift_calendar.dart';
 import 'coordinator_screen.dart';
 
 class ShiftsScreen extends StatefulWidget {
-  const ShiftsScreen({super.key});
+  const ShiftsScreen({super.key, this.initialDate});
+  final DateTime? initialDate;
 
   @override
   State<ShiftsScreen> createState() => _ShiftsScreenState();
@@ -15,10 +17,12 @@ class ShiftsScreen extends StatefulWidget {
 class _ShiftsScreenState extends State<ShiftsScreen> {
   final _store = ShiftStore.instance;
   int _tab = 0;
+  late DateTime _selectedDate;
 
   @override
   void initState() {
     super.initState();
+    _selectedDate = DateUtils.dateOnly(widget.initialDate ?? DateTime.now());
     _store.addListener(_refresh);
     CoordinatorStore.instance.addListener(_refresh);
   }
@@ -62,7 +66,13 @@ class _ShiftsScreenState extends State<ShiftsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final shifts = _tab == 0 ? _store.available : _store.myShifts;
+    final allShifts = _tab == 0 ? _store.available : _store.myShifts;
+    final shifts = allShifts
+        .where(
+          (listing) =>
+              DateUtils.isSameDay(listing.shift.scheduledDate, _selectedDate),
+        )
+        .toList();
     return Scaffold(
       appBar: AppBar(title: const Text('Shifts')),
       body: Center(
@@ -72,7 +82,7 @@ class _ShiftsScreenState extends State<ShiftsScreen> {
             padding: const EdgeInsets.fromLTRB(20, 4, 20, 40),
             children: [
               const Text(
-                'June 2026 · find your slot',
+                'Find a day to lend a hand',
                 style: TextStyle(color: Color(0xFF718078)),
               ),
               const SizedBox(height: 18),
@@ -90,7 +100,13 @@ class _ShiftsScreenState extends State<ShiftsScreen> {
                     setState(() => _tab = value.first),
               ),
               const SizedBox(height: 18),
-              const _MockDateStrip(),
+              ShiftCalendar(
+                selectedDate: _selectedDate,
+                shiftDates: allShifts.map(
+                  (listing) => listing.shift.scheduledDate,
+                ),
+                onSelected: (date) => setState(() => _selectedDate = date),
+              ),
               const SizedBox(height: 24),
               Text(
                 _tab == 0 ? 'Available times' : 'Your upcoming shifts',
@@ -100,8 +116,12 @@ class _ShiftsScreenState extends State<ShiftsScreen> {
                 ),
               ),
               const SizedBox(height: 12),
+              Text(
+                MaterialLocalizations.of(context).formatFullDate(_selectedDate),
+              ),
+              const SizedBox(height: 12),
               if (shifts.isEmpty)
-                const _EmptyShifts()
+                _EmptyShifts(myShifts: _tab == 1)
               else
                 ...shifts.map(
                   (listing) => Padding(
@@ -127,73 +147,6 @@ class _ShiftsScreenState extends State<ShiftsScreen> {
         ),
       ),
       bottomNavigationBar: const BushelNavigationBar(selectedIndex: 3),
-    );
-  }
-}
-
-class _MockDateStrip extends StatelessWidget {
-  const _MockDateStrip();
-
-  @override
-  Widget build(BuildContext context) {
-    return const Row(
-      children: [
-        _DateTile(day: 'THU', date: '18'),
-        SizedBox(width: 8),
-        _DateTile(day: 'FRI', date: '19'),
-        SizedBox(width: 8),
-        _DateTile(day: 'SAT', date: '20', selected: true),
-        SizedBox(width: 8),
-        _DateTile(day: 'SUN', date: '21'),
-        SizedBox(width: 8),
-        _DateTile(day: 'MON', date: '22'),
-      ],
-    );
-  }
-}
-
-class _DateTile extends StatelessWidget {
-  const _DateTile({
-    required this.day,
-    required this.date,
-    this.selected = false,
-  });
-
-  final String day;
-  final String date;
-  final bool selected;
-
-  @override
-  Widget build(BuildContext context) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 11),
-        decoration: BoxDecoration(
-          color: selected ? const Color(0xFF18A94F) : Colors.white,
-          borderRadius: BorderRadius.circular(15),
-          border: Border.all(color: const Color(0xFFE1E8E2)),
-        ),
-        child: Column(
-          children: [
-            Text(
-              day,
-              style: TextStyle(
-                color: selected ? Colors.white : const Color(0xFF718078),
-                fontSize: 10,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-            Text(
-              date,
-              style: TextStyle(
-                color: selected ? Colors.white : null,
-                fontSize: 17,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }
@@ -297,6 +250,7 @@ class _ScheduleCard extends StatelessWidget {
                 Align(
                   alignment: Alignment.centerRight,
                   child: FilledButton(
+                    key: ValueKey('signup-${shift.title}'),
                     onPressed: signedUp ? null : onSignup,
                     style: FilledButton.styleFrom(
                       minimumSize: const Size(110, 44),
@@ -314,23 +268,31 @@ class _ScheduleCard extends StatelessWidget {
 }
 
 class _EmptyShifts extends StatelessWidget {
-  const _EmptyShifts();
+  const _EmptyShifts({required this.myShifts});
+  final bool myShifts;
 
   @override
   Widget build(BuildContext context) {
-    return const Padding(
+    return Padding(
       padding: EdgeInsets.symmetric(vertical: 48),
       child: Column(
         children: [
-          Icon(
+          const Icon(
             Icons.calendar_month_outlined,
             size: 48,
             color: Color(0xFF91A098),
           ),
-          SizedBox(height: 12),
-          Text('No shifts yet', style: TextStyle(fontWeight: FontWeight.w900)),
-          SizedBox(height: 4),
-          Text('Sign up for an available time to see it here.'),
+          const SizedBox(height: 12),
+          Text(
+            myShifts ? 'No signups for this day' : 'No shifts on this day',
+            style: const TextStyle(fontWeight: FontWeight.w900),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            myShifts
+                ? 'Choose Available to find a shift to join.'
+                : 'Try another date.',
+          ),
         ],
       ),
     );

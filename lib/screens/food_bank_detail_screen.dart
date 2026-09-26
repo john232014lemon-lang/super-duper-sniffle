@@ -16,7 +16,10 @@ class FoodBankDetailScreen extends StatefulWidget {
 }
 
 class _FoodBankDetailScreenState extends State<FoodBankDetailScreen> {
-  late final List<FoodBankShift> _shifts = [...widget.foodBank.shifts];
+  List<FoodBankShift> get _shifts => ShiftStore.instance.available
+      .where((listing) => listing.foodBank == widget.foodBank)
+      .map((listing) => listing.shift)
+      .toList();
 
   Future<void> _addShift() async {
     final shift = await showDialog<FoodBankShift>(
@@ -25,9 +28,9 @@ class _FoodBankDetailScreenState extends State<FoodBankDetailScreen> {
     );
     if (shift == null) return;
 
-    setState(() => _shifts.add(shift));
-    ShiftStore.instance.addAvailable(widget.foodBank, shift);
     if (!mounted) return;
+    ShiftStore.instance.addAvailable(widget.foodBank, shift);
+    setState(() {});
     ScaffoldMessenger.of(
       context,
     ).showSnackBar(SnackBar(content: Text('${shift.title} was added.')));
@@ -342,12 +345,37 @@ class _AddShiftDialogState extends State<_AddShiftDialog> {
   String? _required(String? value) =>
       value == null || value.trim().isEmpty ? 'This field is required' : null;
 
+  DateTime? _parseDate(String value) {
+    final text = value.trim();
+    if (!RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(text)) return null;
+    final date = DateTime.tryParse(text);
+    if (date == null ||
+        date.year < 2000 ||
+        date.year > 2100 ||
+        date.toIso8601String().substring(0, 10) != text) {
+      return null;
+    }
+    return date;
+  }
+
+  Future<void> _pickDate() async {
+    final date = await showDatePicker(
+      context: context,
+      initialDate: _parseDate(_date.text) ?? DateTime.now(),
+      firstDate: DateTime(2000),
+      lastDate: DateTime(2100, 12, 31),
+    );
+    if (date != null && mounted) {
+      _date.text = date.toIso8601String().substring(0, 10);
+    }
+  }
+
   void _submit() {
     if (!(_formKey.currentState?.validate() ?? false)) return;
     Navigator.of(context).pop(
       FoodBankShift(
         title: _title.text.trim(),
-        date: _date.text.trim(),
+        scheduledDate: _parseDate(_date.text)!,
         time: _time.text.trim(),
         station: _station.text.trim(),
         spotsLeft: int.parse(_spots.text),
@@ -376,11 +404,18 @@ class _AddShiftDialogState extends State<_AddShiftDialog> {
                 const SizedBox(height: 12),
                 TextFormField(
                   controller: _date,
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     labelText: 'Date',
-                    hintText: 'Sat, Jun 27',
+                    hintText: 'YYYY-MM-DD',
+                    suffixIcon: IconButton(
+                      tooltip: 'Choose shift date',
+                      onPressed: _pickDate,
+                      icon: const Icon(Icons.calendar_month),
+                    ),
                   ),
-                  validator: _required,
+                  validator: (value) => _parseDate(value ?? '') == null
+                      ? 'Enter a valid date (YYYY-MM-DD), 2000–2100'
+                      : null,
                 ),
                 const SizedBox(height: 12),
                 TextFormField(
