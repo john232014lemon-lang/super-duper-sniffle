@@ -11,8 +11,14 @@ todos:
   - id: later-slices
     content: Complete mock slices 2-11 (detail, signup, map, onboarding, rewards, Kid Mode, groups, family accounts, and coordinator-managed QR attendance)
     status: completed
-  - id: firebase-foundation
-    content: Plan slices 12-14 separately for Firebase project configuration, Email/Password Authentication, and a Firestore smoke test
+  - id: slice-12-firebase-core
+    content: Core startup and FlutterFire CLI installed; awaiting Firebase login, project/platform selection, and generated configuration
+    status: in_progress
+  - id: slice-13-auth
+    content: Auth service and login/register/logout UI implemented and locally tested; awaiting provider enablement and live Firebase verification
+    status: in_progress
+  - id: slice-14-firestore
+    content: Create Firestore with restricted rules and a read/write smoke test
     status: pending
   - id: firebase-migrations
     content: Migrate one area per slice 15-21 (session/profile, banks, shifts, groups, family center, attendance, and rewards)
@@ -28,8 +34,8 @@ Bushel is a family-friendly food bank volunteering app: discover nearby banks on
 
 - **Repository root:** `bushel/super-giggle/`. It is the existing git repository; do not create another nested project or run `git init` inside it.
 - **Code lives directly in the repository**, with the Flutter entry point at `lib/main.dart` and this plan at `plan.md`.
-- **Completed mock phase (slices 0-11):** in-memory / local mock models. No Firebase or auth backend implemented yet.
-- **Next phase (planned only):** Firebase setup, Email/Password Authentication, then incremental Firestore migrations. This plan update does not authorize implementation, package installation, or cloud configuration.
+- **Completed mock phase (slices 0-11):** app-area models and stores remain in-memory / local mocks.
+- **Current phase:** slices 12 and 13 are authorized together. Core startup and authentication code are implemented; Firebase project configuration and live verification still need account access. Firestore and app-area migrations are not started.
 - **Later (out of scope for the Firebase phase):** real QR hardware/camera scanning, push notifications, and a free AI onboarding assistant.
 
 ## Seven-screen ecosystem
@@ -104,14 +110,16 @@ Follow your loop for **each** row: plan → prompt → test → fix → commit.
 7. The shift coordinator reviews everyone who checked in and confirms who is present.
 8. Confirmed attendees receive completed-shift credit and rewards; unconfirmed scans do not.
 
-## Firebase phase (planned, not started)
+## Firebase phase (slices 12-13 in progress)
+
+**Current status:** `firebase_core` and `firebase_auth` are installed, FlutterFire CLI is activated, and startup, registration/login/logout, restored-auth routing, errors, and mock-session clearing are implemented. Local widget tests pass. The Firebase CLI reports that login is required, so project/platform selection, generated configuration, Email/Password provider enablement, and live verification remain outstanding. `lib/firebase_options.dart` is a fail-closed setup placeholder; the app shows a startup error until FlutterFire replaces it. Windows plugin setup also requires Developer Mode. Neither slice is marked complete yet.
 
 Implement only one slice at a time when requested. The Firebase CLI is already installed; check its login/project access when Slice 12 begins. Keep unmigrated areas on their existing mock stores until their own slice. Add packages only in the slice that needs them, and retain a mock path for tests.
 
 | Slice | Smallest useful feature | Done when |
 | --- | --- | --- |
-| 12 | Firebase project + FlutterFire configure + core initialization | Pending: create or select the intended Firebase project, confirm target platforms, install/activate FlutterFire CLI if needed, run `flutterfire configure`, add `firebase_core`, and initialize Firebase before app startup. The app launches on each configured target with a clear initialization error state; app data remains mock |
-| 13 | Email/Password Authentication + minimal login | Pending: enable Email/Password in Firebase Authentication, add `firebase_auth`, and introduce a minimal auth service and sign-up/login/logout UI. An adult can register, sign in, restore an auth session after restart, and sign out; invalid credentials show a useful error. Profile persistence remains for Slice 15 |
+| 12 | Firebase project + FlutterFire configure + core initialization | In progress: create or select the intended Firebase project, confirm target platforms, install/activate FlutterFire CLI if needed, run `flutterfire configure`, add `firebase_core`, and initialize Firebase before app startup. The app launches on each configured target with a clear initialization error state; app data remains mock |
+| 13 | Email/Password Authentication + minimal login | In progress: enable Email/Password in Firebase Authentication, add `firebase_auth`, and introduce a minimal auth service and sign-up/login/logout UI. An adult can register, sign in, restore an auth session after restart, and sign out; invalid credentials show a useful error. Profile persistence remains for Slice 15 |
 | 14 | Firestore database + restricted read/write smoke test | Pending: create/connect Cloud Firestore in the chosen project and region, add `cloud_firestore`, and version its rules. A signed-in user can write/read/delete one test document scoped to their UID; signed-out and other-user access are denied in rules tests. Prefer restricted rules; if temporary test mode is used for setup, replace it before completion. No app store is migrated yet |
 | 15 | Session and adult profile persistence | Pending: store adult onboarding/profile data under the authenticated UID, restore it on login/restart, and clear account-specific state on logout. Two users cannot read or edit each other's private profile; UI role selection cannot grant coordinator authority. Unmigrated features retain their mock behavior |
 | 16 | Food bank discovery and details | Pending: seed a small development bank collection and load Discover, map markers, and bank details from it. Loading, empty, and error states work; ordinary users cannot change bank records. Shift data remains mock |
@@ -134,6 +142,6 @@ For each migration, define only that area's document shape and ownership rules, 
 5. Commit from the `super-giggle` repository root with a short why-focused message.
 6. Stop. Do not start the next slice in the same change.
 
-## Next implementation prompt (only when requested)
+## Current implementation boundary
 
-Implement Slice 12 only in the existing repository: select/connect the Firebase project, configure the intended Flutter targets with FlutterFire, add `firebase_core`, and initialize Firebase. Preserve the existing mock workflows and Git repository. Stop after startup verification; Authentication, Firestore, and store migrations belong to subsequent slices. This prompt is queued for a future request; the current task stops at updating this plan and the development log.
+Finish slices 12 and 13 once Firebase login and the project/platform choice are available: run FlutterFire configuration, enable Email/Password Authentication, and verify startup and real authentication on the selected targets. Preserve existing mock workflows. Stop before Slice 14; do not add Firestore or migrate stores in this change.

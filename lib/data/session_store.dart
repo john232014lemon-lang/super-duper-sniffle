@@ -23,6 +23,21 @@ class SessionStore extends ChangeNotifier {
   SessionStore._();
   static final SessionStore instance = SessionStore._();
 
+  void reset() {
+    final initial = SessionStore._();
+    _parentName = initial._parentName;
+    _parentRole = initial._parentRole;
+    _activeChildId = null;
+    _familyAccount = false;
+    _children.clear();
+    _challenges
+      ..clear()
+      ..addAll(initial._challenges);
+    _unlockedKidBadges.clear();
+    _featuredKidBadge = null;
+    notifyListeners();
+  }
+
   String _parentName = 'Maya';
   BushelRole _parentRole = BushelRole.volunteer;
   String? _activeChildId;

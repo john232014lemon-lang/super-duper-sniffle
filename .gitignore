@@ -57,3 +57,4 @@ app.*.map.json
 !.env.example
 # Local standalone development tools
 /tools/firebase/firebase.exe
+/firepit-log.txt

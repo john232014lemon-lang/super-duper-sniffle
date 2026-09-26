@@ -7,6 +7,15 @@ class CoordinatorStore extends ChangeNotifier {
   CoordinatorStore._();
 
   static final CoordinatorStore instance = CoordinatorStore._();
+
+  void reset() {
+    _members
+      ..clear()
+      ..addAll(CoordinatorStore._()._members);
+    _votersByTarget.clear();
+    notifyListeners();
+  }
+
   static const ShiftGroup sharedShiftGroup = ShiftGroup(
     id: 'sorting-packing-jun-20',
     shiftTitle: 'Sorting & Packing Line',

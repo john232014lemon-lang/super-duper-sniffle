@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../data/session_store.dart';
 import '../models/kid_badge.dart';
+import '../services/auth_service.dart';
 import 'home_screen.dart';
 import 'family_center_screen.dart';
 
@@ -14,6 +15,22 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen> {
   final _session = SessionStore.instance;
+  bool _signingOut = false;
+
+  Future<void> _signOut(AuthService auth) async {
+    setState(() => _signingOut = true);
+    try {
+      await auth.signOut();
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(authErrorMessage(error))));
+      }
+    } finally {
+      if (mounted) setState(() => _signingOut = false);
+    }
+  }
 
   KidBadge? get _featured {
     final id = _session.featuredKidBadge;
@@ -33,6 +50,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   Widget build(BuildContext context) {
     final featured = _featured;
+    final auth = AuthScope.maybeOf(context);
     return Scaffold(
       appBar: AppBar(title: const Text('Your profile')),
       body: Center(
@@ -140,6 +158,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 onPressed: _finish,
                 child: const Text('Use this mode'),
               ),
+              if (auth != null) ...[
+                const SizedBox(height: 16),
+                OutlinedButton.icon(
+                  onPressed: _signingOut ? null : () => _signOut(auth),
+                  icon: const Icon(Icons.logout),
+                  label: Text(_signingOut ? 'Signing out…' : 'Sign out'),
+                ),
+              ],
             ],
           ),
         ),

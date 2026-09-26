@@ -39,6 +39,18 @@ class ShiftStore extends ChangeNotifier {
 
   static final ShiftStore instance = ShiftStore._();
 
+  void reset() {
+    _available
+      ..clear()
+      ..addAll(ShiftStore._()._available);
+    _myShiftsByAccount.clear();
+    _completedByAccount.clear();
+    _pointsByAccount.clear();
+    _qrCodes.clear();
+    _pendingAttendance.clear();
+    notifyListeners();
+  }
+
   final List<ShiftListing> _available;
   final Map<String, List<ShiftListing>> _myShiftsByAccount = {};
   final Map<String, Set<FoodBankShift>> _completedByAccount = {};

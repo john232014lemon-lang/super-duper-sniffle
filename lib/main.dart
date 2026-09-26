@@ -1,13 +1,17 @@
 import 'package:flutter/material.dart';
 
 import 'screens/onboarding_screen.dart';
+import 'firebase_bootstrap.dart';
 
 void main() {
-  runApp(const BushelApp());
+  WidgetsFlutterBinding.ensureInitialized();
+  runApp(const FirebaseBootstrap());
 }
 
 class BushelApp extends StatelessWidget {
-  const BushelApp({super.key});
+  const BushelApp({super.key, this.home = const OnboardingScreen()});
+
+  final Widget home;
 
   static const Color seedColor = Color(0xFF31C663);
   static const Color inkColor = Color(0xFF0C2A1B);
@@ -61,7 +65,7 @@ class BushelApp extends StatelessWidget {
           ),
         ),
       ),
-      home: const OnboardingScreen(),
+      home: home,
     );
   }
 }

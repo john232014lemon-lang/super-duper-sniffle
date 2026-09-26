@@ -278,6 +278,16 @@
 
 **Modifications:** Updated the YAML todos and queued next implementation prompt. Kept physical QR scanning, push, AI, and other deferred scope explicitly later. This documentation update installs no packages, configures no Firebase resources, and changes no app code.
 
+### Slices 12-13: Firebase Core and Authentication (2026-09-15)
+
+**Prompt:** Build slices 12 and 13.
+
+**Result:** Added `firebase_core` and `firebase_auth`, activated FlutterFire CLI, and implemented startup loading/error/retry, an injectable auth service, adult Email/Password registration/login, restored-auth routing, and profile logout. Auth changes clear the navigation stack and all local mock account data. Firestore and profile persistence remain deferred.
+
+**Validation:** All 23 widget/unit tests pass, including five new auth tests for initialization retry, validation and credential errors, registration, restored sessions, nested-route logout, account isolation, and logout failure. The web release build passed. Static analysis passes after fixing two formatting-related lint findings. Live Firebase behavior remains unverified.
+
+**Remaining setup:** Firebase CLI requires `firebase login`; the intended project and platforms must be selected before FlutterFire configuration and enabling Email/Password. The options file currently reports missing configuration rather than supplying fake credentials. Live signup/login/restart verification remains pending. Flutter also reported that Windows Developer Mode is required for native plugin symlinks. Both slices remain in progress in `plan.md`.
+
 ## Challenges & Solutions
 
 ### Challenge 1: Flutter SDK Cache Lock
