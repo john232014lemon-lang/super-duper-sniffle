@@ -2,7 +2,7 @@
 
 Bushel is a family-friendly Flutter app for finding food banks and volunteering together. The first version uses local mock data so the core experience can be built and tested one small feature at a time.
 
-Android and Web are configured for Firebase project `bushel-volunteer-20260925`. Firebase initialization and Email/Password authentication are implemented; live API signup now works. Slice 16 creates the Firestore foundation in Dallas, Texas, but food banks, shifts, families, roles, and rewards still use mock data. Slices 14-15 provide a local demo mode and working shift calendar without Firebase login.
+Android and Web are configured for Firebase project `bushel-volunteer-20260925`. Firebase initialization and Email/Password authentication are implemented; live API signup now works. Profiles, banks, shifts, and adult signups use Firestore in Dallas, Texas. Groups, families, and coordinator applications are implemented but await the new rules deployment; attendance and rewards remain later slices. Slices 14-15 provide a local demo mode and working shift calendar without Firebase login.
 
 ## Run locally
 
@@ -42,34 +42,87 @@ Follow the official [FlutterFire setup](https://firebase.google.com/docs/flutter
 - Volunteer/Coordinator choices only change the mock experience; they grant no backend permissions.
 - Initialization and authentication failures have visible retry/error states. Mock widget tests can instantiate `BushelApp` or `DemoApp` directly; `main()` uses the Firebase startup/auth gate unless `BUSHEL_DEMO=true` is explicitly set.
 
-```sh
-flutter analyze --no-pub
-flutter test --no-pub
-flutter build web --no-pub
-```
-
-After enabling the provider, run the opt-in backend smoke test:
+The testing policy in [plan.md](plan.md) favors manual QA. Only seven offline smoke checks remain; use a relevant check for a small change, or the small suite for changes spanning several boundaries:
 
 ```sh
-python tools/firebase/auth_smoke_test.py
+flutter test --no-pub test/smoke_test.dart
 ```
 
-It uses each configured client API key to test signup, sign-in, token refresh, and incorrect-password rejection, and deletes its temporary accounts. It prints no passwords or tokens. This is a backend check, not proof of Android execution or browser session persistence.
-
-On each selected target, also verify: create an adult test account, finish onboarding, sign out from Profile, sign in again, restart to confirm auth and profile restoration, and enter an incorrect password to check the error. Sign in as a second account and confirm the first account's profile and local family/shift data are gone. All 35 local tests pass. Live Firebase UI verification still needs available browser/Android tooling.
+Run `flutter analyze --no-pub` once when Dart code changes. Release builds, emulator runs, and live tests are not routine slice requirements. Future agents should add at most 0–2 high-value smoke checks per feature and finish with 2–4 manual testing ideas. See [the manual testing menu](docs/manual_testing.md) for account switching, failed saves, and backend permission checks.
 
 ## Adult profiles (Slice 17)
 
 Normal startup saves the adult's name, preferred Volunteer/Coordinator experience, and family setting to `profiles/{uid}`, with a server `updatedAt` timestamp. Onboarding waits for a successful save; Profile's **Use this mode** saves the selected experience. Failed saves retain the form for retry. Returning adults skip onboarding. Logout clears local state and late responses cannot restore the old session.
 
-Profiles are private to their authenticated owner. Rules validate the allowed fields and deny collection queries and forged permission fields. `preferredRole` is only a display preference; backend coordinator privileges are not granted. Kid profiles, challenges, banks, shifts, groups, attendance, and rewards still use mocks. Demo mode never reads or writes Firebase.
+Profiles are private to their authenticated owner. Rules validate the allowed fields and deny collection queries and forged permission fields. `preferredRole` is only a display preference; with the new rules, coordinator privileges come from approved bank applications. Kids, challenges, and groups have Firestore implementations described below. Attendance and rewards remain for later slices. Demo mode never reads or writes Firebase.
+
+## Food banks and shifts (Slices 18–19)
+
+Normal mode streams discovery cards, map markers, bank details, shifts, and signups from Firestore. Empty/error states never fall back to mock banks. Date filtering keeps the stored calendar day across timezones. **My shifts** supports cancellation; creation and signup failures can be retried. Slice 21 adds parent-managed child places. Attendance remains Slice 22.
+
+| Path | Purpose | Client access |
+| --- | --- | --- |
+| `banks/{bankId}` | Name, address, hours, description, coordinates | Signed-in read; trusted admin writes |
+| `coordinatorApplications/{uid}/banks/{bankId}` | Application and administrator-controlled status | Owner read/create pending; trusted admin review |
+| `shifts/{shiftId}` | Bank, creator UID, date, time, station, capacity, signup count | Signed-in read; approved coordinator creates |
+| `registrations/{uid}/shifts/{shiftId}` | One registration per adult and shift | Owner-only read; atomic signup/cancellation |
+
+Signup and cancellation use [Firestore transactions](https://firebase.google.com/docs/firestore/manage-data/transactions). The new rules require registration, group membership, and capacity changes together. They reject duplicates and count tampering. Removing another adult requires a verified two-thirds vote, regardless of coordinator role. No Cloud Functions or billing setup is needed.
+
+No mock catalog records or permanent approvals were imported. A trusted project administrator can use the Firebase CLI login to import real records and review submitted applications. Refresh an expired CLI session with `firebase projects:list` (or `firebase login --reauth` if required). The helper targets `bushel-volunteer-20260925` and never prints tokens.
+
+Create a JSON array of bank records. Each record needs `id`, `name`, `shortName`, `description`, `address`, `hours`, numeric `latitude`/`longitude`, and optionally `distance`. Use stable IDs such as `houston-central`; omit distance unless it is meaningful for the catalog. The helper creates new records atomically and refuses to overwrite existing ones.
+
+```sh
+python tools/firebase/catalog_admin.py import-banks path/to/banks.json
+python tools/firebase/catalog_admin.py approve --uid FIREBASE_AUTH_UID --bank BANK_ID
+python tools/firebase/catalog_admin.py reject --uid FIREBASE_AUTH_UID --bank BANK_ID
+```
+
+Use the adult's Firebase Authentication UID, not their email or local `parent` ID. Approval requires an existing application. After approval, open that bank's details and choose **Add shift**. The form accepts a date, time, station, and 1–500 spots. The profile's Volunteer/Coordinator switch cannot create approvals. `grant`/`revoke` remain aliases for approving/rejecting existing applications; legacy `coordinatorAccess` records do not grant access under the new rules.
+
+## Coordinator applications and Slices 20–21
+
+**Deployment status:** The Slice 20–21 implementation was verified before the test-suite reduction; historical results are in `docs/development_log.md`. Production rules deployment remains pending explicit authorization. The previously deployed Slice 19 rules are unchanged. Deploy the new rules before using this app revision with live data. A prior read-only audit found zero existing shifts requiring migration; recheck before a later deployment.
+
+On a bank's detail page, an adult selects **Apply to coordinate** and provides their name, contact information, and experience/reason. The form retains input after a failed save. A successful submission stays **pending** and cannot grant privileges. Each adult has one application per bank; rejected applications require administrator follow-up.
+
+For database approval, open the existing project's Firestore database and navigate to:
+
+```text
+coordinatorApplications / FIREBASE_AUTH_UID / banks / BANK_ID
+```
+
+Review `name`, `contact`, `reason`, and `submittedAt`, then set the string field `status` to **`approved`**. Set it to **`rejected`** to deny or revoke coordination. The app streams this status and unlocks **Add shift** only for the approved bank. Clients cannot edit status, resubmit/overwrite applications, approve themselves, or inspect another person's application. The administrator commands above perform the same review action and check for concurrent changes.
+
+| Path | Stored data and access |
+| --- | --- |
+| `groups/{shiftId}` | Adult display names, seat counts, membership version, removed UIDs; readable only by current group members |
+| `groups/{shiftId}/votes/{targetUid}` | Voter UIDs and membership version; current adults vote once per target/version, never for themselves |
+| `families/{parentUid}` | Child names, family challenge titles, selected child ID; private to the authenticated parent |
+| `registrations/{parentUid}/shifts/{shiftId}.childIds` | Child places managed by that parent; private and atomically counted toward capacity |
+
+Open a group by tapping a shift in **My shifts**, or through the coordinator **Groups** page. Creating a shift does not automatically join its group. The removal threshold is `ceil(2 × current adult members / 3)`, including the target in the denominator. Children do not independently vote. Adult joins/cancellations/removals increment the membership version, invalidating old votes. The final vote attempts an atomic removal; **Complete removal** can retry if that follow-up was interrupted. Server rules validate the quorum and require group removal, registration deletion, and capacity restoration together. Removal also cancels the target parent's child places and prevents their immediate rejoining of that shift.
+
+In **Family Center**, parents create kids and challenges, switch profiles, and reserve child places in shifts they have already joined. Each child consumes one slot. Cancelling the parent's signup cancels all their child places. Kid Mode shows that child's persisted signups and routes shift management to the parent. The selected profile persists under the shared parent account, so switching it also affects the account's other sessions. Kids have no separate authentication identity; the rules reject signup, coordinator, and vote actions while Kid Mode is selected. Challenge completion, attendance, points, and badges remain Slices 22–23.
+
+After deployment approval, use:
+
+```sh
+python tools/firebase/catalog_admin.py audit-groups
+firebase deploy --only firestore:rules --project bushel-volunteer-20260925
+```
+
+If the audit reports legacy shifts missing groups, backfill their group membership from existing registrations before deploying; do not initialize an occupied shift with an empty group. New shifts create their empty groups atomically.
+
+Use the relevant [manual checks](docs/manual_testing.md) after an authorized deployment. The automated emulator/live harnesses have been removed; do not recreate them by default.
 
 ## Firestore foundation (Slice 16)
 
 - Project: `bushel-volunteer-20260925`; database: `(default)`; Standard edition, Native mode.
 - Location: **Dallas, Texas (`us-south1`)**. The existing database is already created; do not create another for this slice.
-- `firestore.rules` is deployed. Only the authenticated owner can create/get/delete `smokeTests/{uid}/runs/{runId}`. Test data must use the fixed message and a server timestamp. Diagnostic queries/updates remain denied. Adult profiles have the separate owner-only rules described above; other app collections remain denied.
-- Adult profiles use Firestore. Demo mode still initializes no Firebase services.
+- The earlier Slice 19 rules are deployed; the current `firestore.rules` adds Slices 20–21 and is pending authorization. Only the authenticated owner can create/get/delete `smokeTests/{uid}/runs/{runId}`. Test data must use the fixed message and a server timestamp. Diagnostic queries/updates remain denied. Profiles, banks, shifts, and registrations have the separate rules above; unmigrated collections remain denied.
+- Adult profiles, banks, shifts, and adult registrations use Firestore. Demo mode still initializes no Firebase services.
 
 Run the separate Flutter diagnostic, sign in, then click **Run connection check**:
 
@@ -79,26 +132,6 @@ flutter run -d chrome --target lib/firestore_smoke_main.dart
 
 It writes a unique test document, reads from the server, deletes it, and verifies deletion. This entry point is separate from normal app/demo flows. If connectivity or sign-in changes interrupt cleanup, rerun or inspect the current user's `smokeTests` documents.
 
-Rules/backend checks use Python 3 and the Firebase CLI. Emulator tests also require Java 21+ on PATH:
-
-```sh
-firebase emulators:exec --only auth,firestore --project demo-bushel "python tools/firebase/firestore_smoke_test.py --emulator"
-python tools/firebase/firestore_smoke_test.py --live
-```
-
-Both modes create temporary accounts/documents and clean them up. The emulator uses only loopback services and a `demo-` project; it never falls back to live data. All 45 checks pass in both modes: diagnostic access, profile persistence with a fresh token, owner access, other-user/signed-out rejection, schema validation, and denied privilege escalation. These checks do not claim an Android launch or interactive Flutter verification.
-
-A checksum-verified portable Java 21 runtime was downloaded to the ignored `.dart_tool/firestore-tools/` directory for this machine's test run; system Java was left unchanged. In PowerShell, select it for the current terminal before the emulator command:
-
-```powershell
-$env:JAVA_HOME = (Get-ChildItem .dart_tool/firestore-tools -Directory | Select-Object -First 1).FullName
-$env:PATH = "$env:JAVA_HOME/bin;$env:PATH"
-```
-
-Deploy future rule changes only after rerunning the emulator checks:
-
-```sh
-firebase deploy --only firestore:rules --project bushel-volunteer-20260925
-```
+Backend QA is developer-driven. Use ordinary authenticated client sessions or the Rules Playground for access checks; administrator operations bypass security rules. Optional manual emulator guidance is in `docs/manual_testing.md`. No automated emulator or live test suite is required before finishing a slice.
 
 Windows native plugin setup still reports a Developer Mode/symlink requirement; Android execution also needs the missing Android SDK/device. The Web diagnostic build succeeds with `--no-pub` using the resolved dependencies.

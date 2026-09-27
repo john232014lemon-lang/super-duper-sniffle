@@ -1,5 +1,31 @@
 # Bushel Development Log
 
+## 2026-09-27 — Manual-first QA and test-suite reduction
+
+**Request:** Refactor the plan, minimize automated testing/token overhead, remove redundant or elaborate tests (especially emulator tests), and require manual testing ideas in future agent handoffs.
+
+**Changes:** Reorganized `plan.md` around current status, remaining slice boundaries, and a manual-first testing policy. Added root `AGENTS.md` so future agents discover that policy. New features receive at most 0–2 small smoke tests for severe regressions; low-risk work may need none. Routine emulator/live suites and release builds are no longer completion requirements. Final feature responses must include 2–4 specific developer manual checks with expected results.
+
+**Pruning:** Replaced 46 Flutter tests across six files with seven short offline checks in `test/smoke_test.dart`: demo startup/reset, Firebase fail-closed startup, logout cleanup, late-account response isolation, no mock fallback for failed live data, approval-dependent coordinator UI, and parent-managed Kid Mode bookings. Removed long navigation/scroll scripts, field/schema permutations, redundant retry tests, badge/calendar detail checks, and fake persistence/voting implementations. Deleted all five automated backend scripts, including the 164-check emulator/live harness and standalone Auth runner. Kept the manually invoked Flutter connection diagnostic. Extracted the small HTTP helper into `tools/firebase/firestore_rest.py` so catalog administration remains functional.
+
+**Manual QA:** Added `docs/manual_testing.md` as a pick-the-relevant-checks menu, not a mandatory full regression run. Updated README commands and removed retired-suite instructions. App behavior and Firestore security rules were not changed by this cleanup. Historical test counts in older log entries describe earlier runs, not the current testing policy.
+
+**Verification:** Ran analysis once (clean), the reduced seven-test suite once (all pass, about two seconds of test execution), and `catalog_admin.py --help` to check local imports without contacting Firebase. No emulator, live-data test, release build, or deployment was run for this cleanup. Manual application/backend checks remain developer work. The previous deployment authorization boundary is unchanged.
+
+## 2026-09-27 — Slices 20–21 and coordinator applications
+
+**Request:** Build both groups/voting and persistent Family Center, plus applications on bank pages that administrators approve in the database.
+
+**Implemented:** Bank-specific applications with required contact/reason fields, pending/approved/rejected status, retained form input on errors, and approval-controlled shift creation. Trusted administrators review the application document directly or use `catalog_admin.py approve/reject`; legacy grants no longer authorize coordination under the new rules.
+
+**Groups:** Shift creation initializes a group. Adult signup/cancellation changes registration, capacity, and group membership atomically. Current adults vote once per target per membership version. Firestore rules verify a two-thirds quorum; removal atomically deletes the registration and adult/child places, restores capacity, revokes group access, and blocks immediate rejoining. Membership changes invalidate stale votes. Interrupted finalization has a retry action. Other families cannot read private registrations.
+
+**Families:** Parent-owned kids, challenge titles, and profile selection persist in a private family document. Parents reserve capacity-counted child places in their own shifts. Kid Mode restores the child's real shifts and cannot independently sign up, coordinate, or vote. Attendance/reward/challenge progress remains outside this slice; demo mode stays local.
+
+**Validation:** Clean Flutter analysis; all 46 Flutter tests pass; Web build succeeds. All 164 emulator backend checks pass (45 foundation, 43 catalog, 76 community). Tests include denial paths, last-slot races, stale/duplicate votes, atomic removal cleanup, family privacy, and persistence. Temporary emulator fixtures are cleaned up. The read-only live audit found zero existing shifts needing group migration.
+
+**Deployment boundary:** Automatic approval review rejected production Firestore rules deployment and isolated live tests because the user had not explicitly authorized those production security changes. No new rules were deployed and no live test fixtures were created. Implementation is ready; live deployment/tests await user approval. Interactive platform verification remains open. No commit or push was made; pre-existing workspace changes were preserved.
+
 ## Project Overview
 
 - **App Name:** Bushel
@@ -335,6 +361,16 @@
 **Result:** Adult onboarding saves name, experience preference, and family setting to `profiles/{auth UID}` in the existing Dallas database. Sign-in restores the profile; missing profiles onboard, and read/write failures allow retry. Profile mode changes save before being applied. Account changes clear navigation and local data; stale responses cannot restore the old session. Demo and all other app areas remain local.
 
 **Security and validation:** Deployed owner-only profile rules with an allowlisted schema. Coordinator preference grants no backend permissions. Static analysis is clean, the normal Web build succeeds, and all 35 Flutter tests and 45 emulator/45 live Firestore checks pass; temporary test users/documents were removed. Interactive Android/Web verification remains pending.
+
+### Feature: Slices 18–19 food banks, shifts, and signup (2026-09-26)
+
+**Prompt:** Build slices 18 and 19; continue.
+
+**Result:** Normal adult mode streams banks into discovery, map, details, and recommendations, with loading/empty/retry states. Shifts use stable document IDs and date-only calendar mapping. Approved coordinators create shifts; adult signup/cancellation and My Shifts persist across sessions. Demo and kid shift data remain local. Live group/attendance actions wait for their slices; removed a stale group path that assumed a nonempty mock shift list.
+
+**Security and setup:** Deployed bank-specific coordinator access rules separate from profile preferences. Atomic registration/count rules enforce capacity, prevent duplicate signup and count tampering, and isolate private registrations. Added administrator CLI helpers to import new bank records and grant/revoke access. No permanent access grants or sample bank data were added.
+
+**Validation:** All 42 Flutter tests pass, analysis is clean, and the Web build succeeds. All 43 catalog/shift checks and 45 existing profile/connection checks pass in both emulator and live runs, including a simultaneous last-slot signup race. Admin import/grant/revoke payloads are exercised by the test fixtures. Temporary fixtures were cleaned up. Interactive Android/Web verification remains pending.
 
 ## Challenges & Solutions
 

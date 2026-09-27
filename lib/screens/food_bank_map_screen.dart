@@ -5,6 +5,8 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 
 import '../data/mock_food_banks.dart';
+import '../data/catalog_store.dart';
+import '../data/shift_store.dart';
 import '../models/food_bank.dart';
 import '../widgets/bushel_navigation_bar.dart';
 import 'food_bank_detail_screen.dart';
@@ -41,14 +43,33 @@ class _FoodBankMapScreenState extends State<FoodBankMapScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final catalog = CatalogScope.maybeOf(context);
+    final banks = catalog?.banks ?? mockFoodBanks;
+    if (catalog != null &&
+        (catalog.banksLoading || catalog.banksFailed || banks.isEmpty)) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Food banks nearby')),
+        body: Center(child: CatalogStatus(store: catalog)),
+        bottomNavigationBar: const BushelNavigationBar(selectedIndex: 1),
+      );
+    }
+    final selectedBank = _selectedBank == null
+        ? null
+        : banks
+              .where(
+                (bank) => bank.id != null
+                    ? bank.id == _selectedBank!.id
+                    : identical(bank, _selectedBank),
+              )
+              .firstOrNull;
     return Scaffold(
       appBar: AppBar(
-        title: const Column(
+        title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text('Food banks nearby'),
             Text(
-              'Houston, TX',
+              catalog == null ? 'Houston, TX' : 'Published locations',
               style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
             ),
           ],
@@ -61,7 +82,9 @@ class _FoodBankMapScreenState extends State<FoodBankMapScreen> {
             children: [
               FlutterMap(
                 options: MapOptions(
-                  initialCenter: _houstonCenter,
+                  initialCenter: catalog != null
+                      ? banks.first.location
+                      : _houstonCenter,
                   initialZoom: 13.5,
                   minZoom: 3,
                   maxZoom: 18,
@@ -75,14 +98,14 @@ class _FoodBankMapScreenState extends State<FoodBankMapScreen> {
                   ),
                   MarkerLayer(
                     markers: [
-                      for (final bank in mockFoodBanks)
+                      for (final bank in banks)
                         Marker(
                           point: bank.location,
                           width: 64,
                           height: 64,
                           child: _MapPin(
                             foodBank: bank,
-                            selected: identical(_selectedBank, bank),
+                            selected: identical(selectedBank, bank),
                             onTap: () => _selectBank(bank),
                           ),
                         ),
@@ -97,15 +120,16 @@ class _FoodBankMapScreenState extends State<FoodBankMapScreen> {
                             top: 82,
                             left: 14,
                             child: _MapKey(
+                              banks: banks,
                               directions: [
                                 for (
                                   var index = 0;
-                                  index < mockFoodBanks.length;
+                                  index < banks.length;
                                   index++
                                 )
                                   _directionTo(
                                     camera.latLngToScreenOffset(
-                                      mockFoodBanks[index].location,
+                                      banks[index].location,
                                     ),
                                     index,
                                   ),
@@ -131,7 +155,7 @@ class _FoodBankMapScreenState extends State<FoodBankMapScreen> {
                 child: Material(
                   elevation: 3,
                   borderRadius: BorderRadius.circular(18),
-                  child: const Padding(
+                  child: Padding(
                     padding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                     child: Row(
                       children: [
@@ -139,7 +163,7 @@ class _FoodBankMapScreenState extends State<FoodBankMapScreen> {
                         SizedBox(width: 10),
                         Expanded(
                           child: Text(
-                            'Explore 3 Houston food banks',
+                            'Explore ${banks.length} food banks',
                             style: TextStyle(fontWeight: FontWeight.w800),
                           ),
                         ),
@@ -160,14 +184,14 @@ class _FoodBankMapScreenState extends State<FoodBankMapScreen> {
                   child: const Icon(Icons.my_location),
                 ),
               ),
-              if (_selectedBank != null)
+              if (selectedBank != null)
                 Positioned(
                   left: 14,
                   right: 14,
                   bottom: 18,
                   child: _BankPreview(
-                    foodBank: _selectedBank!,
-                    onTap: () => _openDetails(_selectedBank!),
+                    foodBank: selectedBank,
+                    onTap: () => _openDetails(selectedBank),
                   ),
                 ),
             ],
@@ -186,7 +210,12 @@ class _FoodBankMapScreenState extends State<FoodBankMapScreen> {
 }
 
 class _MapKey extends StatelessWidget {
-  const _MapKey({required this.directions, required this.onBankSelected});
+  const _MapKey({
+    required this.banks,
+    required this.directions,
+    required this.onBankSelected,
+  });
+  final List<FoodBank> banks;
 
   final List<double> directions;
   final ValueChanged<FoodBank> onBankSelected;
@@ -212,9 +241,9 @@ class _MapKey extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 4),
-            for (var index = 0; index < mockFoodBanks.length; index++)
+            for (var index = 0; index < banks.length; index++)
               InkWell(
-                onTap: () => onBankSelected(mockFoodBanks[index]),
+                onTap: () => onBankSelected(banks[index]),
                 borderRadius: BorderRadius.circular(8),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(vertical: 3),
@@ -225,13 +254,13 @@ class _MapKey extends StatelessWidget {
                         angle: directions[index],
                         child: Icon(
                           Icons.arrow_right_alt_rounded,
-                          color: mockFoodBanks[index].accent,
+                          color: banks[index].accent,
                           size: 22,
                         ),
                       ),
                       const SizedBox(width: 3),
                       Text(
-                        mockFoodBanks[index].shortName,
+                        banks[index].shortName,
                         style: const TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w800,
@@ -306,7 +335,7 @@ class _BankPreview extends StatelessWidget {
           style: const TextStyle(fontWeight: FontWeight.w900),
         ),
         subtitle: Text(
-          '${foodBank.distance} · ${foodBank.shifts.length} upcoming shifts',
+          '${foodBank.distance} · ${ShiftStore.instance.available.where((listing) => foodBank.id != null ? listing.foodBank.id == foodBank.id : listing.foodBank == foodBank).length} upcoming shifts',
         ),
         trailing: FilledButton(
           onPressed: onTap,

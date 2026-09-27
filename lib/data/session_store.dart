@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import '../services/community_models.dart';
 
 enum BushelRole { volunteer, coordinator, kid }
 
@@ -35,6 +36,7 @@ class SessionStore extends ChangeNotifier {
       ..addAll(initial._challenges);
     _unlockedKidBadges.clear();
     _featuredKidBadge = null;
+    _liveFamily = false;
     notifyListeners();
   }
 
@@ -62,12 +64,33 @@ class SessionStore extends ChangeNotifier {
   ];
   final Set<String> _unlockedKidBadges = {};
   String? _featuredKidBadge;
+  bool _liveFamily = false;
+  void applyFamily(FamilyData data) {
+    _liveFamily = true;
+    _children
+      ..clear()
+      ..addAll(
+        data.children.entries.map(
+          (entry) => FamilyChild(id: entry.key, name: entry.value),
+        ),
+      );
+    _challenges
+      ..clear()
+      ..addAll(
+        data.challenges.entries.map(
+          (entry) =>
+              FamilyChallenge(id: entry.key, title: entry.value, emoji: '⭐'),
+        ),
+      );
+    _activeChildId = data.activeChildId.isEmpty ? null : data.activeChildId;
+    notifyListeners();
+  }
 
   String get parentName => _parentName;
   String get userName => activeChild?.name ?? _parentName;
   BushelRole get role => activeChild == null ? _parentRole : BushelRole.kid;
   BushelRole get parentRole => _parentRole;
-  bool get familyAccount => _familyAccount;
+  bool get familyAccount => _familyAccount || _children.isNotEmpty;
   bool get isKidAccount => activeChild != null;
   List<FamilyChild> get children => List.unmodifiable(_children);
   List<FamilyChallenge> get challenges => List.unmodifiable(_challenges);
@@ -93,7 +116,7 @@ class SessionStore extends ChangeNotifier {
     _parentName = name;
     _parentRole = role == BushelRole.kid ? BushelRole.volunteer : role;
     _familyAccount = family;
-    _activeChildId = null;
+    if (!_liveFamily) _activeChildId = null;
     notifyListeners();
   }
 

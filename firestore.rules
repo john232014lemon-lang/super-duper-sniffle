@@ -1,6 +1,186 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    // Kid Mode uses the parent's identity, never a separate child credential.
+    function parentMode() {
+      return signedIn() && (!exists(/databases/$(database)/documents/families/$(request.auth.uid))
+        || get(/databases/$(database)/documents/families/$(request.auth.uid)).data.activeChildId == '');
+    }
+    function coordinates(bankId) {
+      return parentMode()
+        && get(/databases/$(database)/documents/coordinatorApplications/$(request.auth.uid)/banks/$(bankId)).data.status == 'approved';
+    }
+    function groupPath(sid) { return /databases/$(database)/documents/groups/$(sid); }
+    function regPath(uid, sid) { return /databases/$(database)/documents/registrations/$(uid)/shifts/$(sid); }
+    function shiftPath(sid) { return /databases/$(database)/documents/shifts/$(sid); }
+    function member(sid) { return signedIn() && request.auth.uid in get(groupPath(sid)).data.members; }
+    function beforeSeats(uid, sid) { return exists(regPath(uid, sid)) ? 1 + get(regPath(uid, sid)).data.get('childIds', []).size() : 0; }
+    function afterSeats(uid, sid) { return existsAfter(regPath(uid, sid)) ? 1 + getAfter(regPath(uid, sid)).data.get('childIds', []).size() : 0; }
+    function quorum(sid, target) {
+      let g = get(groupPath(sid)).data;
+      let vote = get(/databases/$(database)/documents/groups/$(sid)/votes/$(target)).data;
+      return member(sid) && target != request.auth.uid && target in g.members
+        && vote.version == g.version && vote.voters.size() * 3 >= g.members.size() * 2;
+    }
+    function removedTarget(sid) {
+      return get(groupPath(sid)).data.members.keys().removeAll(getAfter(groupPath(sid)).data.members.keys())[0];
+    }
+    function removal(sid, target) {
+      return quorum(sid, target) && !existsAfter(regPath(target, sid))
+        && !(target in getAfter(groupPath(sid)).data.members)
+        && target in getAfter(groupPath(sid)).data.banned;
+    }
+    function text(value, limit) { return value is string && value.size() > 0 && value.size() <= limit && value.matches('(?s).*\\S.*'); }
+    match /coordinatorApplications/{uid}/banks/{bankId} {
+      allow read: if signedIn() && request.auth.uid == uid;
+      allow create: if parentMode() && request.auth.uid == uid
+        && exists(/databases/$(database)/documents/banks/$(bankId))
+        && request.resource.data.keys().hasOnly(['name', 'contact', 'reason', 'status', 'submittedAt'])
+        && text(request.resource.data.name, 80) && text(request.resource.data.contact, 160)
+        && text(request.resource.data.reason, 2000)
+        && request.resource.data.status == 'pending' && request.resource.data.submittedAt == request.time;
+      // Only a trusted administrator can approve, reject, or reopen an application.
+    }
+    match /families/{uid} {
+      function owner() { return signedIn() && request.auth.uid == uid; }
+      function entryChange(field, limit, maxEntries) {
+        let old = resource == null ? {} : resource.data[field];
+        let next = request.resource.data[field];
+        let changed = next.keys().removeAll(old.keys());
+        return next == old || (next is map && next.size() <= maxEntries
+          && next.diff(old).removedKeys().size() == 0 && next.diff(old).changedKeys().size() == 0
+          && changed.size() == 1 && text(next[changed[0]], limit));
+      }
+      allow get: if owner();
+      allow create, update: if owner()
+        && request.resource.data.keys().hasOnly(['children', 'challenges', 'activeChildId'])
+        && entryChange('children', 80, 50) && entryChange('challenges', 160, 100)
+        && (parentMode() || (request.resource.data.children == resource.data.children && request.resource.data.challenges == resource.data.challenges))
+        && request.resource.data.activeChildId is string
+        && (request.resource.data.activeChildId == '' || request.resource.data.activeChildId in request.resource.data.children);
+    }
+    match /banks/{bankId} {
+      allow read: if signedIn();
+      // Catalog records are managed by trusted project administrators only.
+    }
+    match /coordinatorAccess/{uid} {
+      allow get: if signedIn() && request.auth.uid == uid;
+      // Never writable by clients, including coordinators.
+    }
+    match /shifts/{shiftId} {
+      allow read: if signedIn();
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(['bankId', 'creatorUid', 'title', 'date', 'time', 'station', 'capacity', 'signupCount', 'createdAt'])
+        && request.resource.data.bankId is string
+        && exists(/databases/$(database)/documents/banks/$(request.resource.data.bankId))
+        && coordinates(request.resource.data.bankId)
+        && request.resource.data.creatorUid == request.auth.uid
+        && request.resource.data.title is string && request.resource.data.title.size() > 0 && request.resource.data.title.size() <= 120
+        && request.resource.data.time is string && request.resource.data.time.size() > 0 && request.resource.data.time.size() <= 80
+        && request.resource.data.station is string && request.resource.data.station.size() > 0 && request.resource.data.station.size() <= 120
+        && request.resource.data.date is timestamp
+        && request.resource.data.date >= timestamp.date(2000, 1, 1)
+        && request.resource.data.date < timestamp.date(2101, 1, 1)
+        && request.resource.data.capacity is int && request.resource.data.capacity > 0 && request.resource.data.capacity <= 500
+        && request.resource.data.signupCount == 0
+        && request.resource.data.createdAt == request.time
+        && !exists(groupPath(shiftId))
+        && getAfter(groupPath(shiftId)).data == {'members': {}, 'seats': {}, 'version': 0, 'banned': []};
+
+      function registration() {
+        return /databases/$(database)/documents/registrations/$(request.auth.uid)/shifts/$(shiftId);
+      }
+      function ownCountChange() {
+        let delta = afterSeats(request.auth.uid, shiftId) - beforeSeats(request.auth.uid, shiftId);
+        return delta != 0 && request.resource.data.signupCount == resource.data.signupCount + delta;
+      }
+      function removalCountChange() {
+        let target = removedTarget(shiftId);
+        return removal(shiftId, target)
+          && request.resource.data.signupCount == resource.data.signupCount - beforeSeats(target, shiftId);
+      }
+      allow update: if signedIn()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['signupCount'])
+        && request.resource.data.signupCount is int
+        && request.resource.data.signupCount >= 0
+        && request.resource.data.signupCount <= resource.data.capacity
+        && (ownCountChange() || removalCountChange());
+    }
+    match /registrations/{uid}/shifts/{shiftId} {
+      function owner() { return signedIn() && request.auth.uid == uid; }
+      function shift() { return /databases/$(database)/documents/shifts/$(shiftId); }
+      allow read: if owner();
+      allow create: if owner() && parentMode()
+        && request.resource.data.keys().hasOnly(['createdAt'])
+        && request.resource.data.createdAt == request.time
+        && exists(shift())
+        && getAfter(shift()).data.signupCount == get(shift()).data.signupCount + 1
+        && getAfter(shift()).data.signupCount <= get(shift()).data.capacity
+        && uid in getAfter(groupPath(shiftId)).data.members
+        && !(uid in get(groupPath(shiftId)).data.members)
+        && !(uid in get(groupPath(shiftId)).data.banned);
+      allow update: if owner() && parentMode()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['childIds'])
+        && request.resource.data.childIds is list
+        && request.resource.data.childIds.size() == request.resource.data.childIds.toSet().size()
+        && request.resource.data.childIds.hasOnly(get(/databases/$(database)/documents/families/$(uid)).data.children.keys())
+        && ((request.resource.data.childIds.size() == resource.data.get('childIds', []).size() + 1
+              && request.resource.data.childIds.hasAll(resource.data.get('childIds', [])))
+          || (request.resource.data.childIds.size() == resource.data.get('childIds', []).size() - 1
+              && resource.data.get('childIds', []).hasAll(request.resource.data.childIds)))
+        && getAfter(shift()).data.signupCount == get(shift()).data.signupCount + request.resource.data.childIds.size() - resource.data.get('childIds', []).size()
+        && getAfter(groupPath(shiftId)).data.seats[uid] == 1 + request.resource.data.childIds.size();
+      allow delete: if parentMode() && (owner() || removal(shiftId, uid))
+        && !(uid in getAfter(groupPath(shiftId)).data.members)
+        && getAfter(shift()).data.signupCount == get(shift()).data.signupCount - 1 - resource.data.get('childIds', []).size()
+        && getAfter(shift()).data.signupCount >= 0;
+    }
+    match /groups/{shiftId} {
+      allow get: if member(shiftId);
+      allow create: if signedIn() && !exists(shiftPath(shiftId))
+        && getAfter(shiftPath(shiftId)).data.creatorUid == request.auth.uid
+        && request.resource.data == {'members': {}, 'seats': {}, 'version': 0, 'banned': []};
+      function ownMembership() {
+        let uid = request.auth.uid;
+        let before = beforeSeats(uid, shiftId);
+        let after = afterSeats(uid, shiftId);
+        let next = request.resource.data;
+        return next.banned == resource.data.banned
+          && next.members.diff(resource.data.members).affectedKeys().hasOnly([uid])
+          && next.seats.diff(resource.data.seats).affectedKeys().hasOnly([uid])
+          && ((before == 0 && after == 1 && !(uid in resource.data.banned)
+              && text(next.members[uid], 80) && next.seats[uid] == 1 && next.version == resource.data.version + 1)
+            || (before > 0 && after == 0 && !(uid in next.members) && !(uid in next.seats) && next.version == resource.data.version + 1)
+            || (before > 0 && after > 0 && before != after && next.members == resource.data.members
+              && next.seats[uid] == after && next.version == resource.data.version));
+      }
+      function removeMember() {
+        let target = removedTarget(shiftId);
+        let next = request.resource.data;
+        return removal(shiftId, target)
+          && next.members.diff(resource.data.members).affectedKeys().hasOnly([target])
+          && next.seats.diff(resource.data.seats).affectedKeys().hasOnly([target])
+          && !(target in next.seats) && next.version == resource.data.version + 1
+          && next.banned == resource.data.banned.concat([target]);
+      }
+      allow update: if signedIn()
+        && request.resource.data.keys().hasOnly(['members', 'seats', 'version', 'banned'])
+        && (ownMembership() || removeMember());
+      match /votes/{target} {
+        allow read: if member(shiftId);
+        function validVote() {
+          let g = get(groupPath(shiftId)).data;
+          let previous = resource == null || resource.data.version != g.version ? [] : resource.data.voters;
+          return parentMode() && member(shiftId) && target in g.members && target != request.auth.uid
+            && request.resource.data.keys().hasOnly(['version', 'voters'])
+            && request.resource.data.version == g.version
+            && !(request.auth.uid in previous)
+            && request.resource.data.voters == previous.concat([request.auth.uid]);
+        }
+        allow create, update: if validVote();
+      }
+    }
     match /profiles/{uid} {
       function isOwner() {
         return request.auth != null && request.auth.uid == uid;

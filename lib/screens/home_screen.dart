@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 
 import '../data/mock_food_banks.dart';
+import '../data/catalog_store.dart';
+import '../data/shift_store.dart';
+import 'shifts_screen.dart';
 import '../data/session_store.dart';
 import '../models/kid_badge.dart';
 import 'food_bank_detail_screen.dart';
@@ -46,9 +49,11 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final catalog = CatalogScope.maybeOf(context);
+    final banks = catalog?.banks ?? mockFoodBanks;
     if (_session.role == BushelRole.kid) {
       return _KidHomeScreen(
-        name: widget.name,
+        name: _session.userName,
         onProfile: _openProfile,
         onCheckIn: _openCheckIn,
       );
@@ -71,7 +76,8 @@ class _HomeScreenState extends State<HomeScreen> {
                         role: _session.role,
                         onProfile: _openProfile,
                       ),
-                      if (_session.role == BushelRole.coordinator) ...[
+                      if (catalog == null &&
+                          _session.role == BushelRole.coordinator) ...[
                         const SizedBox(height: 14),
                         _CoordinatorNotice(
                           onTap: () => Navigator.of(context).push(
@@ -82,7 +88,27 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                       ],
                       const SizedBox(height: 20),
-                      _NextShiftCard(onCheckIn: _openCheckIn),
+                      if (catalog == null)
+                        _NextShiftCard(onCheckIn: _openCheckIn)
+                      else
+                        Card(
+                          child: ListTile(
+                            title: Text(
+                              ShiftStore.instance.myShifts.isEmpty
+                                  ? 'Find your next shift'
+                                  : 'Your upcoming shifts',
+                            ),
+                            subtitle: Text(
+                              '${ShiftStore.instance.myShifts.length} signed up',
+                            ),
+                            trailing: const Icon(Icons.chevron_right),
+                            onTap: () => Navigator.of(context).push(
+                              MaterialPageRoute<void>(
+                                builder: (_) => const ShiftsScreen(),
+                              ),
+                            ),
+                          ),
+                        ),
                       const SizedBox(height: 18),
                       const _ImpactStats(),
                       const SizedBox(height: 26),
@@ -96,82 +122,63 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                       ),
                       const SizedBox(height: 12),
-                      SizedBox(
-                        height: 176,
-                        child: ListView(
-                          scrollDirection: Axis.horizontal,
-                          children: [
-                            _FoodBankCard(
-                              name: 'Second Harvest',
-                              status: 'Open · 12 shifts open',
-                              distance: '0.8 mi',
-                              accent: const Color(0xFFEF5269),
-                              icon: Icons.inventory_2_outlined,
-                              onTap: () => Navigator.of(context).push(
-                                MaterialPageRoute<void>(
-                                  builder: (_) => FoodBankDetailScreen(
-                                    foodBank: mockFoodBanks[0],
+                      if (catalog != null &&
+                          (catalog.banksLoading ||
+                              catalog.banksFailed ||
+                              banks.isEmpty))
+                        CatalogStatus(store: catalog)
+                      else
+                        SizedBox(
+                          height: 176,
+                          child: ListView.separated(
+                            scrollDirection: Axis.horizontal,
+                            itemCount: banks.length,
+                            separatorBuilder: (_, _) =>
+                                const SizedBox(width: 12),
+                            itemBuilder: (context, index) {
+                              final bank = banks[index];
+                              return _FoodBankCard(
+                                name: bank.shortName,
+                                status: bank.hours,
+                                distance: bank.distance,
+                                accent: bank.accent,
+                                icon: bank.icon,
+                                onTap: () => Navigator.of(context).push(
+                                  MaterialPageRoute<void>(
+                                    builder: (_) =>
+                                        FoodBankDetailScreen(foodBank: bank),
                                   ),
                                 ),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            _FoodBankCard(
-                              name: 'Loaves & Fishes',
-                              status: 'Open · 4 shifts open',
-                              distance: '1.4 mi',
-                              accent: const Color(0xFF23B65E),
-                              icon: Icons.groups_outlined,
-                              onTap: () => Navigator.of(context).push(
-                                MaterialPageRoute<void>(
-                                  builder: (_) => FoodBankDetailScreen(
-                                    foodBank: mockFoodBanks[1],
-                                  ),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            _FoodBankCard(
-                              name: 'Martha’s Kitchen',
-                              status: 'Open · 2 shifts open',
-                              distance: '2.1 mi',
-                              accent: const Color(0xFF2D8FC7),
-                              icon: Icons.soup_kitchen_outlined,
-                              onTap: () => Navigator.of(context).push(
-                                MaterialPageRoute<void>(
-                                  builder: (_) => FoodBankDetailScreen(
-                                    foodBank: mockFoodBanks[2],
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
+                              );
+                            },
+                          ),
                         ),
-                      ),
                       const SizedBox(height: 26),
-                      _SectionHeader(
-                        title: 'Help needed today',
-                        action: 'All',
-                        onPressed: () => _comingSoon('All shifts'),
-                      ),
-                      const SizedBox(height: 12),
-                      _HelpCard(
-                        title: 'Delivery drivers',
-                        detail: 'Second Harvest · 2–4 PM',
-                        icon: Icons.local_shipping,
-                        color: const Color(0xFF2CC56A),
-                        action: 'Claim',
-                        onTap: () => _comingSoon('Shift signup'),
-                      ),
-                      const SizedBox(height: 10),
-                      _HelpCard(
-                        title: 'Produce sorting',
-                        detail: 'Loaves & Fishes · 3–5 PM',
-                        icon: Icons.eco,
-                        color: const Color(0xFFFFAD17),
-                        action: '3 left',
-                        onTap: () => _comingSoon('Shift signup'),
-                      ),
+                      if (catalog == null) ...[
+                        _SectionHeader(
+                          title: 'Help needed today',
+                          action: 'All',
+                          onPressed: () => _comingSoon('All shifts'),
+                        ),
+                        const SizedBox(height: 12),
+                        _HelpCard(
+                          title: 'Delivery drivers',
+                          detail: 'Second Harvest · 2–4 PM',
+                          icon: Icons.local_shipping,
+                          color: const Color(0xFF2CC56A),
+                          action: 'Claim',
+                          onTap: () => _comingSoon('Shift signup'),
+                        ),
+                        const SizedBox(height: 10),
+                        _HelpCard(
+                          title: 'Produce sorting',
+                          detail: 'Loaves & Fishes · 3–5 PM',
+                          icon: Icons.eco,
+                          color: const Color(0xFFFFAD17),
+                          action: '3 left',
+                          onTap: () => _comingSoon('Shift signup'),
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -216,12 +223,14 @@ class _HomeHeader extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Row(
+              Row(
                 children: [
                   Icon(Icons.location_on, color: Color(0xFF20B85A), size: 16),
                   SizedBox(width: 4),
                   Text(
-                    'San Jose, CA',
+                    CatalogScope.maybeOf(context) == null
+                        ? 'San Jose, CA'
+                        : 'Food bank network',
                     style: TextStyle(
                       color: Color(0xFF68756D),
                       fontSize: 12,
@@ -326,6 +335,8 @@ class _KidHomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final featured = _featured;
+    final catalog = CatalogScope.maybeOf(context);
+    final nextShift = ShiftStore.instance.myShifts.firstOrNull;
     return Scaffold(
       key: const ValueKey('kid-home'),
       body: SafeArea(
@@ -365,23 +376,32 @@ class _KidHomeScreen extends StatelessWidget {
                     ),
                     borderRadius: BorderRadius.circular(28),
                   ),
-                  child: const Column(
+                  child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
+                      const Text(
                         'YOUR NEXT ADVENTURE',
                         style: TextStyle(fontWeight: FontWeight.w900),
                       ),
-                      SizedBox(height: 12),
+                      const SizedBox(height: 12),
                       Text(
-                        'Sorting & Packing Line',
-                        style: TextStyle(
+                        catalog == null
+                            ? 'Sorting & Packing Line'
+                            : nextShift?.shift.title ??
+                                  'Plan your next shift together',
+                        style: const TextStyle(
                           fontSize: 24,
                           fontWeight: FontWeight.w900,
                         ),
                       ),
-                      SizedBox(height: 6),
-                      Text('Saturday · 9:00 AM · Warehouse A'),
+                      const SizedBox(height: 6),
+                      Text(
+                        catalog == null
+                            ? 'Saturday · 9:00 AM · Warehouse A'
+                            : nextShift == null
+                            ? 'Ask your parent to reserve a place in Family Center.'
+                            : '${nextShift.shift.date} · ${nextShift.shift.time} · ${nextShift.shift.station}',
+                      ),
                     ],
                   ),
                 ),
@@ -389,11 +409,19 @@ class _KidHomeScreen extends StatelessWidget {
                 SizedBox(
                   height: 74,
                   child: FilledButton.icon(
-                    onPressed: onCheckIn,
+                    onPressed: catalog == null
+                        ? onCheckIn
+                        : () => Navigator.of(context).push(
+                            MaterialPageRoute<void>(
+                              builder: (_) => const ShiftsScreen(),
+                            ),
+                          ),
                     icon: const Icon(Icons.qr_code_scanner, size: 30),
-                    label: const Text(
-                      'CHECK IN & PICK A BADGE',
-                      style: TextStyle(fontSize: 17),
+                    label: Text(
+                      catalog == null
+                          ? 'CHECK IN & PICK A BADGE'
+                          : 'VIEW MY SHIFTS',
+                      style: const TextStyle(fontSize: 17),
                     ),
                   ),
                 ),

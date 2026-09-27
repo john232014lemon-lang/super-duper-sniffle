@@ -13,6 +13,8 @@ import 'screens/auth_screen.dart';
 import 'profile_app.dart';
 import 'services/profile_service.dart';
 import 'services/auth_service.dart';
+import 'services/catalog_repository.dart';
+import 'catalog_session.dart';
 
 typedef AuthInitializer = Future<AuthService> Function();
 
@@ -63,6 +65,7 @@ class _FirebaseBootstrapState extends State<FirebaseBootstrap> {
       if (!snapshot.hasData) return const BushelApp(home: _LoadingScreen());
       return AuthGate(
         auth: snapshot.requireData,
+        catalog: FirestoreCatalogRepository(),
         signedInHome: widget.signedInHome,
         profiles: widget.profiles,
       );
@@ -77,10 +80,12 @@ class AuthGate extends StatefulWidget {
     required this.auth,
     this.signedInHome,
     this.profiles,
+    this.catalog,
   });
   final AuthService auth;
   final Widget? signedInHome;
   final ProfileRepository? profiles;
+  final CatalogRepository? catalog;
 
   @override
   State<AuthGate> createState() => _AuthGateState();
@@ -147,6 +152,13 @@ class _AuthGateState extends State<AuthGate> {
     }
     if (_waiting) return const BushelApp(home: _LoadingScreen());
     final uid = _uid;
+    final profileApp = uid == null
+        ? null
+        : ProfileApp(
+            uid: uid,
+            repository: widget.profiles ?? FirestoreProfileRepository(),
+            isCurrent: () => mounted && _uid == uid && !_waiting && !_failed,
+          );
     return AuthScope(
       service: widget.auth,
       child: KeyedSubtree(
@@ -155,11 +167,12 @@ class _AuthGateState extends State<AuthGate> {
             ? BushelApp(home: AuthScreen(auth: widget.auth))
             : widget.signedInHome != null
             ? BushelApp(home: widget.signedInHome!)
-            : ProfileApp(
-                uid: _uid!,
-                repository: widget.profiles ?? FirestoreProfileRepository(),
-                isCurrent: () =>
-                    mounted && _uid == uid && !_waiting && !_failed,
+            : widget.catalog == null
+            ? profileApp!
+            : CatalogSession(
+                uid: uid!,
+                repository: widget.catalog!,
+                child: profileApp!,
               ),
       ),
     );

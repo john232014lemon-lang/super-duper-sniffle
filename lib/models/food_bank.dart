@@ -3,12 +3,15 @@ import 'package:latlong2/latlong.dart';
 
 class FoodBankShift {
   const FoodBankShift({
+    this.id,
     required this.title,
     required this.scheduledDate,
     required this.time,
     required this.station,
     required this.spotsLeft,
   });
+
+  final String? id;
 
   final String title;
   final DateTime scheduledDate;
@@ -38,6 +41,7 @@ class FoodBankShift {
 
 class FoodBank {
   const FoodBank({
+    this.id,
     required this.name,
     required this.shortName,
     required this.description,
@@ -49,6 +53,8 @@ class FoodBank {
     required this.icon,
     required this.shifts,
   });
+
+  final String? id;
 
   final String name;
   final String shortName;

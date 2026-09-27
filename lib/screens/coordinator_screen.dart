@@ -6,12 +6,49 @@ import '../data/shift_store.dart';
 import '../models/group_member.dart';
 import '../widgets/bushel_navigation_bar.dart';
 import '../widgets/mock_qr_code.dart';
+import '../data/catalog_store.dart';
+import 'live_group_screen.dart';
 
 class CoordinatorScreen extends StatelessWidget {
   const CoordinatorScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final catalog = CatalogScope.maybeOf(context);
+    if (catalog != null) {
+      final shifts = ShiftStore.instance.myShifts;
+      return Scaffold(
+        appBar: AppBar(title: const Text('Groups')),
+        body: catalog.shiftsLoading || catalog.shiftsFailed
+            ? Center(child: CatalogStatus(store: catalog, shifts: true))
+            : shifts.isEmpty
+            ? const Center(
+                child: Text('Sign up for a shift to join its group.'),
+              )
+            : ListView(
+                padding: const EdgeInsets.all(20),
+                children: [
+                  for (final listing in shifts)
+                    Card(
+                      child: ListTile(
+                        title: Text(listing.shift.title),
+                        subtitle: Text(listing.foodBank.shortName),
+                        trailing: const Icon(Icons.chevron_right),
+                        onTap: () => Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) => LiveGroupScreen(
+                              shiftId: listing.shift.id!,
+                              title: listing.shift.title,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+        bottomNavigationBar: const BushelNavigationBar(selectedIndex: 4),
+      );
+    }
     final group = CoordinatorStore.sharedShiftGroup;
     return Scaffold(
       appBar: AppBar(title: const Text('Groups')),
@@ -198,6 +235,12 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
   Widget build(BuildContext context) {
     final group = CoordinatorStore.sharedShiftGroup;
     final shiftStore = ShiftStore.instance;
+    if (shiftStore.usingLive) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Shift group')),
+        body: const Center(child: Text('Shift groups are coming soon.')),
+      );
+    }
     final shift = shiftStore.available.first.shift;
     final qrCode = shiftStore.qrCodeFor(shift);
     final pending = shiftStore.pendingAttendance(shift);

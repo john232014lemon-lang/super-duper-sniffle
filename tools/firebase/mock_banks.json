@@ -1,0 +1,12 @@
+[
+  {
+    "id": "mock-houston-food-bank",
+    "name": "Bushel Mock Food Bank (Test Only)",
+    "shortName": "Mock Bank (Test)",
+    "description": "A fictional food bank for testing Bushel discovery, maps, and volunteer shifts. This is not a real volunteering location.",
+    "address": "Sample map location in Houston, TX - not a real food bank address",
+    "hours": "Sample hours: Monday-Friday, 9:00 AM-5:00 PM",
+    "latitude": 29.7607,
+    "longitude": -95.3695
+  }
+]
