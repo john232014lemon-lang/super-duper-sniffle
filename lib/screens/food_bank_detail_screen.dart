@@ -8,6 +8,7 @@ import '../data/session_store.dart';
 import '../models/food_bank.dart';
 import '../widgets/bushel_navigation_bar.dart';
 import '../widgets/coordinator_application.dart';
+import 'attendance_management_screen.dart';
 
 class FoodBankDetailScreen extends StatefulWidget {
   const FoodBankDetailScreen({super.key, required this.foodBank});
@@ -212,6 +213,24 @@ class _FoodBankDetailScreenState extends State<FoodBankDetailScreen> {
                   ),
                 ),
               const SizedBox(height: 18),
+              if (catalog != null && !SessionStore.instance.isKidAccount)
+                for (final record in catalog.shifts.where(
+                  (record) =>
+                      record.bankId == _bank.id &&
+                      record.creatorUid == catalog.uid,
+                ))
+                  OutlinedButton.icon(
+                    onPressed: () => Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => AttendanceManagementScreen(
+                          shiftId: record.shift.id!,
+                          title: record.shift.title,
+                        ),
+                      ),
+                    ),
+                    icon: const Icon(Icons.fact_check_outlined),
+                    label: Text('Manage check-ins: ${record.shift.title}'),
+                  ),
               const Text(
                 'Recommended food banks',
                 style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900),

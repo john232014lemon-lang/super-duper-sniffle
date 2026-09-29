@@ -5,6 +5,7 @@ import '../models/food_bank.dart';
 import 'coordinator_store.dart';
 import 'session_store.dart';
 import 'catalog_store.dart';
+import '../services/catalog_repository.dart';
 
 class ShiftListing {
   const ShiftListing({
@@ -121,18 +122,39 @@ class ShiftStore extends ChangeNotifier {
     );
   }
 
-  int get points => _pointsByAccount[SessionStore.instance.accountId] ?? 0;
+  int get points => usingLive
+      ? _catalog!.rewards.points(SessionStore.instance.accountId)
+      : _pointsByAccount[SessionStore.instance.accountId] ?? 0;
 
   bool isSignedUp(FoodBankShift shift) =>
       myShifts.any((listing) => _sameShift(listing.shift, shift));
 
-  bool isCheckedIn(FoodBankShift shift) =>
-      _completedByAccount[SessionStore.instance.accountId]?.contains(shift) ??
-      false;
-  bool isAwaitingConfirmation(FoodBankShift shift) =>
-      _pendingAttendance[shift]?.containsKey(SessionStore.instance.accountId) ??
-      false;
-  String? qrCodeFor(FoodBankShift shift) => _qrCodes[shift];
+  bool isCheckedIn(FoodBankShift shift) => usingLive
+      ? _catalog!.attendance.any(
+          (e) =>
+              e.shiftId == shift.id &&
+              e.participantId == SessionStore.instance.accountId &&
+              e.confirmed,
+        )
+      : _completedByAccount[SessionStore.instance.accountId]?.contains(shift) ??
+            false;
+  bool isAwaitingConfirmation(FoodBankShift shift) => usingLive
+      ? _catalog!.attendance.any(
+          (e) =>
+              e.shiftId == shift.id &&
+              e.participantId == SessionStore.instance.accountId &&
+              !e.confirmed,
+        )
+      : _pendingAttendance[shift]?.containsKey(
+              SessionStore.instance.accountId,
+            ) ??
+            false;
+  String? qrCodeFor(FoodBankShift shift) => usingLive
+      ? _catalog!.shifts
+            .where((e) => e.shift.id == shift.id)
+            .firstOrNull
+            ?.qrCode
+      : _qrCodes[shift];
   List<AttendanceRecord> pendingAttendance(FoodBankShift shift) =>
       List.unmodifiable(_pendingAttendance[shift]?.values ?? const []);
   ShiftListing? listingFor(FoodBankShift shift) {
@@ -143,8 +165,12 @@ class ShiftStore extends ChangeNotifier {
   }
 
   bool canManageShift(FoodBankShift shift) {
-    // Live attendance and trusted leader actions are Slice 22.
-    if (usingLive) return false;
+    if (usingLive) {
+      final listing = listingFor(shift);
+      return !SessionStore.instance.isKidAccount &&
+          listing?.leaderAccountId == _catalog!.uid &&
+          _catalog!.coordinatorBanks.contains(listing?.foodBank.id);
+    }
     final listing = listingFor(shift);
     return listing != null &&
         SessionStore.instance.role == BushelRole.coordinator &&
@@ -152,6 +178,7 @@ class ShiftStore extends ChangeNotifier {
   }
 
   String? generateQrCode(FoodBankShift shift) {
+    if (usingLive) return null;
     if (!canManageShift(shift)) return null;
     final index = _available.indexWhere(
       (listing) => identical(listing.shift, shift),
@@ -208,6 +235,7 @@ class ShiftStore extends ChangeNotifier {
   }
 
   bool checkIn(FoodBankShift shift) {
+    if (usingLive) return false;
     if (!isSignedUp(shift) ||
         isCheckedIn(shift) ||
         isAwaitingConfirmation(shift) ||
@@ -224,12 +252,40 @@ class ShiftStore extends ChangeNotifier {
   }
 
   bool confirmAttendance(FoodBankShift shift, String accountId) {
+    if (usingLive) return false;
     if (!canManageShift(shift)) return false;
     final record = _pendingAttendance[shift]?.remove(accountId);
     if (record == null) return false;
     (_completedByAccount[accountId] ??= {}).add(shift);
     _pointsByAccount[accountId] = (_pointsByAccount[accountId] ?? 0) + 100;
     notifyListeners();
+    return true;
+  }
+
+  Future<bool> submitCheckIn(FoodBankShift shift) async {
+    if (!usingLive) return checkIn(shift);
+    final catalog = _catalog!;
+    if (catalog.attendanceLoading ||
+        catalog.attendanceFailed ||
+        catalog.shiftsLoading ||
+        catalog.shiftsFailed) {
+      throw const CatalogException(
+        'Wait for your shifts and attendance to load, then retry.',
+      );
+    }
+    final code = qrCodeFor(shift);
+    if (!isSignedUp(shift) || code == null) {
+      throw const CatalogException(
+        'You need a current signup and a shift QR code.',
+      );
+    }
+    await catalog.repository.submitAttendance(
+      catalog.uid,
+      SessionStore.instance.accountId,
+      shift.id!,
+      SessionStore.instance.userName,
+      code,
+    );
     return true;
   }
 }

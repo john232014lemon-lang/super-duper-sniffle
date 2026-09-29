@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 
 import '../data/session_store.dart';
+import '../data/catalog_store.dart';
+import '../widgets/attendance_status.dart';
+import 'rewards_screen.dart';
+import 'kid_badges_screen.dart';
 import '../models/kid_badge.dart';
 import '../services/auth_service.dart';
 import '../services/profile_service.dart';
@@ -80,6 +84,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final catalog = CatalogScope.maybeOf(context);
     final featured = _featured;
     final auth = AuthScope.maybeOf(context);
     return Scaffold(
@@ -187,6 +192,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
               ),
               const SizedBox(height: 28),
+              if (catalog != null &&
+                  (catalog.rewardsLoading || catalog.rewardsFailed))
+                AttendanceStatus(store: catalog, rewards: true),
+              OutlinedButton(
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => _session.isKidAccount
+                        ? const KidBadgesScreen()
+                        : const RewardsScreen(),
+                  ),
+                ),
+                child: Text(
+                  _session.isKidAccount
+                      ? 'Choose or feature a badge'
+                      : 'View rewards',
+                ),
+              ),
               FilledButton(
                 onPressed: _saving ? null : _finish,
                 child: Text(_saving ? 'Saving...' : 'Use this mode'),

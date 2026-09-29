@@ -19,7 +19,7 @@ Bushel helps families find food banks, join shifts, check in, and earn rewards. 
 | 20 | Groups/voting implemented locally; new live rules deployment pending |
 | 21 | Persistent family profiles, challenges, profile switching, and child places implemented locally; new live rules deployment pending |
 | Additional | Bank-page coordinator applications implemented; only administrator database approval grants coordination under the new rules |
-| 22–23 | Not started: persistent attendance, then rewards and challenge progress |
+| 22–23 | Implemented locally: persistent QR/check-in/leader confirmation, derived points, earned badges, and family challenge progress; rules/index deployment and manual live QA pending |
 
 Use the existing Firebase project `bushel-volunteer-20260925`, `(default)` database in Dallas (`us-south1`). Do not create another project/database. Android still needs an SDK and device/emulator. Setup, schema, and application approval instructions are in `README.md`.
 
@@ -37,7 +37,9 @@ Demo runs with `flutter run -d chrome --dart-define=BUSHEL_DEMO=true`; it initia
 | 22: Attendance | Persist per-shift mock QR, provisional check-in, and assigned-leader confirmation. Only members check in; only the assigned leader confirms; completion is recorded once |
 | 23: Rewards | Confirmed attendance drives persistent points, badges, kid badge selection, and challenge progress. Trusted updates prevent forged rewards and duplicate awards |
 
-Next: deploy the already implemented rules only when authorized, manually check the relevant flows, then implement Slice 22. Keep demo behavior local and leave unmigrated features at their current boundary. Real scanning hardware/camera integration, secure QR tokens, notifications, AI features, map scaling, and production launch hardening remain later work.
+Next: deploy the implemented rules and collection-group indexes only when authorized, then manually check Slices 20–23. Keep demo behavior local. Real scanning hardware/camera integration, secure QR tokens, notifications, AI features, map scaling, and production launch hardening remain later work.
+
+Attendance uses one immutable completion record per family participant/shift. Pending check-ins earn nothing; the assigned, approved bank leader confirms current participants. Confirmed records derive 100 points each without a client-writable balance. Each confirmed child shift grants one permanent badge choice; earned badges can be featured again. Family challenges use explicit goals of 1–100 distinct confirmed family shifts, including past shifts; several family members on one shift count once. Legacy text-only challenges need a new goal-based challenge and do not invent progress from their titles. See README for schema and deployment instructions.
 
 ## Testing policy for future agents
 
@@ -51,7 +53,7 @@ Next: deploy the already implemented rules only when authorized, manually check 
 6. Rerun only when a failure or subsequent relevant code change justifies it. Read the useful failure output, fix the cause, and stop when the selected checks pass. Keep successful command output concise; no repeated full log dumps or coverage targets.
 7. Release builds, emulator sessions, and live exercises are developer/manual tasks unless explicitly requested or necessary to investigate an actual build/platform failure. Report unperformed checks honestly; a fake-repository smoke test is not evidence of backend security or real persistence.
 
-The retained offline suite is `test/smoke_test.dart` (seven checks). Run a relevant check with:
+The retained offline suite is `test/smoke_test.dart` (nine checks). Run a relevant check with:
 
 ```sh
 flutter test --no-pub test/smoke_test.dart --plain-name "part of the test name"

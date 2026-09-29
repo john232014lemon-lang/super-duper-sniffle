@@ -33,7 +33,12 @@ Pick the 2–4 checks relevant to your change; this is a menu, not a required fu
 
 ## Attendance and rewards
 
-Currently these flows are local demo behavior; live persistence waits for Slices 22–23. In demo mode, check that a scan only creates provisional attendance, coordinator confirmation awards points once, and repeated confirmation does not award again.
+Slices 22–23 are implemented locally; deploy rules and indexes only after authorization before doing live QA.
+
+- As an approved shift creator, open **Manage check-ins** from bank details or **Shifts you lead** in Groups and generate the QR. As a signed-up adult or booked child, simulate scanning and submit. Restart: attendance should remain pending with zero new points and no badge choice. Demo mode should still work without Firebase.
+- Confirm with the assigned approved leader: the participant should gain exactly 100 points, surviving restart and retries. Using ordinary clients, try confirming as another coordinator or creating confirmed attendance directly as a participant; both must be denied. Cancel/remove an unconfirmed participant and verify confirmation is denied.
+- In Kid Mode, choose a badge after confirmation, then feature another previously earned badge and restart. Expect one permanent choice per confirmed child shift and the featured choice restored. Pending attendance and a sibling's attendance must not unlock this child's badges.
+- Create a two-shift family goal. Confirm parent and child on the same shift: expect 1/2, not 2/2. Confirm a second distinct shift: expect completion. Past confirmed shifts count; old text-only challenges show an explicit legacy notice instead of guessed progress. Disconnect and retry: expect a visible error/loading state rather than demo rewards.
 
 ## Optional connection diagnostic
 
@@ -41,4 +46,4 @@ Run `flutter run -d chrome --target lib/firestore_smoke_main.dart`, sign in, and
 
 ## Current deployment boundary
 
-The Slice 20–21/application rules have not been deployed. Do not expect these live flows to work under the old Slice 19 rules. Production deployment still needs explicit authorization; reducing automated tests does not authorize deployment. After an approved deployment, use the relevant checks above and clean up disposable records/accounts.
+The Slice 20–23/application rules and attendance collection-group indexes have not been deployed. Do not expect these live flows to work under the old Slice 19 rules. Production deployment still needs explicit authorization; reducing automated tests does not authorize deployment. After an approved deployment, use the relevant checks above and clean up disposable records/accounts.

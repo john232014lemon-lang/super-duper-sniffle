@@ -42,7 +42,7 @@ Follow the official [FlutterFire setup](https://firebase.google.com/docs/flutter
 - Volunteer/Coordinator choices only change the mock experience; they grant no backend permissions.
 - Initialization and authentication failures have visible retry/error states. Mock widget tests can instantiate `BushelApp` or `DemoApp` directly; `main()` uses the Firebase startup/auth gate unless `BUSHEL_DEMO=true` is explicitly set.
 
-The testing policy in [plan.md](plan.md) favors manual QA. Only seven offline smoke checks remain; use a relevant check for a small change, or the small suite for changes spanning several boundaries:
+The testing policy in [plan.md](plan.md) favors manual QA. Only nine offline smoke checks remain; use a relevant check for a small change, or the small suite for changes spanning several boundaries:
 
 ```sh
 flutter test --no-pub test/smoke_test.dart
@@ -58,7 +58,7 @@ Profiles are private to their authenticated owner. Rules validate the allowed fi
 
 ## Food banks and shifts (Slices 18–19)
 
-Normal mode streams discovery cards, map markers, bank details, shifts, and signups from Firestore. Empty/error states never fall back to mock banks. Date filtering keeps the stored calendar day across timezones. **My shifts** supports cancellation; creation and signup failures can be retried. Slice 21 adds parent-managed child places. Attendance remains Slice 22.
+Normal mode streams discovery cards, map markers, bank details, shifts, and signups from Firestore. Empty/error states never fall back to mock banks. Date filtering keeps the stored calendar day across timezones. **My shifts** supports cancellation; creation and signup failures can be retried. Slice 21 adds parent-managed child places. Persistent attendance and rewards are implemented in Slices 22–23 below.
 
 | Path | Purpose | Client access |
 | --- | --- | --- |
@@ -104,24 +104,45 @@ Review `name`, `contact`, `reason`, and `submittedAt`, then set the string field
 
 Open a group by tapping a shift in **My shifts**, or through the coordinator **Groups** page. Creating a shift does not automatically join its group. The removal threshold is `ceil(2 × current adult members / 3)`, including the target in the denominator. Children do not independently vote. Adult joins/cancellations/removals increment the membership version, invalidating old votes. The final vote attempts an atomic removal; **Complete removal** can retry if that follow-up was interrupted. Server rules validate the quorum and require group removal, registration deletion, and capacity restoration together. Removal also cancels the target parent's child places and prevents their immediate rejoining of that shift.
 
-In **Family Center**, parents create kids and challenges, switch profiles, and reserve child places in shifts they have already joined. Each child consumes one slot. Cancelling the parent's signup cancels all their child places. Kid Mode shows that child's persisted signups and routes shift management to the parent. The selected profile persists under the shared parent account, so switching it also affects the account's other sessions. Kids have no separate authentication identity; the rules reject signup, coordinator, and vote actions while Kid Mode is selected. Challenge completion, attendance, points, and badges remain Slices 22–23.
+In **Family Center**, parents create kids and challenges, switch profiles, and reserve child places in shifts they have already joined. Each child consumes one slot. Cancelling the parent's signup cancels all their child places. Kid Mode shows that child's persisted signups and routes shift management to the parent. The selected profile persists under the shared parent account, so switching it also affects the account's other sessions. Kids have no separate authentication identity; the rules reject signup, coordinator, and vote actions while Kid Mode is selected. Attendance, rewards, and goal-based challenge progress are implemented below.
 
 After deployment approval, use:
 
 ```sh
 python tools/firebase/catalog_admin.py audit-groups
-firebase deploy --only firestore:rules --project bushel-volunteer-20260925
+firebase deploy --only firestore:rules,firestore:indexes --project bushel-volunteer-20260925
 ```
 
 If the audit reports legacy shifts missing groups, backfill their group membership from existing registrations before deploying; do not initialize an occupied shift with an empty group. New shifts create their empty groups atomically.
 
 Use the relevant [manual checks](docs/manual_testing.md) after an authorized deployment. The automated emulator/live harnesses have been removed; do not recreate them by default.
 
+## Attendance and rewards (Slices 22–23)
+
+Implemented locally; rules and indexes have **not** been deployed or manually verified against the live backend. The QR is a persisted simulation, not camera scanning or a secure attendance token.
+
+An approved bank coordinator who created a shift opens **Manage check-ins** on the bank page, or **Shifts you lead** under Groups. Generate the shift QR once. Booked adults and children can simulate scanning on Check-in; submission stays pending until that assigned, still-approved leader confirms. Removed/cancelled participants cannot be confirmed. Duplicate submissions/confirmations use the same record and cannot award twice.
+
+| Path | Purpose |
+| --- | --- |
+| `shifts/{shiftId}.qrCode` | Immutable mock shift code, published by the assigned approved leader |
+| `attendance/{shiftId}/families/{ownerUid}/attendanceEntries/{participantId}` | `parent` or child ID; pending then confirmed with server timestamps; owner and assigned leader can read |
+| `rewardPreferences/{uid}/people/{childId}` | Featured badge backed by a confirmed record for that child |
+| `families/{uid}.challengeTargets` | Goal per challenge ID, 1–100 distinct completed family shifts |
+
+Confirmed attendance is the persistent reward ledger: **100 points per participant per shift**, with adult badge thresholds derived from those points. There are no client-writable balances or Cloud Functions to deploy. Every confirmed child shift offers one permanent badge choice in **My badge garden**. Featuring an already earned badge consumes no new choice. Profile links to rewards/badge selection. Loading and failed attendance reads have retry states and never substitute mock rewards.
+
+Challenge progress includes all past confirmed family shifts, counting one shift once even when multiple family members attended. Legacy text-only challenges remain visible with a notice to create a goal-based challenge; titles such as pounds or hours are not interpreted as shift goals. Challenges grant no additional points.
+
+The assigned leader can see participant names, including booked children's names, for attendance management; other group members cannot read those attendance records. Attendance history and earned rewards remain after signup cancellation. The existing parent-managed Kid Mode uses the parent's authentication identity.
+
+Deploy both rules and `firestore.indexes.json` after approval, then wait for indexes to finish building. Owner/leader queries use collection-group single-field indexes, as described in [Firebase index documentation](https://firebase.google.com/docs/firestore/query-data/index-overview). Follow the [manual attendance checks](docs/manual_testing.md#attendance-and-rewards) with ordinary authenticated clients; offline smoke checks do not validate Firestore permissions.
+
 ## Firestore foundation (Slice 16)
 
 - Project: `bushel-volunteer-20260925`; database: `(default)`; Standard edition, Native mode.
 - Location: **Dallas, Texas (`us-south1`)**. The existing database is already created; do not create another for this slice.
-- The earlier Slice 19 rules are deployed; the current `firestore.rules` adds Slices 20–21 and is pending authorization. Only the authenticated owner can create/get/delete `smokeTests/{uid}/runs/{runId}`. Test data must use the fixed message and a server timestamp. Diagnostic queries/updates remain denied. Profiles, banks, shifts, and registrations have the separate rules above; unmigrated collections remain denied.
+- The earlier Slice 19 rules are deployed; the current `firestore.rules` adds Slices 20–23 and is pending authorization. Only the authenticated owner can create/get/delete `smokeTests/{uid}/runs/{runId}`. Test data must use the fixed message and a server timestamp. Diagnostic queries/updates remain denied. Profiles, banks, shifts, and registrations have the separate rules above; unmigrated collections remain denied.
 - Adult profiles, banks, shifts, and adult registrations use Firestore. Demo mode still initializes no Firebase services.
 
 Run the separate Flutter diagnostic, sign in, then click **Run connection check**:

@@ -6,6 +6,7 @@ import '../models/food_bank.dart';
 import '../services/catalog_repository.dart';
 import 'session_store.dart';
 import '../services/community_models.dart';
+import '../models/attendance.dart';
 
 class CatalogStore extends ChangeNotifier {
   CatalogStore({required this.uid, required this.repository}) {
@@ -21,6 +22,17 @@ class CatalogStore extends ChangeNotifier {
   Map<String, String> applications = {};
   Map<String, Set<String>> childSignups = {};
   FamilyData family = const FamilyData();
+  List<AttendanceEntry> attendance = [];
+  Map<String, String> featuredBadges = {};
+  AttendanceRewards get rewards => AttendanceRewards(attendance);
+  bool get attendanceLoading => _loading.contains('attendance');
+  bool get attendanceFailed => _errors.contains('attendance');
+  bool get rewardsLoading => attendanceLoading || _loading.contains('badges');
+  bool get rewardsFailed => attendanceFailed || _errors.contains('badges');
+  void _refreshBadges() => SessionStore.instance.applyRewards({
+    for (final id in attendance.map((e) => e.participantId).toSet())
+      id: rewards.badges(id),
+  }, featuredBadges);
   bool get familyLoading => _loading.contains('family');
   bool get familyFailed => _errors.contains('family');
   bool get applicationsLoading => _loading.contains('applications');
@@ -57,6 +69,8 @@ class CatalogStore extends ChangeNotifier {
       'applications',
       'family',
       'children',
+      'attendance',
+      'badges',
     ]);
     banks = [];
     shifts = [];
@@ -64,6 +78,9 @@ class CatalogStore extends ChangeNotifier {
     coordinatorBanks = {};
     applications = {};
     childSignups = {};
+    attendance = [];
+    featuredBadges = {};
+    _refreshBadges();
     void listen<T>(String key, Stream<T> stream, void Function(T) accept) {
       _subscriptions.add(
         stream.listen(
@@ -79,6 +96,9 @@ class CatalogStore extends ChangeNotifier {
             _loading.remove(key);
             _errors.add(key);
             if (key == 'access') coordinatorBanks = {};
+            if (key == 'attendance') attendance = [];
+            if (key == 'badges') featuredBadges = {};
+            if (key == 'attendance' || key == 'badges') _refreshBadges();
             notifyListeners();
           },
         ),
@@ -86,6 +106,14 @@ class CatalogStore extends ChangeNotifier {
     }
 
     listen('banks', repository.watchBanks(), (value) => banks = value);
+    listen('attendance', repository.watchAttendance(uid), (value) {
+      attendance = value;
+      _refreshBadges();
+    });
+    listen('badges', repository.watchFeaturedBadges(uid), (value) {
+      featuredBadges = value;
+      _refreshBadges();
+    });
     listen('shifts', repository.watchShifts(), (value) => shifts = value);
     listen('signups', repository.watchSignups(uid), (value) => signups = value);
     listen(

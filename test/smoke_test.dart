@@ -11,6 +11,8 @@ import 'package:bushel/demo_app.dart';
 import 'package:bushel/firebase_bootstrap.dart';
 import 'package:bushel/main.dart';
 import 'package:bushel/models/food_bank.dart';
+import 'package:bushel/models/attendance.dart';
+import 'package:bushel/screens/check_in_screen.dart';
 import 'package:bushel/screens/auth_screen.dart';
 import 'package:bushel/screens/food_bank_detail_screen.dart';
 import 'package:bushel/screens/home_screen.dart';
@@ -55,7 +57,20 @@ final _bank = FirestoreCatalogRepository.decodeBank('bank', {
 });
 
 class _Catalog implements CatalogRepository {
-  _Catalog({this.failBanks = false, this.kidMode = false});
+  _Catalog({
+    this.failBanks = false,
+    this.kidMode = false,
+    this.attendanceStream,
+  });
+  final Stream<List<AttendanceEntry>>? attendanceStream;
+  @override
+  Stream<List<AttendanceEntry>> watchAttendance(
+    String uid, {
+    bool asLeader = false,
+  }) => attendanceStream ?? Stream.value([]);
+  @override
+  Stream<Map<String, String>> watchFeaturedBadges(String uid) =>
+      Stream.value({});
   final bool failBanks;
   final bool kidMode;
   final access = StreamController<Set<String>>.broadcast();
@@ -108,11 +123,73 @@ class _Catalog implements CatalogRepository {
 }
 
 void main() {
+  AttendanceEntry entry(String person, String status, {String? badge}) =>
+      AttendanceEntry(
+        ownerUid: 'adult',
+        participantId: person,
+        shiftId: 'child-shift',
+        leaderUid: 'leader',
+        name: 'Sam',
+        status: status,
+        badgeId: badge,
+      );
   setUp(() {
     SessionStore.instance.reset();
     CoordinatorStore.instance.reset();
     ShiftStore.instance.reset();
   });
+
+  test('rewards exclude pending attendance and duplicate completions', () {
+    final confirmed = entry('kid', 'confirmed', badge: 'bee');
+    final rewards = AttendanceRewards([
+      entry('other-kid', 'pending'),
+      confirmed,
+      confirmed,
+      entry('parent', 'confirmed'),
+    ]);
+    expect(rewards.points('kid'), 100);
+    expect(rewards.points('other-kid'), 0);
+    expect(rewards.badges('kid'), {'bee'});
+    expect(rewards.badges('parent'), isEmpty);
+    expect(rewards.familyShifts, 1);
+  });
+
+  testWidgets(
+    'live check-in survives attendance updates without awarding pending points',
+    (tester) async {
+      final updates = StreamController<List<AttendanceEntry>>();
+      final repository = _Catalog(
+        kidMode: true,
+        attendanceStream: updates.stream,
+      );
+      addTearDown(updates.close);
+      addTearDown(repository.access.close);
+      await tester.pumpWidget(
+        CatalogSession(
+          uid: 'adult',
+          repository: repository,
+          child: const BushelApp(home: CheckInScreen()),
+        ),
+      );
+      updates.add([]);
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      updates.add([entry('kid', 'pending')]);
+      await tester.pumpAndSettle();
+      expect(ShiftStore.instance.points, 0);
+      expect(
+        ShiftStore.instance.isAwaitingConfirmation(
+          ShiftStore.instance.myShifts.single.shift,
+        ),
+        isTrue,
+      );
+      updates.add([entry('kid', 'confirmed')]);
+      await tester.pumpAndSettle();
+      expect(ShiftStore.instance.points, 100);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox());
+    },
+  );
 
   testWidgets('demo boots without Firebase and reset clears private state', (
     tester,

@@ -7,6 +7,7 @@ import '../data/shift_store.dart';
 import '../services/catalog_repository.dart';
 import '../widgets/bushel_navigation_bar.dart';
 import '../widgets/family_entry_dialog.dart';
+import '../widgets/attendance_status.dart';
 import 'home_screen.dart';
 
 class FamilyCenterScreen extends StatefulWidget {
@@ -288,6 +289,9 @@ class _FamilyCenterScreenState extends State<FamilyCenterScreen> {
                 ],
               ),
               const SizedBox(height: 10),
+              if (catalog != null &&
+                  (catalog.attendanceLoading || catalog.attendanceFailed))
+                AttendanceStatus(store: catalog),
               for (final challenge in _session.challenges)
                 Card(
                   child: ListTile(
@@ -300,7 +304,18 @@ class _FamilyCenterScreenState extends State<FamilyCenterScreen> {
                       style: const TextStyle(fontWeight: FontWeight.w800),
                     ),
                     subtitle: Text(
-                      kidMode ? 'You can do it!' : 'Visible to all your kids',
+                      catalog == null
+                          ? (kidMode
+                                ? 'You can do it!'
+                                : 'Visible to all your kids')
+                          : catalog.attendanceLoading ||
+                                catalog.attendanceFailed
+                          ? 'Progress unavailable until attendance loads.'
+                          : !catalog.family.challengeTargets.containsKey(
+                              challenge.id,
+                            )
+                          ? 'Legacy challenge: create a new challenge with a completed-shift goal to track progress.'
+                          : '${catalog.rewards.familyShifts.clamp(0, catalog.family.challengeTargets[challenge.id]!)} / ${catalog.family.challengeTargets[challenge.id]} confirmed family shifts${catalog.rewards.familyShifts >= catalog.family.challengeTargets[challenge.id]! ? ' · Complete!' : ''}',
                     ),
                   ),
                 ),

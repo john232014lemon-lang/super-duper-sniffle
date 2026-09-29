@@ -14,6 +14,15 @@ service cloud.firestore {
     function groupPath(sid) { return /databases/$(database)/documents/groups/$(sid); }
     function regPath(uid, sid) { return /databases/$(database)/documents/registrations/$(uid)/shifts/$(sid); }
     function shiftPath(sid) { return /databases/$(database)/documents/shifts/$(sid); }
+    function attendancePath(uid, pid, sid) { return /databases/$(database)/documents/attendance/$(sid)/families/$(uid)/attendanceEntries/$(pid); }
+    function shiftLeader(sid) {
+      let shift = get(shiftPath(sid)).data;
+      return signedIn() && shift.creatorUid == request.auth.uid && coordinates(shift.bankId);
+    }
+    function attendingMember(uid, pid, sid) {
+      return existsAfter(regPath(uid, sid)) && (pid == 'parent'
+        || pid in getAfter(regPath(uid, sid)).data.get('childIds', []));
+    }
     function member(sid) { return signedIn() && request.auth.uid in get(groupPath(sid)).data.members; }
     function beforeSeats(uid, sid) { return exists(regPath(uid, sid)) ? 1 + get(regPath(uid, sid)).data.get('childIds', []).size() : 0; }
     function afterSeats(uid, sid) { return existsAfter(regPath(uid, sid)) ? 1 + getAfter(regPath(uid, sid)).data.get('childIds', []).size() : 0; }
@@ -52,10 +61,22 @@ service cloud.firestore {
           && next.diff(old).removedKeys().size() == 0 && next.diff(old).changedKeys().size() == 0
           && changed.size() == 1 && text(next[changed[0]], limit));
       }
+      function targetsChange() {
+        let old = resource == null ? {} : resource.data.get('challengeTargets', {});
+        let next = request.resource.data.get('challengeTargets', {});
+        let added = next.keys().removeAll(old.keys());
+        let oldChallenges = resource == null ? {} : resource.data.challenges;
+        return next == old || (parentMode() && next is map
+          && next.diff(old).removedKeys().size() == 0 && next.diff(old).changedKeys().size() == 0
+          && added.size() == 1 && !(added[0] in oldChallenges)
+          && added[0] in request.resource.data.challenges
+          && next[added[0]] is int && next[added[0]] >= 1 && next[added[0]] <= 100);
+      }
       allow get: if owner();
       allow create, update: if owner()
-        && request.resource.data.keys().hasOnly(['children', 'challenges', 'activeChildId'])
+        && request.resource.data.keys().hasOnly(['children', 'challenges', 'activeChildId', 'challengeTargets'])
         && entryChange('children', 80, 50) && entryChange('challenges', 160, 100)
+        && targetsChange()
         && (parentMode() || (request.resource.data.children == resource.data.children && request.resource.data.challenges == resource.data.challenges))
         && request.resource.data.activeChildId is string
         && (request.resource.data.activeChildId == '' || request.resource.data.activeChildId in request.resource.data.children);
@@ -106,6 +127,49 @@ service cloud.firestore {
         && request.resource.data.signupCount >= 0
         && request.resource.data.signupCount <= resource.data.capacity
         && (ownCountChange() || removalCountChange());
+      allow update: if shiftLeader(shiftId)
+        && !('qrCode' in resource.data)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['qrCode'])
+        && request.resource.data.qrCode == 'BUSHEL-SHIFT-' + shiftId;
+    }
+    // Collection-group queries must constrain ownerUid or leaderUid to auth.uid.
+    // These grants are read-only; writes are allowed only at the canonical path.
+    match /{path=**}/attendanceEntries/{pid} {
+      allow list: if signedIn() && (resource.data.ownerUid == request.auth.uid || resource.data.leaderUid == request.auth.uid);
+    }
+    match /attendance/{sid}/families/{uid}/attendanceEntries/{pid} {
+      function owner() { return signedIn() && request.auth.uid == uid; }
+      function childBadge() {
+        return owner() && pid != 'parent' && resource.data.status == 'confirmed'
+          && !('badgeId' in resource.data)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['badgeId'])
+          && request.resource.data.badgeId in ['donkey', 'bunny', 'fox', 'bear', 'panda', 'frog', 'bee', 'butterfly', 'chick', 'turtle', 'carrot', 'corn', 'tomato', 'broccoli', 'pepper', 'pumpkin', 'apple', 'strawberry', 'watermelon', 'grapes', 'sunflower', 'sprout', 'cactus', 'tree', 'clover'];
+      }
+      allow get: if owner() || (signedIn() && get(shiftPath(sid)).data.creatorUid == request.auth.uid);
+      allow create: if owner() && attendingMember(uid, pid, sid)
+        && (parentMode() || pid == get(/databases/$(database)/documents/families/$(uid)).data.activeChildId)
+        && request.resource.data.keys().hasOnly(['ownerUid', 'participantId', 'shiftId', 'leaderUid', 'name', 'code', 'status', 'checkedInAt'])
+        && request.resource.data.ownerUid == uid && request.resource.data.participantId == pid
+        && request.resource.data.shiftId == sid
+        && request.resource.data.leaderUid == get(shiftPath(sid)).data.creatorUid
+        && text(request.resource.data.name, 80)
+        && request.resource.data.code == get(shiftPath(sid)).data.qrCode
+        && request.resource.data.status == 'pending' && request.resource.data.checkedInAt == request.time;
+      allow update: if childBadge() || (shiftLeader(sid) && attendingMember(uid, pid, sid)
+        && resource.data.status == 'pending'
+        && request.resource.data.status == 'confirmed'
+        && request.resource.data.confirmedAt == request.time
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'confirmedAt']));
+      // No deletes, replays, reversals, client point totals, or direct completion creates.
+    }
+    match /rewardPreferences/{uid}/people/{pid} {
+      function owner() { return signedIn() && request.auth.uid == uid; }
+      allow read: if owner();
+      allow create, update: if owner() && pid != 'parent'
+        && request.resource.data.keys().hasOnly(['badgeId', 'shiftId'])
+        && request.resource.data.shiftId is string
+        && getAfter(attendancePath(uid, pid, request.resource.data.shiftId)).data.status == 'confirmed'
+        && getAfter(attendancePath(uid, pid, request.resource.data.shiftId)).data.badgeId == request.resource.data.badgeId;
     }
     match /registrations/{uid}/shifts/{shiftId} {
       function owner() { return signedIn() && request.auth.uid == uid; }

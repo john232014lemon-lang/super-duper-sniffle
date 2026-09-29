@@ -17,11 +17,13 @@ class FamilyEntryDialog extends StatefulWidget {
 class _FamilyEntryDialogState extends State<FamilyEntryDialog> {
   final _form = GlobalKey<FormState>();
   final _text = TextEditingController();
+  final _target = TextEditingController(text: '1');
   bool _saving = false;
   String? _error;
   @override
   void dispose() {
     _text.dispose();
+    _target.dispose();
     super.dispose();
   }
 
@@ -36,6 +38,7 @@ class _FamilyEntryDialogState extends State<FamilyEntryDialog> {
         widget.store.uid,
         widget.childEntry ? 'children' : 'challenges',
         _text.text,
+        targetShifts: widget.childEntry ? 1 : int.parse(_target.text.trim()),
       );
       if (mounted) Navigator.pop(context);
     } catch (error) {
@@ -52,6 +55,7 @@ class _FamilyEntryDialogState extends State<FamilyEntryDialog> {
   Widget build(BuildContext context) => PopScope(
     canPop: !_saving,
     child: AlertDialog(
+      scrollable: true,
       title: Text(
         widget.childEntry ? 'Add a kid account' : 'Create a challenge',
       ),
@@ -76,6 +80,25 @@ class _FamilyEntryDialogState extends State<FamilyEntryDialog> {
                   ? 'This field is required'
                   : null,
             ),
+            if (!widget.childEntry) ...[
+              const Text(
+                'Progress counts distinct coordinator-confirmed family shifts, including past shifts.',
+              ),
+              TextFormField(
+                controller: _target,
+                enabled: !_saving,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: 'Completed-shift goal',
+                ),
+                validator: (value) {
+                  final count = int.tryParse(value?.trim() ?? '');
+                  return count == null || count < 1 || count > 100
+                      ? 'Enter 1 to 100 shifts'
+                      : null;
+                },
+              ),
+            ],
           ],
         ),
       ),

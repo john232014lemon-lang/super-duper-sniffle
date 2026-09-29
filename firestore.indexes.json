@@ -1,4 +1,15 @@
 {
   "indexes": [],
-  "fieldOverrides": []
+  "fieldOverrides": [
+    {
+      "collectionGroup": "attendanceEntries",
+      "fieldPath": "ownerUid",
+      "indexes": [{"order": "ASCENDING", "queryScope": "COLLECTION_GROUP"}]
+    },
+    {
+      "collectionGroup": "attendanceEntries",
+      "fieldPath": "leaderUid",
+      "indexes": [{"order": "ASCENDING", "queryScope": "COLLECTION_GROUP"}]
+    }
+  ]
 }

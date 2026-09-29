@@ -37,6 +37,8 @@ class SessionStore extends ChangeNotifier {
     _unlockedKidBadges.clear();
     _featuredKidBadge = null;
     _liveFamily = false;
+    _liveBadges.clear();
+    _liveFeatured.clear();
     notifyListeners();
   }
 
@@ -65,6 +67,21 @@ class SessionStore extends ChangeNotifier {
   final Set<String> _unlockedKidBadges = {};
   String? _featuredKidBadge;
   bool _liveFamily = false;
+  final Map<String, Set<String>> _liveBadges = {};
+  final Map<String, String> _liveFeatured = {};
+  void applyRewards(
+    Map<String, Set<String>> badges,
+    Map<String, String> featured,
+  ) {
+    _liveBadges
+      ..clear()
+      ..addAll(badges);
+    _liveFeatured
+      ..clear()
+      ..addAll(featured);
+    notifyListeners();
+  }
+
   void applyFamily(FamilyData data) {
     _liveFamily = true;
     _children
@@ -102,8 +119,14 @@ class SessionStore extends ChangeNotifier {
     return null;
   }
 
-  Set<String> get unlockedKidBadges => Set.unmodifiable(_unlockedKidBadges);
-  String? get featuredKidBadge => _featuredKidBadge;
+  Set<String> get unlockedKidBadges => Set.unmodifiable(
+    _liveFamily ? (_liveBadges[accountId] ?? <String>{}) : _unlockedKidBadges,
+  );
+  String? get featuredKidBadge => _liveFamily
+      ? (unlockedKidBadges.contains(_liveFeatured[accountId])
+            ? _liveFeatured[accountId]
+            : null)
+      : _featuredKidBadge;
   String get phoneNumber =>
       isKidAccount ? 'Managed by parent' : '(713) 555-0100';
   String get accountId => activeChild?.id ?? 'parent';
@@ -162,12 +185,14 @@ class SessionStore extends ChangeNotifier {
   }
 
   void unlockKidBadge(String id) {
+    if (_liveFamily) return;
     _unlockedKidBadges.add(id);
     _featuredKidBadge = id;
     notifyListeners();
   }
 
   void featureKidBadge(String id) {
+    if (_liveFamily) return;
     if (!_unlockedKidBadges.contains(id)) return;
     _featuredKidBadge = id;
     notifyListeners();

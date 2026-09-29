@@ -1,5 +1,17 @@
 # Bushel Development Log
 
+## 2026-09-28 — Slices 22–23: persisted attendance and rewards
+
+**Request:** Build Slices 22 and 23, retaining the manual-first testing policy.
+
+**Implemented:** Persisted per-shift simulated QR, private participant attendance, and assigned approved leader confirmation. Bank details and coordinator Groups expose attendance management without requiring the creator to join the group. Check-in follows live registrations, handles stream updates, and displays loading/error/retry states. Canonical per-person/per-shift records and transactions make retries idempotent; rules prohibit direct confirmed creates, deletions, forged totals, or confirmation by other coordinators.
+
+**Rewards:** Confirmed records derive 100 points per participant per shift and existing adult badge thresholds. Each confirmed child shift grants one immutable badge choice; a proof-backed featured badge persists independently. Family goals explicitly count 1–100 all-time distinct confirmed family shifts, deduplicating multiple family members. Legacy text challenges retain an explanatory notice. No Cloud Function, writable balance, real QR scanner, or token security was introduced. Demo behavior remains local.
+
+**Verification:** Nine offline smoke checks passed, including two new checks for duplicate/pending reward exclusion and live check-in stream updates. Static analysis initially reported six brace-style issues; after fixing those, analysis passed with no issues. No emulator, live backend test, release build, or deployment was run. Backend permission/persistence checks remain manual and are listed in `docs/manual_testing.md`.
+
+**Deployment:** Production remains on Slice 19 rules. Slices 20–23 require authorized deployment of rules and the new owner/leader attendance collection-group indexes, followed by manual client QA. Child attendance names are visible to the assigned leader, not general group members. No commit or push was performed.
+
 ## 2026-09-27 — Manual-first QA and test-suite reduction
 
 **Request:** Refactor the plan, minimize automated testing/token overhead, remove redundant or elaborate tests (especially emulator tests), and require manual testing ideas in future agent handoffs.

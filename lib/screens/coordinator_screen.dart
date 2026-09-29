@@ -8,6 +8,7 @@ import '../widgets/bushel_navigation_bar.dart';
 import '../widgets/mock_qr_code.dart';
 import '../data/catalog_store.dart';
 import 'live_group_screen.dart';
+import 'attendance_management_screen.dart';
 
 class CoordinatorScreen extends StatelessWidget {
   const CoordinatorScreen({super.key});
@@ -21,13 +22,43 @@ class CoordinatorScreen extends StatelessWidget {
         appBar: AppBar(title: const Text('Groups')),
         body: catalog.shiftsLoading || catalog.shiftsFailed
             ? Center(child: CatalogStatus(store: catalog, shifts: true))
-            : shifts.isEmpty
-            ? const Center(
-                child: Text('Sign up for a shift to join its group.'),
-              )
             : ListView(
                 padding: const EdgeInsets.all(20),
                 children: [
+                  if (!SessionStore.instance.isKidAccount) ...[
+                    const Text(
+                      'Shifts you lead',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    for (final record in catalog.shifts.where(
+                      (record) => record.creatorUid == catalog.uid,
+                    ))
+                      Card(
+                        child: ListTile(
+                          title: Text(record.shift.title),
+                          subtitle: const Text('Manage QR and attendance'),
+                          trailing: const Icon(Icons.fact_check_outlined),
+                          onTap: () => Navigator.of(context).push(
+                            MaterialPageRoute<void>(
+                              builder: (_) => AttendanceManagementScreen(
+                                shiftId: record.shift.id!,
+                                title: record.shift.title,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    const SizedBox(height: 20),
+                  ],
+                  const Text(
+                    'Your shift groups',
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                  ),
+                  if (shifts.isEmpty)
+                    const Text('Sign up for a shift to join its group.'),
                   for (final listing in shifts)
                     Card(
                       child: ListTile(

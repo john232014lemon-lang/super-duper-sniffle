@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../data/shift_store.dart';
 import '../models/reward_badge.dart';
 import '../widgets/bushel_navigation_bar.dart';
+import '../data/catalog_store.dart';
+import '../widgets/attendance_status.dart';
 
 class RewardsScreen extends StatefulWidget {
   const RewardsScreen({super.key});
@@ -30,6 +32,14 @@ class _RewardsScreenState extends State<RewardsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final catalog = CatalogScope.maybeOf(context);
+    if (catalog != null && (catalog.rewardsLoading || catalog.rewardsFailed)) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Rewards')),
+        body: Center(child: AttendanceStatus(store: catalog, rewards: true)),
+        bottomNavigationBar: const BushelNavigationBar(selectedIndex: 4),
+      );
+    }
     final points = _store.points;
     final earned = rewardBadges.where((b) => b.isUnlockedAt(points)).length;
     RewardBadge? nextBadge;
@@ -56,7 +66,7 @@ class _RewardsScreenState extends State<RewardsScreen> {
               ),
               const SizedBox(height: 6),
               const Text(
-                'Every completed check-in adds 100 points.',
+                'Every coordinator-confirmed shift adds 100 points.',
                 style: TextStyle(color: Color(0xFF718078)),
               ),
               const SizedBox(height: 14),

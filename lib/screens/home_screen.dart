@@ -409,18 +409,12 @@ class _KidHomeScreen extends StatelessWidget {
                 SizedBox(
                   height: 74,
                   child: FilledButton.icon(
-                    onPressed: catalog == null
-                        ? onCheckIn
-                        : () => Navigator.of(context).push(
-                            MaterialPageRoute<void>(
-                              builder: (_) => const ShiftsScreen(),
-                            ),
-                          ),
+                    onPressed: onCheckIn,
                     icon: const Icon(Icons.qr_code_scanner, size: 30),
                     label: Text(
                       catalog == null
                           ? 'CHECK IN & PICK A BADGE'
-                          : 'VIEW MY SHIFTS',
+                          : 'CHECK IN & EARN A BADGE',
                       style: const TextStyle(fontSize: 17),
                     ),
                   ),

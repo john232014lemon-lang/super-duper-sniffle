@@ -5,19 +5,22 @@ import 'package:latlong2/latlong.dart';
 import '../models/food_bank.dart';
 import 'community_models.dart';
 import '../data/session_store.dart';
+import 'attendance_repository.dart';
 
 class StoredShift {
   const StoredShift({
     required this.bankId,
     required this.creatorUid,
     required this.shift,
+    this.qrCode,
   });
   final String bankId;
   final String creatorUid;
   final FoodBankShift shift;
+  final String? qrCode;
 }
 
-abstract class CatalogRepository {
+abstract class CatalogRepository implements AttendanceRepository {
   Stream<List<FoodBank>> watchBanks();
   Stream<List<StoredShift>> watchShifts();
   Stream<Set<String>> watchSignups(String uid);
@@ -33,7 +36,12 @@ abstract class CatalogRepository {
     String reason,
   );
   Stream<FamilyData> watchFamily(String uid);
-  Future<void> saveFamilyEntry(String uid, String field, String value);
+  Future<void> saveFamilyEntry(
+    String uid,
+    String field,
+    String value, {
+    int targetShifts = 1,
+  });
   Future<void> switchFamilyProfile(String uid, String childId);
   Stream<Map<String, Set<String>>> watchChildSignups(String uid);
   Future<void> setChildSignup(
@@ -63,7 +71,8 @@ String catalogError(Object error) {
   return 'Could not save this change. Check your connection and try again.';
 }
 
-class FirestoreCatalogRepository implements CatalogRepository {
+class FirestoreCatalogRepository extends FirestoreAttendanceRepository
+    implements CatalogRepository {
   FirebaseFirestore get _db => FirebaseFirestore.instance;
 
   static FoodBank decodeBank(String id, Map<String, dynamic> data) => FoodBank(
@@ -88,6 +97,7 @@ class FirestoreCatalogRepository implements CatalogRepository {
     return StoredShift(
       bankId: data['bankId'] as String,
       creatorUid: data['creatorUid'] as String,
+      qrCode: data['qrCode'] as String?,
       shift: FoodBankShift(
         id: id,
         title: data['title'] as String,
@@ -185,7 +195,12 @@ class FirestoreCatalogRepository implements CatalogRepository {
       .map((doc) => FamilyData.decode(doc.data()));
 
   @override
-  Future<void> saveFamilyEntry(String uid, String field, String value) async {
+  Future<void> saveFamilyEntry(
+    String uid,
+    String field,
+    String value, {
+    int targetShifts = 1,
+  }) async {
     if (!['children', 'challenges'].contains(field)) {
       throw const CatalogException('Invalid family entry.');
     }
@@ -204,6 +219,12 @@ class FirestoreCatalogRepository implements CatalogRepository {
         ...Map<String, dynamic>.from(data[field]),
         id: value.trim(),
       };
+      if (field == 'challenges') {
+        data['challengeTargets'] = {
+          ...Map<String, dynamic>.from(data['challengeTargets'] ?? {}),
+          id: targetShifts,
+        };
+      }
       tx.set(ref, data);
     });
   }
