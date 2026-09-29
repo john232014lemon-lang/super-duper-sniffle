@@ -2,7 +2,7 @@
 
 Bushel is a family-friendly Flutter app for finding food banks and volunteering together. The first version uses local mock data so the core experience can be built and tested one small feature at a time.
 
-Android and Web are configured for Firebase project `bushel-volunteer-20260925`. Firebase initialization and Email/Password authentication are implemented; live API signup now works. Profiles, banks, shifts, and adult signups use Firestore in Dallas, Texas. Groups, families, and coordinator applications are implemented but await the new rules deployment; attendance and rewards remain later slices. Slices 14-15 provide a local demo mode and working shift calendar without Firebase login.
+Android and Web are configured for Firebase project `bushel-volunteer-20260925`. Firebase initialization and Email/Password authentication are implemented. Profiles, banks, shifts, signups, groups, families, and coordinator applications use Firestore in Dallas, Texas. Attendance, rewards, and scheduling validation are implemented, with their matching production rules/indexes deployed September 28 after user approval. Slices 14-15 provide a local demo mode and working shift calendar without Firebase login.
 
 ## Run locally
 
@@ -42,7 +42,7 @@ Follow the official [FlutterFire setup](https://firebase.google.com/docs/flutter
 - Volunteer/Coordinator choices only change the mock experience; they grant no backend permissions.
 - Initialization and authentication failures have visible retry/error states. Mock widget tests can instantiate `BushelApp` or `DemoApp` directly; `main()` uses the Firebase startup/auth gate unless `BUSHEL_DEMO=true` is explicitly set.
 
-The testing policy in [plan.md](plan.md) favors manual QA. Only eleven offline smoke checks remain; use a relevant check for a small change, or the small suite for changes spanning several boundaries:
+The testing policy in [plan.md](plan.md) favors manual QA. Only twelve offline smoke checks remain; use a relevant check for a small change, or the small suite for changes spanning several boundaries:
 
 ```sh
 flutter test --no-pub test/smoke_test.dart
@@ -83,7 +83,7 @@ Use the adult's Firebase Authentication UID, not their email or local `parent` I
 
 ## Coordinator applications and Slices 20–21
 
-**Deployment status:** The Slice 20–21 implementation was verified before the test-suite reduction; historical results are in `docs/development_log.md`. Production rules deployment remains pending explicit authorization. The previously deployed Slice 19 rules are unchanged. Deploy the new rules before using this app revision with live data. A prior read-only audit found zero existing shifts requiring migration; recheck before a later deployment.
+**Deployment status:** The September 28 read-only audit confirmed Slices 20–21 rules are deployed. At audit time, Slices 22–23 and scheduling fields were absent from those rules, and the attendance collection-group indexes were missing. This explained the reported shift-creation, QR, and attendance failures. The user subsequently approved deployment; it completed September 28. Active rules match the repository, and index readiness is recorded in the development log. All three existing shifts have groups and consistent checked registration counts, but malformed legacy schedules; see [database audit](docs/firestore_audit.md).
 
 On a bank's detail page, an adult selects **Apply to coordinate** and provides their name, contact information, and experience/reason. The form retains input after a failed save. A successful submission stays **pending** and cannot grant privileges. Each adult has one application per bank; rejected applications require administrator follow-up.
 
@@ -119,11 +119,11 @@ Use the relevant [manual checks](docs/manual_testing.md) after an authorized dep
 
 ## Attendance and rewards (Slices 22–23)
 
-New shifts/groups accept a single local start time from `01:00` to `24:00` and must start in the current minute or within the next 365 days. `24:00` is midnight ending the selected date. New records store `startsAt` and the local `utcOffsetMinutes` alongside the calendar date and normalized time. Pending rules validate their consistency and the window using [Firebase request time](https://firebase.google.com/docs/reference/rules/rules.firestore.Request). Existing shifts remain readable; new clients require the updated rules for creation.
+New shifts/groups accept a single local start time from `01:00` to `24:00` and must start in the current minute or within the next 365 days. `24:00` is midnight ending the selected date. New records store `startsAt` and the local `utcOffsetMinutes` alongside the calendar date and normalized time. Deployed rules validate their consistency and the window using [Firebase request time](https://firebase.google.com/docs/reference/rules/rules.firestore.Request). Existing shifts remain readable; the updated rules are now deployed for creation.
 
-Check-in handles empty or changing signup lists without retaining obsolete dropdown values. QR generation is available to the assigned approved leader even when the attendance query is loading or fails. An empty bank first needs a shift created by an approved coordinator; QR codes belong to shifts, not banks. Rule-denied QR writes still require the pending rules deployment, not a UI permission bypass.
+Check-in handles empty or changing signup lists without retaining obsolete dropdown values. QR generation is available to the assigned approved leader even when the attendance query is loading or fails. An empty bank first needs a shift created by an approved coordinator; QR codes belong to shifts, not banks. The approved rules deployment includes QR permissions; assigned-leader and approved-bank restrictions still apply.
 
-Implemented locally; rules and indexes have **not** been deployed or manually verified against the live backend. The QR is a persisted simulation, not camera scanning or a secure attendance token.
+Rules and indexes were deployed September 28 after user approval. Active rules were verified against the repository; manual client behavior checks remain pending. The QR is a persisted simulation, not camera scanning or a secure attendance token.
 
 An approved bank coordinator who created a shift opens **Manage check-ins** on the bank page, or **Shifts you lead** under Groups. Generate the shift QR once. Booked adults and children can simulate scanning on Check-in; submission stays pending until that assigned, still-approved leader confirms. Removed/cancelled participants cannot be confirmed. Duplicate submissions/confirmations use the same record and cannot award twice.
 
@@ -140,13 +140,13 @@ Challenge progress includes all past confirmed family shifts, counting one shift
 
 The assigned leader can see participant names, including booked children's names, for attendance management; other group members cannot read those attendance records. Attendance history and earned rewards remain after signup cancellation. The existing parent-managed Kid Mode uses the parent's authentication identity.
 
-Deploy both rules and `firestore.indexes.json` after approval, then wait for indexes to finish building. Owner/leader queries use collection-group single-field indexes, as described in [Firebase index documentation](https://firebase.google.com/docs/firestore/query-data/index-overview). Follow the [manual attendance checks](docs/manual_testing.md#attendance-and-rewards) with ordinary authenticated clients; offline smoke checks do not validate Firestore permissions.
+Both rules and `firestore.indexes.json` were deployed after approval; deployment verification is recorded in the development log. Owner/leader queries use collection-group single-field indexes, as described in [Firebase index documentation](https://firebase.google.com/docs/firestore/query-data/index-overview). Follow the [manual attendance checks](docs/manual_testing.md#attendance-and-rewards) with ordinary authenticated clients; offline smoke checks do not validate Firestore permissions.
 
 ## Firestore foundation (Slice 16)
 
 - Project: `bushel-volunteer-20260925`; database: `(default)`; Standard edition, Native mode.
 - Location: **Dallas, Texas (`us-south1`)**. The existing database is already created; do not create another for this slice.
-- The earlier Slice 19 rules are deployed; the current `firestore.rules` adds Slices 20–23 and is pending authorization. Only the authenticated owner can create/get/delete `smokeTests/{uid}/runs/{runId}`. Test data must use the fixed message and a server timestamp. Diagnostic queries/updates remain denied. Profiles, banks, shifts, and registrations have the separate rules above; unmigrated collections remain denied.
+- Slices 20–21 rules are deployed; the current `firestore.rules` adds attendance, rewards, and scheduling validation and was deployed September 28 after approval. Only the authenticated owner can create/get/delete `smokeTests/{uid}/runs/{runId}`. Test data must use the fixed message and a server timestamp. Diagnostic queries/updates remain denied. Profiles, banks, shifts, and registrations have the separate rules above; unmigrated collections remain denied.
 - Adult profiles, banks, shifts, and adult registrations use Firestore. Demo mode still initializes no Firebase services.
 
 Run the separate Flutter diagnostic, sign in, then click **Run connection check**:

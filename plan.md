@@ -16,14 +16,14 @@ Bushel helps families find food banks, join shifts, check in, and earn rewards. 
 | 12–13 | Firebase initialization and auth implemented; interactive Android/Web launch, login/logout, and restart verification still pending |
 | 14–15 | Complete: explicit local demo mode and working shift calendar |
 | 16–19 | Complete: Firestore foundation, private adult profiles, banks, shifts, capacity enforcement, and adult signups |
-| 20 | Groups/voting implemented locally; new live rules deployment pending |
-| 21 | Persistent family profiles, challenges, profile switching, and child places implemented locally; new live rules deployment pending |
+| 20 | Groups/voting implemented; live rules confirmed deployed by September 28 audit |
+| 21 | Persistent family profiles, profile switching, and child places implemented; live rules confirmed deployed; goal-based challenge fields deployed September 28 |
 | Additional | Bank-page coordinator applications implemented; only administrator database approval grants coordination under the new rules |
-| 22–23 | Implemented locally: persistent QR/check-in/leader confirmation, derived points, earned badges, and family challenge progress; rules/index deployment and manual live QA pending |
+| 22–23 | Implemented: persistent QR/check-in/leader confirmation, derived points, earned badges, and family challenge progress; rules/indexes deployed September 28; manual client QA pending |
 
 Use the existing Firebase project `bushel-volunteer-20260925`, `(default)` database in Dallas (`us-south1`). Do not create another project/database. Android still needs an SDK and device/emulator. Setup, schema, and application approval instructions are in `README.md`.
 
-**Deployment remains pending.** Automatic approval review blocked the Slice 20–21 production rules deployment because explicit authorization was missing. Existing live rules remain at Slice 19. A prior read-only audit found no existing shifts requiring group migration; recheck if deploying later. This testing-policy change does not authorize deployment.
+**Deployment approved and completed September 28.** Active production rules match the local `firestore.rules`, including attendance/QR/reward permissions and scheduling validation. Both attendance collection-group indexes were verified READY; verification is recorded in the development log. See `docs/firestore_audit.md` for the three malformed legacy shifts and consistent group/registration counts. Legacy records were not changed; their intended schedules must not be guessed.
 
 Demo runs with `flutter run -d chrome --dart-define=BUSHEL_DEMO=true`; it initializes no Firebase services and resets all local state with **Reset demo**. Normal startup requires Firebase authentication. Live failures must never fall back to demo data.
 
@@ -37,13 +37,13 @@ Demo runs with `flutter run -d chrome --dart-define=BUSHEL_DEMO=true`; it initia
 | 22: Attendance | Persist per-shift mock QR, provisional check-in, and assigned-leader confirmation. Only members check in; only the assigned leader confirms; completion is recorded once |
 | 23: Rewards | Confirmed attendance drives persistent points, badges, kid badge selection, and challenge progress. Trusted updates prevent forged rewards and duplicate awards |
 
-Next: deploy the implemented rules and collection-group indexes only when authorized, then manually check Slices 20–23. Keep demo behavior local. Real scanning hardware/camera integration, secure QR tokens, notifications, AI features, map scaling, and production launch hardening remain later work.
+Next: manually check Slices 20–23 against the deployed rules and indexes. Keep demo behavior local. Real scanning hardware/camera integration, secure QR tokens, notifications, AI features, map scaling, and production launch hardening remain later work.
 
 Attendance uses one immutable completion record per family participant/shift. Pending check-ins earn nothing; the assigned, approved bank leader confirms current participants. Confirmed records derive 100 points each without a client-writable balance. Each confirmed child shift grants one permanent badge choice; earned badges can be featured again. Family challenges use explicit goals of 1–100 distinct confirmed family shifts, including past shifts; several family members on one shift count once. Legacy text-only challenges need a new goal-based challenge and do not invent progress from their titles. See README for schema and deployment instructions.
 
 ## Testing policy for future agents
 
-New volunteer groups/shifts use a single local start time from `01:00` through `24:00`, with `24:00` meaning midnight at the end of the selected date. Creation is limited to the current minute through the next 365 days, validated in the form/repository and pending server rules. New records include `startsAt` and `utcOffsetMinutes`; existing shifts remain readable. Check-in uses stable dropdown values and handles an empty signup list. Leader QR controls remain available independently of attendance-query loading/errors.
+New volunteer groups/shifts use a single local start time from `01:00` through `24:00`, with `24:00` meaning midnight at the end of the selected date. Creation is limited to the current minute through the next 365 days, validated in the form/repository and deployed server rules. New records include `startsAt` and `utcOffsetMinutes`; existing shifts remain readable. Check-in uses stable dropdown values and handles an empty signup list. Leader QR controls remain available independently of attendance-query loading/errors.
 
 **Manual testing is the default. Automated tests are a small smoke alarm, not a completion checklist.** The previous large Flutter and emulator/live suites have been deliberately retired; do not restore them as routine cleanup.
 
@@ -55,7 +55,9 @@ New volunteer groups/shifts use a single local start time from `01:00` through `
 6. Rerun only when a failure or subsequent relevant code change justifies it. Read the useful failure output, fix the cause, and stop when the selected checks pass. Keep successful command output concise; no repeated full log dumps or coverage targets.
 7. Release builds, emulator sessions, and live exercises are developer/manual tasks unless explicitly requested or necessary to investigate an actual build/platform failure. Report unperformed checks honestly; a fake-repository smoke test is not evidence of backend security or real persistence.
 
-The retained offline suite is `test/smoke_test.dart` (eleven checks). Run a relevant check with:
+My shifts lists all bookings with clickable cards and a **View group & members** action. Home's upcoming-shifts shortcut opens that tab. Removal voting explains why fewer than three adults cannot satisfy the existing two-thirds rule without self-votes.
+
+The retained offline suite is `test/smoke_test.dart` (twelve checks). Run a relevant check with:
 
 ```sh
 flutter test --no-pub test/smoke_test.dart --plain-name "part of the test name"

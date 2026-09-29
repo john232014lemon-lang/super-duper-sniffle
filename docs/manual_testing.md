@@ -36,7 +36,7 @@ Pick the 2–4 checks relevant to your change; this is a menu, not a required fu
 
 ## Attendance and rewards
 
-Slices 22–23 are implemented locally; deploy rules and indexes only after authorization before doing live QA.
+Slices 22–23 rules/indexes were deployed September 28 after authorization; manual client QA is now the next step.
 
 - As an approved shift creator, open **Manage check-ins** from bank details or **Shifts you lead** in Groups and generate the QR. As a signed-up adult or booked child, simulate scanning and submit. Restart: attendance should remain pending with zero new points and no badge choice. Demo mode should still work without Firebase.
 - Confirm with the assigned approved leader: the participant should gain exactly 100 points, surviving restart and retries. Using ordinary clients, try confirming as another coordinator or creating confirmed attendance directly as a participant; both must be denied. Cancel/remove an unconfirmed participant and verify confirmation is denied.
@@ -49,4 +49,6 @@ Run `flutter run -d chrome --target lib/firestore_smoke_main.dart`, sign in, and
 
 ## Current deployment boundary
 
-The Slice 20–23/application rules and attendance collection-group indexes have not been deployed. Do not expect these live flows to work under the old Slice 19 rules. Production deployment still needs explicit authorization; reducing automated tests does not authorize deployment. After an approved deployment, use the relevant checks above and clean up disposable records/accounts.
+The September 28 audit confirmed Slices 20–21/application rules are deployed. Attendance/rewards/scheduling rules and attendance collection-group indexes were subsequently deployed with explicit user approval on September 28. See `docs/firestore_audit.md` for the invalid legacy shifts and verified causes of current failures. After an approved deployment, use the relevant checks above and clean up disposable records/accounts.
+
+- Open Home → **Your upcoming shifts**: expect My shifts to show all bookings, including dates outside today. Tap a card or **View group & members** to see that shift's members. Groups with fewer than three adults should explain why removal cannot reach the existing quorum.

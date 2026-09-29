@@ -122,9 +122,6 @@ service cloud.firestore {
         && !exists(groupPath(shiftId))
         && getAfter(groupPath(shiftId)).data == {'members': {}, 'seats': {}, 'version': 0, 'banned': []};
 
-      function registration() {
-        return /databases/$(database)/documents/registrations/$(request.auth.uid)/shifts/$(shiftId);
-      }
       function ownCountChange() {
         let delta = afterSeats(request.auth.uid, shiftId) - beforeSeats(request.auth.uid, shiftId);
         return delta != 0 && request.resource.data.signupCount == resource.data.signupCount + delta;

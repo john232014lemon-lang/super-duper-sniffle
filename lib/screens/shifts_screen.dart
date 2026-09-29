@@ -11,8 +11,9 @@ import 'live_group_screen.dart';
 import '../data/session_store.dart';
 
 class ShiftsScreen extends StatefulWidget {
-  const ShiftsScreen({super.key, this.initialDate});
+  const ShiftsScreen({super.key, this.initialDate, this.showMyShifts = false});
   final DateTime? initialDate;
+  final bool showMyShifts;
 
   @override
   State<ShiftsScreen> createState() => _ShiftsScreenState();
@@ -27,6 +28,7 @@ class _ShiftsScreenState extends State<ShiftsScreen> {
   @override
   void initState() {
     super.initState();
+    _tab = widget.showMyShifts ? 1 : 0;
     _selectedDate = DateUtils.dateOnly(widget.initialDate ?? DateTime.now());
     _store.addListener(_refresh);
     CoordinatorStore.instance.addListener(_refresh);
@@ -125,6 +127,12 @@ class _ShiftsScreenState extends State<ShiftsScreen> {
               DateUtils.isSameDay(listing.shift.scheduledDate, _selectedDate),
         )
         .toList();
+    // My shifts must remain reachable even when a legacy booking has a bad date.
+    final displayed = _tab == 1
+        ? (allShifts.toList()..sort(
+            (a, b) => a.shift.scheduledDate.compareTo(b.shift.scheduledDate),
+          ))
+        : shifts;
     return Scaffold(
       appBar: AppBar(title: const Text('Shifts')),
       body: Center(
@@ -152,13 +160,14 @@ class _ShiftsScreenState extends State<ShiftsScreen> {
                     setState(() => _tab = value.first),
               ),
               const SizedBox(height: 18),
-              ShiftCalendar(
-                selectedDate: _selectedDate,
-                shiftDates: allShifts.map(
-                  (listing) => listing.shift.scheduledDate,
+              if (_tab == 0)
+                ShiftCalendar(
+                  selectedDate: _selectedDate,
+                  shiftDates: allShifts.map(
+                    (listing) => listing.shift.scheduledDate,
+                  ),
+                  onSelected: (date) => setState(() => _selectedDate = date),
                 ),
-                onSelected: (date) => setState(() => _selectedDate = date),
-              ),
               const SizedBox(height: 24),
               Text(
                 _tab == 0 ? 'Available times' : 'Your upcoming shifts',
@@ -169,16 +178,22 @@ class _ShiftsScreenState extends State<ShiftsScreen> {
               ),
               const SizedBox(height: 12),
               Text(
-                MaterialLocalizations.of(context).formatFullDate(_selectedDate),
+                _tab == 1
+                    ? (SessionStore.instance.isKidAccount
+                          ? 'All your booked shifts · your parent manages group membership'
+                          : 'All your booked shifts · tap a card to open its group')
+                    : MaterialLocalizations.of(
+                        context,
+                      ).formatFullDate(_selectedDate),
               ),
               const SizedBox(height: 12),
               if (catalog != null &&
                   (catalog.shiftsLoading || catalog.shiftsFailed))
                 CatalogStatus(store: catalog, shifts: true)
-              else if (shifts.isEmpty)
+              else if (displayed.isEmpty)
                 _EmptyShifts(myShifts: _tab == 1)
               else
-                ...shifts.map(
+                ...displayed.map(
                   (listing) => Padding(
                     padding: const EdgeInsets.only(bottom: 12),
                     child: _ScheduleCard(
@@ -326,6 +341,15 @@ class _ScheduleCard extends StatelessWidget {
                     child: const Text('Cancel signup'),
                   ),
                 ),
+              if (onOpenGroup != null)
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton.icon(
+                    onPressed: onOpenGroup,
+                    icon: const Icon(Icons.groups_outlined),
+                    label: const Text('View group & members'),
+                  ),
+                ),
               if (showSignup) ...[
                 const Divider(height: 24),
                 Align(
@@ -378,7 +402,7 @@ class _EmptyShifts extends StatelessWidget {
               'Your parent manages your shift places in Family Center.',
             ),
           Text(
-            myShifts ? 'No signups for this day' : 'No shifts on this day',
+            myShifts ? 'No booked shifts' : 'No shifts on this day',
             style: const TextStyle(fontWeight: FontWeight.w900),
           ),
           const SizedBox(height: 4),

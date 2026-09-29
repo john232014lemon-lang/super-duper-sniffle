@@ -15,6 +15,8 @@ import 'package:bushel/models/attendance.dart';
 import 'package:bushel/models/shift_schedule.dart';
 import 'package:bushel/screens/attendance_management_screen.dart';
 import 'package:bushel/screens/check_in_screen.dart';
+import 'package:bushel/screens/shifts_screen.dart';
+import 'package:bushel/screens/live_group_screen.dart';
 import 'package:bushel/screens/auth_screen.dart';
 import 'package:bushel/screens/food_bank_detail_screen.dart';
 import 'package:bushel/screens/home_screen.dart';
@@ -59,6 +61,12 @@ final _bank = FirestoreCatalogRepository.decodeBank('bank', {
 });
 
 class _Catalog implements CatalogRepository {
+  @override
+  Stream<ShiftGroup> watchGroup(String shiftId) =>
+      Stream.value(const ShiftGroup(members: {'adult': 'Adult'}, version: 1));
+  @override
+  Stream<Map<String, RemovalVote>> watchVotes(String shiftId) =>
+      Stream.value({});
   _Catalog({
     this.failBanks = false,
     this.kidMode = false,
@@ -145,6 +153,35 @@ void main() {
     SessionStore.instance.reset();
     CoordinatorStore.instance.reset();
     ShiftStore.instance.reset();
+  });
+
+  testWidgets('My shifts exposes groups beyond the selected calendar date', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1000, 1200));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final repository = _Catalog();
+    addTearDown(repository.access.close);
+    await tester.pumpWidget(
+      CatalogSession(
+        uid: 'adult',
+        repository: repository,
+        child: BushelApp(
+          home: ShiftsScreen(showMyShifts: true, initialDate: DateTime(2030)),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('View group & members'), findsNWidgets(2));
+    await tester.tap(find.text('View group & members').first);
+    await tester.pumpAndSettle();
+    expect(find.byType(LiveGroupScreen), findsOneWidget);
+    expect(
+      find.textContaining('Removal voting needs at least 3 adults'),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox());
   });
 
   test('rewards exclude pending attendance and duplicate completions', () {

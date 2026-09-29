@@ -136,6 +136,13 @@ class _LiveGroupScreenState extends State<LiveGroupScreen> {
                             const Text(
                               'Child places are managed privately by their parents. Adult membership changes reset removal votes.',
                             ),
+                            if (group.members.length < 3)
+                              const Padding(
+                                padding: EdgeInsets.symmetric(vertical: 12),
+                                child: Text(
+                                  'Removal voting needs at least 3 adults. Two-thirds of all members must vote, and nobody can vote for themselves. You can cancel your own signup from My shifts.',
+                                ),
+                              ),
                             if (_error != null)
                               Text(
                                 _error!,
@@ -163,7 +170,10 @@ class _LiveGroupScreenState extends State<LiveGroupScreen> {
                                       ),
                                       trailing: TextButton(
                                         onPressed:
-                                            _busy || self || (voted && !ready)
+                                            _busy ||
+                                                self ||
+                                                group.members.length < 3 ||
+                                                (voted && !ready)
                                             ? null
                                             : () => _vote(
                                                 entry.key,

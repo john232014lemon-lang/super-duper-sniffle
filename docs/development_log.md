@@ -1,5 +1,21 @@
 # Bushel Development Log
 
+## 2026-09-28 — Approved Firestore deployment
+
+The user explicitly approved deployment of the prepared rules and indexes. Ran `firebase deploy --only "firestore:rules,firestore:indexes" --project bushel-volunteer-20260925 --non-interactive`; deployment succeeded. Read back the active rules and verified an exact match to local `firestore.rules`. Release update: `2026-09-29T02:15:18.620415Z` (September 28, Chicago); ruleset `f42fefb4-d62b-4108-9764-7eafcb8f4022`.
+
+Both attendance collection-group indexes (`ownerUid` and `leaderUid`) were verified READY after their build completed. Existing shifts, registrations, and schedules were not modified. No app build, hosting deployment, client mutation test, commit, or push was performed. Manual client checks remain: valid shift creation, assigned-leader QR generation, and attendance loading/check-in.
+
+## 2026-09-28 — Live permission audit and group navigation
+
+**Request:** Investigate failed shift creation, QR generation, attendance loading, old malformed schedules, and inaccessible removal screens.
+
+**Live findings:** Read-only inspection confirmed the deployed rules are Slices 20–21 (release updated September 27), not the previously documented Slice 19. They reject the newer scheduling fields and contain no attendance/QR grants. Required attendance collection-group indexes are absent. Found three shifts, all with malformed times and past/far-future dates; each has its group and consistent member-registration/seat/signup counts. All creators have approved applications. No removal votes exist; groups contain two, one, and one adults, making removal impossible under the unchanged two-thirds/no-self-vote policy. Detailed findings and IDs are in `docs/firestore_audit.md`. No dates were guessed or records changed.
+
+**Changes:** My shifts shows all booked shifts instead of hiding them behind a selected calendar date. Cards remain clickable and now expose **View group & members**; Home opens My shifts directly when bookings exist. Small groups explain the voting limit. Removed an unused rules helper flagged during source compilation.
+
+**Verification:** One targeted offline navigation smoke check passed; Flutter analysis clean. Firebase Rules API source compilation returned no issues after removing the helper. This was not an emulator suite or a live client permission test. Deployment requires approval; production writes, legacy cleanup, release builds, commits, and pushes were not performed.
+
 ## 2026-09-28 — Scheduling bounds, empty check-in, and QR access
 
 **Request:** Restrict times to 01:00–24:00 and group creation to now through one year ahead; fix the reported ShiftListing dropdown assertion and coordinator QR access.

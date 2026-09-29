@@ -104,7 +104,10 @@ class _HomeScreenState extends State<HomeScreen> {
                             trailing: const Icon(Icons.chevron_right),
                             onTap: () => Navigator.of(context).push(
                               MaterialPageRoute<void>(
-                                builder: (_) => const ShiftsScreen(),
+                                builder: (_) => ShiftsScreen(
+                                  showMyShifts:
+                                      ShiftStore.instance.myShifts.isNotEmpty,
+                                ),
                               ),
                             ),
                           ),
