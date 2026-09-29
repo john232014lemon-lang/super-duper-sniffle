@@ -8,6 +8,7 @@ class FoodBankShift {
     required this.scheduledDate,
     required this.time,
     required this.station,
+    this.instructions = '',
     required this.spotsLeft,
   });
 
@@ -36,6 +37,7 @@ class FoodBankShift {
 
   final String time;
   final String station;
+  final String instructions;
   final int spotsLeft;
 }
 

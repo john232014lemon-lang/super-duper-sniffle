@@ -23,7 +23,7 @@ Bushel helps families find food banks, join shifts, check in, and earn rewards. 
 
 Use the existing Firebase project `bushel-volunteer-20260925`, `(default)` database in Dallas (`us-south1`). Do not create another project/database. Android still needs an SDK and device/emulator. Setup, schema, and application approval instructions are in `README.md`.
 
-**Deployment approved and completed September 28.** Active production rules match the local `firestore.rules`, including attendance/QR/reward permissions and scheduling validation. Both attendance collection-group indexes were verified READY; verification is recorded in the development log. See `docs/firestore_audit.md` for the three malformed legacy shifts and consistent group/registration counts. Legacy records were not changed; their intended schedules must not be guessed.
+**Deployment approved and completed September 28.** The September 28 deployment includes attendance/QR/reward permissions and the earlier scheduling validation. September 29 time-range, text-limit, and instructions rules were subsequently approved, deployed, and verified against the local file. Both attendance collection-group indexes were verified READY; verification is recorded in the development log. See `docs/firestore_audit.md` for the three malformed legacy shifts and consistent group/registration counts. Legacy records were not changed; their intended schedules must not be guessed.
 
 Demo runs with `flutter run -d chrome --dart-define=BUSHEL_DEMO=true`; it initializes no Firebase services and resets all local state with **Reset demo**. Normal startup requires Firebase authentication. Live failures must never fall back to demo data.
 
@@ -43,7 +43,7 @@ Attendance uses one immutable completion record per family participant/shift. Pe
 
 ## Testing policy for future agents
 
-New volunteer groups/shifts use a single local start time from `01:00` through `24:00`, with `24:00` meaning midnight at the end of the selected date. Creation is limited to the current minute through the next 365 days, validated in the form/repository and deployed server rules. New records include `startsAt` and `utcOffsetMinutes`; existing shifts remain readable. Check-in uses stable dropdown values and handles an empty signup list. Leader QR controls remain available independently of attendance-query loading/errors.
+New volunteer groups/shifts use a single local start time from `00:00` through `23:59`; `0:00` normalizes to `00:00` and `24:00` is rejected. Shift names allow 40 characters, stations 30, and optional location instructions 500. Instructions appear on shift cards and check-in. These September 29 rules changes were deployed after fresh explicit approval; the active rules exactly match the local file. Creation is limited to the current minute through the next 365 days, validated in the form/repository and deployed server rules. New records include `startsAt` and `utcOffsetMinutes`; existing shifts remain readable. Check-in uses stable dropdown values and handles an empty signup list. Leader QR controls remain available independently of attendance-query loading/errors.
 
 **Manual testing is the default. Automated tests are a small smoke alarm, not a completion checklist.** The previous large Flutter and emulator/live suites have been deliberately retired; do not restore them as routine cleanup.
 

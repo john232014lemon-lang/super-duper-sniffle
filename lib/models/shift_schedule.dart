@@ -2,9 +2,8 @@
 class ShiftSchedule {
   static int? minutes(String value) {
     final match = RegExp(
-      r'^(0?[1-9]|1[0-9]|2[0-3]):([0-5][0-9])$',
+      r'^([01]?[0-9]|2[0-3]):([0-5][0-9])$',
     ).firstMatch(value.trim());
-    if (value.trim() == '24:00') return 1440;
     if (match == null) return null;
     return int.parse(match[1]!) * 60 + int.parse(match[2]!);
   }
@@ -21,7 +20,7 @@ class ShiftSchedule {
 
   static String? validate(DateTime date, String time, {DateTime? now}) {
     if (minutes(time) == null) {
-      return 'Enter a time from 01:00 to 24:00 (HH:mm).';
+      return 'Enter a time from 00:00 to 23:59 (HH:mm).';
     }
     final clock = now ?? DateTime.now();
     final currentMinute = DateTime(
@@ -38,8 +37,7 @@ class ShiftSchedule {
     }
     // Do not silently shift nonexistent local times across a daylight-saving gap.
     final count = minutes(time)!;
-    if (count != 1440 &&
-        (scheduled.hour != count ~/ 60 || scheduled.minute != count % 60)) {
+    if (scheduled.hour != count ~/ 60 || scheduled.minute != count % 60) {
       return 'This local time is unavailable. Choose another time.';
     }
     return null;

@@ -1,5 +1,21 @@
 # Bushel Development Log
 
+## 2026-09-29 — Approved shift-form rules deployment
+
+Following the user's explicit approval, deployed `firestore.rules` to `bushel-volunteer-20260925` successfully. The active rules were fetched and verified as an exact match to the local file. Release timestamp: `2026-09-29T22:27:02.110191Z`; ruleset: `e6dfa67d-aad9-4a57-8003-ab0512d2da2d`.
+
+Production now permits 00:00–23:59 and optional instructions up to 500 characters, with 40-character shift names and 30-character stations. No existing shift documents were altered, no indexes needed changes, and no client mutation tests were run. Manual checks: future midnight succeeds while 24:00 fails; length limits hold; saved instructions persist and display after restart. This supersedes the deployment-blocked status in the preceding implementation entry.
+
+## 2026-09-29 — Military time and location instructions
+
+**Request:** Correct military time to 00:00–23:59, reduce station/name length, and provide a box for specific location instructions.
+
+**Changes:** Creation accepts 0:00 and normalizes it to 00:00; 24:00 is rejected. The current-minute/365-day window remains. Shift names are limited to 40 characters, stations to 30, and optional multiline location instructions to 500. Instructions persist on the shift and appear on bank shift cards, My shifts, and check-in. Existing records without instructions decode as empty, and existing names are not truncated. Matching Firestore rules enforce these limits on new records.
+
+**Verification:** Static analysis and three existing affected smoke checks passed after correcting a misplaced display widget. No new tests, emulator runs, or live client writes. The attempted rules deployment was rejected by automatic approval review: the earlier approval covered the previous prepared ruleset, not this modification. New explicit approval is required; production still uses the prior 01:00–24:00 validation and does not allow instructions. No deployment occurred for this change.
+
+**Manual checks after deployment:** Save a future 0:00 shift and verify 00:00 display; reject 24:00. Try pasting overlong names/stations and verify 40/30 limits. Save multiline instructions, restart, and confirm they appear on shift cards and check-in; legacy shifts should still load without instructions.
+
 ## 2026-09-28 — Approved Firestore deployment
 
 The user explicitly approved deployment of the prepared rules and indexes. Ran `firebase deploy --only "firestore:rules,firestore:indexes" --project bushel-volunteer-20260925 --non-interactive`; deployment succeeded. Read back the active rules and verified an exact match to local `firestore.rules`. Release update: `2026-09-29T02:15:18.620415Z` (September 28, Chicago); ruleset `f42fefb4-d62b-4108-9764-7eafcb8f4022`.

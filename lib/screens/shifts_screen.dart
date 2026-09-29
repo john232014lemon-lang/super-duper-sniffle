@@ -333,6 +333,14 @@ class _ScheduleCard extends StatelessWidget {
                   ),
                 ],
               ),
+              if (shift.instructions.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(top: 12),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text('Location instructions: ${shift.instructions}'),
+                  ),
+                ),
               if (onCancel != null)
                 Align(
                   alignment: Alignment.centerRight,

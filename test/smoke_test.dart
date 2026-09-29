@@ -205,7 +205,17 @@ void main() {
     expect(ShiftSchedule.validate(now, '12:29', now: now), isNotNull);
     expect(ShiftSchedule.validate(now, '00:59', now: now), isNotNull);
     expect(ShiftSchedule.validate(now, '24:01', now: now), isNotNull);
-    expect(ShiftSchedule.start(now, '24:00'), DateTime(2026, 9, 29));
+    expect(ShiftSchedule.minutes('24:00'), isNull);
+    expect(ShiftSchedule.normalize('0:00'), '00:00');
+    expect(ShiftSchedule.minutes('23:59'), 1439);
+    expect(
+      ShiftSchedule.validate(
+        now.add(const Duration(days: 1)),
+        '0:00',
+        now: now,
+      ),
+      isNull,
+    );
     expect(
       ShiftSchedule.validate(
         now.add(const Duration(days: 366)),

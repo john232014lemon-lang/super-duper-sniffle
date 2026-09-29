@@ -94,7 +94,7 @@ service cloud.firestore {
         let d = request.resource.data;
         let parts = d.time.split(':');
         let minutes = int(parts[0]) * 60 + int(parts[1]);
-        return d.time.matches('^((0[1-9]|1[0-9]|2[0-3]):[0-5][0-9]|24:00)$')
+        return d.time.matches('^([01][0-9]|2[0-3]):[0-5][0-9]$')
           && d.date is timestamp && d.date == d.date.date()
           && d.startsAt is timestamp
           && d.utcOffsetMinutes is int && d.utcOffsetMinutes >= -840 && d.utcOffsetMinutes <= 840
@@ -105,14 +105,16 @@ service cloud.firestore {
       }
       allow read: if signedIn();
       allow create: if signedIn()
-        && request.resource.data.keys().hasOnly(['bankId', 'creatorUid', 'title', 'date', 'time', 'startsAt', 'utcOffsetMinutes', 'station', 'capacity', 'signupCount', 'createdAt'])
+        && request.resource.data.keys().hasOnly(['bankId', 'creatorUid', 'title', 'date', 'time', 'startsAt', 'utcOffsetMinutes', 'station', 'instructions', 'capacity', 'signupCount', 'createdAt'])
         && request.resource.data.bankId is string
         && exists(/databases/$(database)/documents/banks/$(request.resource.data.bankId))
         && coordinates(request.resource.data.bankId)
         && request.resource.data.creatorUid == request.auth.uid
-        && request.resource.data.title is string && request.resource.data.title.size() > 0 && request.resource.data.title.size() <= 120
+        && text(request.resource.data.title, 40)
         && request.resource.data.time is string && validSchedule()
-        && request.resource.data.station is string && request.resource.data.station.size() > 0 && request.resource.data.station.size() <= 120
+        && text(request.resource.data.station, 30)
+        && request.resource.data.get('instructions', '') is string
+        && request.resource.data.get('instructions', '').size() <= 500
         && request.resource.data.date is timestamp
         && request.resource.data.date >= timestamp.date(2000, 1, 1)
         && request.resource.data.date < timestamp.date(2101, 1, 1)

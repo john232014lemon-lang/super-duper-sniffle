@@ -106,6 +106,7 @@ class FirestoreCatalogRepository extends FirestoreAttendanceRepository
         scheduledDate: DateTime(date.year, date.month, date.day),
         time: data['time'] as String,
         station: data['station'] as String,
+        instructions: data['instructions'] as String? ?? '',
         spotsLeft: (data['capacity'] as int) - (data['signupCount'] as int),
       ),
     );
@@ -373,6 +374,15 @@ class FirestoreCatalogRepository extends FirestoreAttendanceRepository
     FoodBankShift shift,
   ) async {
     final date = shift.scheduledDate;
+    if (shift.title.trim().isEmpty ||
+        shift.title.length > 40 ||
+        shift.station.trim().isEmpty ||
+        shift.station.length > 30 ||
+        shift.instructions.length > 500) {
+      throw const CatalogException(
+        'Use a name up to 40 characters, station up to 30, and instructions up to 500.',
+      );
+    }
     final error = ShiftSchedule.validate(date, shift.time);
     if (error != null) throw CatalogException(error);
     final startsAt = ShiftSchedule.start(date, shift.time);
@@ -387,6 +397,8 @@ class FirestoreCatalogRepository extends FirestoreAttendanceRepository
       'startsAt': Timestamp.fromDate(startsAt),
       'utcOffsetMinutes': startsAt.timeZoneOffset.inMinutes,
       'station': shift.station,
+      if (shift.instructions.trim().isNotEmpty)
+        'instructions': shift.instructions.trim(),
       'capacity': shift.spotsLeft,
       'signupCount': 0,
       'createdAt': FieldValue.serverTimestamp(),

@@ -417,6 +417,10 @@ class _ShiftCard extends StatelessWidget {
                       fontSize: 12,
                     ),
                   ),
+                  if (shift.instructions.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    Text('Location instructions: ${shift.instructions}'),
+                  ],
                 ],
               ),
             ),
@@ -455,6 +459,7 @@ class _AddShiftDialogState extends State<_AddShiftDialog> {
   final _date = TextEditingController();
   final _time = TextEditingController();
   final _station = TextEditingController();
+  final _instructions = TextEditingController();
   final _spots = TextEditingController(text: '1');
   bool _saving = false;
   String? _error;
@@ -465,6 +470,7 @@ class _AddShiftDialogState extends State<_AddShiftDialog> {
     _date.dispose();
     _time.dispose();
     _station.dispose();
+    _instructions.dispose();
     _spots.dispose();
     super.dispose();
   }
@@ -511,6 +517,7 @@ class _AddShiftDialogState extends State<_AddShiftDialog> {
       scheduledDate: _parseDate(_date.text)!,
       time: ShiftSchedule.normalize(_time.text),
       station: _station.text.trim(),
+      instructions: _instructions.text.trim(),
       spotsLeft: int.parse(_spots.text),
     );
     setState(() {
@@ -553,7 +560,7 @@ class _AddShiftDialogState extends State<_AddShiftDialog> {
                   enabled: !_saving,
                   key: const ValueKey('shift-title'),
                   controller: _title,
-                  maxLength: 120,
+                  maxLength: 40,
                   decoration: const InputDecoration(labelText: 'Shift name'),
                   validator: _required,
                 ),
@@ -583,8 +590,7 @@ class _AddShiftDialogState extends State<_AddShiftDialog> {
                   decoration: const InputDecoration(
                     labelText: 'Start time (24-hour)',
                     hintText: '09:00',
-                    helperText:
-                        '01:00–24:00, local time. Within 365 days.\n24:00 means midnight at the end of this date.',
+                    helperText: '00:00–23:59, local time. Within 365 days.',
                   ),
                   validator: (value) {
                     final date = _parseDate(_date.text);
@@ -596,9 +602,22 @@ class _AddShiftDialogState extends State<_AddShiftDialog> {
                 TextFormField(
                   enabled: !_saving,
                   controller: _station,
-                  maxLength: 120,
+                  maxLength: 30,
                   decoration: const InputDecoration(labelText: 'Station'),
                   validator: _required,
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  enabled: !_saving,
+                  controller: _instructions,
+                  maxLength: 500,
+                  minLines: 2,
+                  maxLines: 4,
+                  decoration: const InputDecoration(
+                    labelText: 'Location instructions (optional)',
+                    hintText:
+                        'Use the side entrance and meet at the upstairs packing room.',
+                  ),
                 ),
                 const SizedBox(height: 12),
                 TextFormField(

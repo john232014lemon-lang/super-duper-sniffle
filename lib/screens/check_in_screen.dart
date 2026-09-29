@@ -263,6 +263,13 @@ class _CheckInScreenState extends State<CheckInScreen> {
                             _scannedCode = null;
                           }),
                   ),
+                if (current.shift.instructions.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 12),
+                    child: Text(
+                      'Location instructions: ${current.shift.instructions}',
+                    ),
+                  ),
                 const SizedBox(height: 16),
                 SizedBox(
                   height: kidMode ? 70 : null,
