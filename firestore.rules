@@ -90,15 +90,28 @@ service cloud.firestore {
       // Never writable by clients, including coordinators.
     }
     match /shifts/{shiftId} {
+      function validSchedule() {
+        let d = request.resource.data;
+        let parts = d.time.split(':');
+        let minutes = int(parts[0]) * 60 + int(parts[1]);
+        return d.time.matches('^((0[1-9]|1[0-9]|2[0-3]):[0-5][0-9]|24:00)$')
+          && d.date is timestamp && d.date == d.date.date()
+          && d.startsAt is timestamp
+          && d.utcOffsetMinutes is int && d.utcOffsetMinutes >= -840 && d.utcOffsetMinutes <= 840
+          && d.startsAt == d.date + duration.value(minutes - d.utcOffsetMinutes, 'm')
+          // Minute precision allows a start in the current minute.
+          && d.startsAt + duration.value(1, 'm') > request.time
+          && d.startsAt <= request.time + duration.value(365, 'd');
+      }
       allow read: if signedIn();
       allow create: if signedIn()
-        && request.resource.data.keys().hasOnly(['bankId', 'creatorUid', 'title', 'date', 'time', 'station', 'capacity', 'signupCount', 'createdAt'])
+        && request.resource.data.keys().hasOnly(['bankId', 'creatorUid', 'title', 'date', 'time', 'startsAt', 'utcOffsetMinutes', 'station', 'capacity', 'signupCount', 'createdAt'])
         && request.resource.data.bankId is string
         && exists(/databases/$(database)/documents/banks/$(request.resource.data.bankId))
         && coordinates(request.resource.data.bankId)
         && request.resource.data.creatorUid == request.auth.uid
         && request.resource.data.title is string && request.resource.data.title.size() > 0 && request.resource.data.title.size() <= 120
-        && request.resource.data.time is string && request.resource.data.time.size() > 0 && request.resource.data.time.size() <= 80
+        && request.resource.data.time is string && validSchedule()
         && request.resource.data.station is string && request.resource.data.station.size() > 0 && request.resource.data.station.size() <= 120
         && request.resource.data.date is timestamp
         && request.resource.data.date >= timestamp.date(2000, 1, 1)

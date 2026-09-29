@@ -42,7 +42,7 @@ Follow the official [FlutterFire setup](https://firebase.google.com/docs/flutter
 - Volunteer/Coordinator choices only change the mock experience; they grant no backend permissions.
 - Initialization and authentication failures have visible retry/error states. Mock widget tests can instantiate `BushelApp` or `DemoApp` directly; `main()` uses the Firebase startup/auth gate unless `BUSHEL_DEMO=true` is explicitly set.
 
-The testing policy in [plan.md](plan.md) favors manual QA. Only nine offline smoke checks remain; use a relevant check for a small change, or the small suite for changes spanning several boundaries:
+The testing policy in [plan.md](plan.md) favors manual QA. Only eleven offline smoke checks remain; use a relevant check for a small change, or the small suite for changes spanning several boundaries:
 
 ```sh
 flutter test --no-pub test/smoke_test.dart
@@ -118,6 +118,10 @@ If the audit reports legacy shifts missing groups, backfill their group membersh
 Use the relevant [manual checks](docs/manual_testing.md) after an authorized deployment. The automated emulator/live harnesses have been removed; do not recreate them by default.
 
 ## Attendance and rewards (Slices 22–23)
+
+New shifts/groups accept a single local start time from `01:00` to `24:00` and must start in the current minute or within the next 365 days. `24:00` is midnight ending the selected date. New records store `startsAt` and the local `utcOffsetMinutes` alongside the calendar date and normalized time. Pending rules validate their consistency and the window using [Firebase request time](https://firebase.google.com/docs/reference/rules/rules.firestore.Request). Existing shifts remain readable; new clients require the updated rules for creation.
+
+Check-in handles empty or changing signup lists without retaining obsolete dropdown values. QR generation is available to the assigned approved leader even when the attendance query is loading or fails. An empty bank first needs a shift created by an approved coordinator; QR codes belong to shifts, not banks. Rule-denied QR writes still require the pending rules deployment, not a UI permission bypass.
 
 Implemented locally; rules and indexes have **not** been deployed or manually verified against the live backend. The QR is a persisted simulation, not camera scanning or a secure attendance token.
 

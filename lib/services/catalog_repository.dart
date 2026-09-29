@@ -6,6 +6,7 @@ import '../models/food_bank.dart';
 import 'community_models.dart';
 import '../data/session_store.dart';
 import 'attendance_repository.dart';
+import '../models/shift_schedule.dart';
 
 class StoredShift {
   const StoredShift({
@@ -372,6 +373,9 @@ class FirestoreCatalogRepository extends FirestoreAttendanceRepository
     FoodBankShift shift,
   ) async {
     final date = shift.scheduledDate;
+    final error = ShiftSchedule.validate(date, shift.time);
+    if (error != null) throw CatalogException(error);
+    final startsAt = ShiftSchedule.start(date, shift.time);
     final ref = _db.collection('shifts').doc();
     final batch = _db.batch();
     batch.set(ref, {
@@ -379,7 +383,9 @@ class FirestoreCatalogRepository extends FirestoreAttendanceRepository
       'creatorUid': uid,
       'title': shift.title,
       'date': Timestamp.fromDate(DateTime.utc(date.year, date.month, date.day)),
-      'time': shift.time,
+      'time': ShiftSchedule.normalize(shift.time),
+      'startsAt': Timestamp.fromDate(startsAt),
+      'utcOffsetMinutes': startsAt.timeZoneOffset.inMinutes,
       'station': shift.station,
       'capacity': shift.spotsLeft,
       'signupCount': 0,

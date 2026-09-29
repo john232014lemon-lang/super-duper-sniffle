@@ -1,5 +1,15 @@
 # Bushel Development Log
 
+## 2026-09-28 — Scheduling bounds, empty check-in, and QR access
+
+**Request:** Restrict times to 01:00–24:00 and group creation to now through one year ahead; fix the reported ShiftListing dropdown assertion and coordinator QR access.
+
+**Changes:** Added shared schedule validation for the creation form, repository, and demo store. New times normalize to HH:mm; 24:00 means midnight ending the selected date. The creation window uses current-minute precision and a rolling 365-day year. Date picker bounds match the window; typed dates are checked with time on submission. New Firestore fields `startsAt` and `utcOffsetMinutes` bind the stored calendar date/time to the actual instant; pending rules enforce format, consistency, and the server-time window. Existing records remain readable.
+
+**Fixes:** Dropdown values now use persistent shift IDs (shift identity in demo), with selection reconciled after updates and no dropdown for an empty list. QR generation no longer waits for a successful attendance query; the approved creator can generate it even with no attendees or a query error. Approval/assigned-leader enforcement remains intact. Production QR writes may still fail until the pending rules are deployed.
+
+**Verification:** The three affected smoke checks passed: schedule bounds, populated/empty/repopulated check-in streams, and QR controls during attendance failure. Added only two smoke tests and extended an existing one. The QR fixture initially lost its error before subscription; corrected that fixture and reran only that failed check. Static analysis passed after one brace-style fix. No emulator, live backend test, build, deployment, commit, or push. Manual checks were added to `docs/manual_testing.md`; rules/index deployment and client QA remain pending.
+
 ## 2026-09-28 — Slices 22–23: persisted attendance and rewards
 
 **Request:** Build Slices 22 and 23, retaining the manual-first testing policy.

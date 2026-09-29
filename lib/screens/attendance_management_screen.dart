@@ -88,24 +88,8 @@ class _AttendanceManagementScreenState
           : StreamBuilder<List<AttendanceEntry>>(
               stream: _entries,
               builder: (context, snapshot) {
-                if (snapshot.hasError) {
-                  return Center(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Text('Could not load check-ins.'),
-                        TextButton(
-                          onPressed: () => setState(_subscribe),
-                          child: const Text('Retry'),
-                        ),
-                      ],
-                    ),
-                  );
-                }
-                if (!snapshot.hasData) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-                final entries = snapshot.data!
+                final ready = snapshot.hasData && !snapshot.hasError;
+                final entries = (ready ? snapshot.data! : <AttendanceEntry>[])
                     .where((entry) => entry.shiftId == widget.shiftId)
                     .toList();
                 final pending = entries
@@ -152,56 +136,68 @@ class _AttendanceManagementScreenState
                             child: MockQrCode(value: shift.qrCode!, size: 180),
                           ),
                         const SizedBox(height: 24),
-                        Text(
-                          'Awaiting confirmation · ${pending.length}',
-                          style: const TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
+                        if (snapshot.hasError) ...[
+                          const Text(
+                            'Could not load check-ins. You can still generate the shift QR.',
                           ),
-                        ),
-                        const Text(
-                          'Confirm only people who attended. Cancelled or removed participants cannot be confirmed.',
-                        ),
-                        if (pending.isEmpty)
-                          const Padding(
-                            padding: EdgeInsets.all(16),
-                            child: Text('No pending check-ins.'),
+                          TextButton(
+                            onPressed: () => setState(_subscribe),
+                            child: const Text('Retry check-ins'),
                           ),
-                        for (final entry in pending)
-                          Card(
-                            child: ListTile(
-                              title: Text(entry.name),
-                              subtitle: Text(
-                                entry.participantId == 'parent'
-                                    ? 'Adult participant'
-                                    : 'Parent-managed child',
-                              ),
-                              trailing: FilledButton(
-                                onPressed: _saving
-                                    ? null
-                                    : () => _save(
-                                        () => store.repository.confirmEntry(
-                                          entry,
+                        ] else if (!ready)
+                          const LinearProgressIndicator(),
+                        if (ready) ...[
+                          Text(
+                            'Awaiting confirmation · ${pending.length}',
+                            style: const TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const Text(
+                            'Confirm only people who attended. Cancelled or removed participants cannot be confirmed.',
+                          ),
+                          if (pending.isEmpty)
+                            const Padding(
+                              padding: EdgeInsets.all(16),
+                              child: Text('No pending check-ins.'),
+                            ),
+                          for (final entry in pending)
+                            Card(
+                              child: ListTile(
+                                title: Text(entry.name),
+                                subtitle: Text(
+                                  entry.participantId == 'parent'
+                                      ? 'Adult participant'
+                                      : 'Parent-managed child',
+                                ),
+                                trailing: FilledButton(
+                                  onPressed: _saving
+                                      ? null
+                                      : () => _save(
+                                          () => store.repository.confirmEntry(
+                                            entry,
+                                          ),
                                         ),
-                                      ),
-                                child: const Text('Confirm'),
+                                  child: const Text('Confirm'),
+                                ),
                               ),
                             ),
+                          Text(
+                            '${entries.where((entry) => entry.confirmed).length} confirmed',
+                            style: const TextStyle(fontWeight: FontWeight.bold),
                           ),
-                        Text(
-                          '${entries.where((entry) => entry.confirmed).length} confirmed',
-                          style: const TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                        for (final entry in entries.where(
-                          (entry) => entry.confirmed,
-                        ))
-                          ListTile(
-                            title: Text(entry.name),
-                            trailing: const Icon(
-                              Icons.check_circle,
-                              color: Colors.green,
+                          for (final entry in entries.where(
+                            (entry) => entry.confirmed,
+                          ))
+                            ListTile(
+                              title: Text(entry.name),
+                              trailing: const Icon(
+                                Icons.check_circle,
+                                color: Colors.green,
+                              ),
                             ),
-                          ),
+                        ],
                       ],
                     ),
                   ),

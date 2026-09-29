@@ -10,6 +10,9 @@ Pick the 2–4 checks relevant to your change; this is a menu, not a required fu
 
 ## Bank applications and shifts
 
+- Try creating a group with `00:59`, `24:01`, a past time today, or a start beyond 365 days: expect validation errors and no creation. The current minute and a future start inside the window should work; `24:00` means next midnight. Repeat invalid creation through an ordinary client after rules deployment to check server enforcement.
+- Open Check-in with no bookings, then add/cancel bookings and return: expect an empty state or a valid dropdown, never the red assertion screen. As the approved shift creator, open **Manage check-ins** with no attendees or with attendance loading unavailable: **Generate shift QR** should remain accessible. Other coordinators must still be denied.
+
 - Submit an application from bank details. While pending, **Add shift** must stay unavailable even with the Coordinator profile preference. Have an admin set that bank application's `status` to `approved`; creation should unlock only there. Set `rejected` and verify new creation is blocked again.
 - Create a small-capacity shift and sign up. Restart and check **My shifts** and its group. Cancel and expect both membership and reserved capacity to update.
 - With one place left, attempt signup from two ordinary adult sessions. Expect only one success and no count above capacity. A duplicate attempt must not reserve another place.

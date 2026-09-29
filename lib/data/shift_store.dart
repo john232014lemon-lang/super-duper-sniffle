@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 
 import '../data/mock_food_banks.dart';
 import '../models/food_bank.dart';
+import '../models/shift_schedule.dart';
 import 'coordinator_store.dart';
 import 'session_store.dart';
 import 'catalog_store.dart';
@@ -190,6 +191,8 @@ class ShiftStore extends ChangeNotifier {
   }
 
   Future<void> addAvailable(FoodBank bank, FoodBankShift shift) async {
+    final error = ShiftSchedule.validate(shift.scheduledDate, shift.time);
+    if (error != null) throw CatalogException(error);
     if (usingLive) {
       await _catalog!.repository.createShift(_catalog!.uid, bank.id!, shift);
       return;

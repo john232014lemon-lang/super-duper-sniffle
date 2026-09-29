@@ -6,6 +6,7 @@ import '../services/catalog_repository.dart';
 import '../data/shift_store.dart';
 import '../data/session_store.dart';
 import '../models/food_bank.dart';
+import '../models/shift_schedule.dart';
 import '../widgets/bushel_navigation_bar.dart';
 import '../widgets/coordinator_application.dart';
 import 'attendance_management_screen.dart';
@@ -485,11 +486,18 @@ class _AddShiftDialogState extends State<_AddShiftDialog> {
   }
 
   Future<void> _pickDate() async {
+    final now = DateTime.now();
+    final first = DateTime(now.year, now.month, now.day);
+    final last = now.add(const Duration(days: 365));
+    final selected = _parseDate(_date.text);
     final date = await showDatePicker(
       context: context,
-      initialDate: _parseDate(_date.text) ?? DateTime.now(),
-      firstDate: DateTime(2000),
-      lastDate: DateTime(2100, 12, 31),
+      initialDate:
+          selected == null || selected.isBefore(first) || selected.isAfter(last)
+          ? first
+          : selected,
+      firstDate: first,
+      lastDate: last,
     );
     if (date != null && mounted) {
       _date.text = date.toIso8601String().substring(0, 10);
@@ -501,7 +509,7 @@ class _AddShiftDialogState extends State<_AddShiftDialog> {
     final shift = FoodBankShift(
       title: _title.text.trim(),
       scheduledDate: _parseDate(_date.text)!,
-      time: _time.text.trim(),
+      time: ShiftSchedule.normalize(_time.text),
       station: _station.text.trim(),
       spotsLeft: int.parse(_spots.text),
     );
@@ -563,19 +571,26 @@ class _AddShiftDialogState extends State<_AddShiftDialog> {
                     ),
                   ),
                   validator: (value) => _parseDate(value ?? '') == null
-                      ? 'Enter a valid date (YYYY-MM-DD), 2000–2100'
+                      ? 'Enter a valid date (YYYY-MM-DD)'
                       : null,
                 ),
                 const SizedBox(height: 12),
                 TextFormField(
                   enabled: !_saving,
                   controller: _time,
-                  maxLength: 80,
+                  maxLength: 5,
+                  keyboardType: TextInputType.datetime,
                   decoration: const InputDecoration(
-                    labelText: 'Time',
-                    hintText: '9:00–11:00 AM',
+                    labelText: 'Start time (24-hour)',
+                    hintText: '09:00',
+                    helperText:
+                        '01:00–24:00, local time. Within 365 days.\n24:00 means midnight at the end of this date.',
                   ),
-                  validator: _required,
+                  validator: (value) {
+                    final date = _parseDate(_date.text);
+                    if (date == null) return 'Choose a valid date first.';
+                    return ShiftSchedule.validate(date, value ?? '');
+                  },
                 ),
                 const SizedBox(height: 12),
                 TextFormField(

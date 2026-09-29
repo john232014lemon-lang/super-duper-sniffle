@@ -24,6 +24,7 @@ class _CheckInScreenState extends State<CheckInScreen> {
   String? _error;
   String? _scannedCode;
   String? _selectedAccount;
+  Object _shiftKey(ShiftListing listing) => listing.shift.id ?? listing.shift;
 
   List<ShiftListing> get _eligibleShifts => _store.myShifts
       .where(
@@ -234,10 +235,10 @@ class _CheckInScreenState extends State<CheckInScreen> {
                 if (kidMode && eligible.length == 1)
                   _KidShiftCard(listing: current!)
                 else
-                  DropdownButtonFormField<ShiftListing>(
-                    key: ObjectKey(current),
+                  DropdownButtonFormField<Object>(
+                    key: ValueKey((_selectedAccount, _shiftKey(current!))),
                     isExpanded: true,
-                    initialValue: _selectedShift,
+                    initialValue: _shiftKey(current),
                     decoration: const InputDecoration(
                       labelText: 'Shift to check in',
                       prefixIcon: Icon(Icons.calendar_month_outlined),
@@ -245,7 +246,7 @@ class _CheckInScreenState extends State<CheckInScreen> {
                     items: [
                       for (final listing in eligible)
                         DropdownMenuItem(
-                          value: listing,
+                          value: _shiftKey(listing),
                           child: Text(
                             '${listing.shift.title} · ${listing.shift.station}',
                             overflow: TextOverflow.ellipsis,
@@ -255,7 +256,9 @@ class _CheckInScreenState extends State<CheckInScreen> {
                     onChanged: _saving
                         ? null
                         : (value) => setState(() {
-                            _selectedShift = value;
+                            _selectedShift = eligible
+                                .where((listing) => _shiftKey(listing) == value)
+                                .firstOrNull;
                             _scanned = false;
                             _scannedCode = null;
                           }),

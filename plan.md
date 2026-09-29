@@ -43,6 +43,8 @@ Attendance uses one immutable completion record per family participant/shift. Pe
 
 ## Testing policy for future agents
 
+New volunteer groups/shifts use a single local start time from `01:00` through `24:00`, with `24:00` meaning midnight at the end of the selected date. Creation is limited to the current minute through the next 365 days, validated in the form/repository and pending server rules. New records include `startsAt` and `utcOffsetMinutes`; existing shifts remain readable. Check-in uses stable dropdown values and handles an empty signup list. Leader QR controls remain available independently of attendance-query loading/errors.
+
 **Manual testing is the default. Automated tests are a small smoke alarm, not a completion checklist.** The previous large Flutter and emulator/live suites have been deliberately retired; do not restore them as routine cleanup.
 
 1. For each new feature, add **0–2 focused smoke tests at most**, and only for a plausible severe failure: app cannot launch, private data survives account changes, unauthorized actions become available, or important data is lost/duplicated. Zero new tests is appropriate for low-impact changes or when a smoke test already covers the risk. More automation requires an explicit user request.
@@ -53,7 +55,7 @@ Attendance uses one immutable completion record per family participant/shift. Pe
 6. Rerun only when a failure or subsequent relevant code change justifies it. Read the useful failure output, fix the cause, and stop when the selected checks pass. Keep successful command output concise; no repeated full log dumps or coverage targets.
 7. Release builds, emulator sessions, and live exercises are developer/manual tasks unless explicitly requested or necessary to investigate an actual build/platform failure. Report unperformed checks honestly; a fake-repository smoke test is not evidence of backend security or real persistence.
 
-The retained offline suite is `test/smoke_test.dart` (nine checks). Run a relevant check with:
+The retained offline suite is `test/smoke_test.dart` (eleven checks). Run a relevant check with:
 
 ```sh
 flutter test --no-pub test/smoke_test.dart --plain-name "part of the test name"

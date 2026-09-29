@@ -12,6 +12,8 @@ import 'package:bushel/firebase_bootstrap.dart';
 import 'package:bushel/main.dart';
 import 'package:bushel/models/food_bank.dart';
 import 'package:bushel/models/attendance.dart';
+import 'package:bushel/models/shift_schedule.dart';
+import 'package:bushel/screens/attendance_management_screen.dart';
 import 'package:bushel/screens/check_in_screen.dart';
 import 'package:bushel/screens/auth_screen.dart';
 import 'package:bushel/screens/food_bank_detail_screen.dart';
@@ -61,13 +63,19 @@ class _Catalog implements CatalogRepository {
     this.failBanks = false,
     this.kidMode = false,
     this.attendanceStream,
+    this.signupStream,
+    this.leaderAttendanceStream,
   });
   final Stream<List<AttendanceEntry>>? attendanceStream;
+  final Stream<Set<String>>? signupStream;
+  final Stream<List<AttendanceEntry>>? leaderAttendanceStream;
   @override
   Stream<List<AttendanceEntry>> watchAttendance(
     String uid, {
     bool asLeader = false,
-  }) => attendanceStream ?? Stream.value([]);
+  }) =>
+      (asLeader ? leaderAttendanceStream : attendanceStream) ??
+      Stream.value([]);
   @override
   Stream<Map<String, String>> watchFeaturedBadges(String uid) =>
       Stream.value({});
@@ -95,7 +103,7 @@ class _Catalog implements CatalogRepository {
   ]);
   @override
   Stream<Set<String>> watchSignups(String uid) =>
-      Stream.value({'parent-shift', 'child-shift'});
+      signupStream ?? Stream.value({'parent-shift', 'child-shift'});
   @override
   Stream<Set<String>> watchCoordinatorBanks(String uid) async* {
     yield <String>{};
@@ -154,15 +162,72 @@ void main() {
     expect(rewards.familyShifts, 1);
   });
 
+  test('new shifts reject invalid times and out-of-window starts', () {
+    final now = DateTime(2026, 9, 28, 12, 30, 45);
+    expect(ShiftSchedule.validate(now, '12:30', now: now), isNull);
+    expect(ShiftSchedule.validate(now, '12:29', now: now), isNotNull);
+    expect(ShiftSchedule.validate(now, '00:59', now: now), isNotNull);
+    expect(ShiftSchedule.validate(now, '24:01', now: now), isNotNull);
+    expect(ShiftSchedule.start(now, '24:00'), DateTime(2026, 9, 29));
+    expect(
+      ShiftSchedule.validate(
+        now.add(const Duration(days: 366)),
+        '12:30',
+        now: now,
+      ),
+      isNotNull,
+    );
+  });
+
+  testWidgets('leader QR remains available when attendance query fails', (
+    tester,
+  ) async {
+    final repository = _Catalog(
+      leaderAttendanceStream: Stream<List<AttendanceEntry>>.error(
+        StateError('missing index'),
+      ),
+    );
+    addTearDown(repository.access.close);
+    await tester.pumpWidget(
+      CatalogSession(
+        uid: 'leader',
+        repository: repository,
+        child: const BushelApp(
+          home: AttendanceManagementScreen(
+            shiftId: 'parent-shift',
+            title: 'Shift',
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    repository.access.add({'bank'});
+    await tester.pumpAndSettle();
+    expect(find.text('Generate shift QR'), findsOneWidget);
+    expect(find.text('Retry check-ins'), findsOneWidget);
+    expect(
+      tester
+          .widget<FilledButton>(
+            find.widgetWithText(FilledButton, 'Generate shift QR'),
+          )
+          .onPressed,
+      isNotNull,
+    );
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox());
+  });
+
   testWidgets(
     'live check-in survives attendance updates without awarding pending points',
     (tester) async {
       final updates = StreamController<List<AttendanceEntry>>();
+      final bookings = StreamController<Set<String>>();
       final repository = _Catalog(
-        kidMode: true,
         attendanceStream: updates.stream,
+        signupStream: bookings.stream,
       );
       addTearDown(updates.close);
+      addTearDown(bookings.close);
       addTearDown(repository.access.close);
       await tester.pumpWidget(
         CatalogSession(
@@ -172,9 +237,18 @@ void main() {
         ),
       );
       updates.add([]);
+      bookings.add({'parent-shift', 'child-shift'});
       await tester.pumpAndSettle();
+      expect(find.byType(DropdownButtonFormField<Object>), findsOneWidget);
       expect(tester.takeException(), isNull);
-      updates.add([entry('kid', 'pending')]);
+      bookings.add({});
+      await tester.pumpAndSettle();
+      expect(find.byType(DropdownButtonFormField<Object>), findsNothing);
+      expect(tester.takeException(), isNull);
+      bookings.add({'child-shift'});
+      await tester.pumpAndSettle();
+      expect(find.byType(DropdownButtonFormField<Object>), findsOneWidget);
+      updates.add([entry('parent', 'pending')]);
       await tester.pumpAndSettle();
       expect(ShiftStore.instance.points, 0);
       expect(
@@ -183,7 +257,7 @@ void main() {
         ),
         isTrue,
       );
-      updates.add([entry('kid', 'confirmed')]);
+      updates.add([entry('parent', 'confirmed')]);
       await tester.pumpAndSettle();
       expect(ShiftStore.instance.points, 100);
       expect(tester.takeException(), isNull);
