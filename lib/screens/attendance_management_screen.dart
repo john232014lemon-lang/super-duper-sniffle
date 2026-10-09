@@ -66,7 +66,7 @@ class _AttendanceManagementScreenState
         !SessionStore.instance.isKidAccount &&
         store.coordinatorBanks.contains(shift.bankId);
     return Scaffold(
-      appBar: AppBar(title: Text(widget.title)),
+      appBar: AppBar(title: Text('${widget.title} · QR & attendance')),
       body: store != null && (store.shiftsLoading || store.shiftsFailed)
           ? Center(child: CatalogStatus(store: store, shifts: true))
           : !allowed
@@ -93,7 +93,7 @@ class _AttendanceManagementScreenState
                     .where((entry) => entry.shiftId == widget.shiftId)
                     .toList();
                 final pending = entries
-                    .where((entry) => !entry.confirmed)
+                    .where((entry) => entry.status == 'pending')
                     .toList();
                 return Center(
                   child: ConstrainedBox(
@@ -147,6 +147,10 @@ class _AttendanceManagementScreenState
                         ] else if (!ready)
                           const LinearProgressIndicator(),
                         if (ready) ...[
+                          if (entries.any((entry) => entry.status == 'revoked'))
+                            const Text(
+                              'Removed families are excluded from attendance and rewards.',
+                            ),
                           Text(
                             'Awaiting confirmation · ${pending.length}',
                             style: const TextStyle(

@@ -1,5 +1,7 @@
 # Firestore audit — 2026-09-28
 
+**September 29 cleanup:** The user subsequently requested clearing all shift data. Shifts, groups/votes, registrations, and attendance were deleted and verified empty. The legacy records listed below are historical and no longer exist. Non-shift account/bank/family data was preserved.
+
 **Post-audit update:** The user approved the prepared rules/index deployment. Deployment succeeded September 28 (release timestamp `2026-09-29T02:15:18.620415Z`). The active rules exactly match the repository, and both attendance collection-group indexes were verified READY; details are recorded in `docs/development_log.md`. The findings below describe the pre-deployment snapshot. Legacy shift records remain unchanged.
 
 Read-only inspection of `bushel-volunteer-20260925`, `(default)`. No live records or active rules were changed. Three shifts and three corresponding groups were returned, with no additional pages. The reported fourth shift was not present in this database snapshot.

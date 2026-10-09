@@ -9,6 +9,7 @@ import '../widgets/shift_calendar.dart';
 import 'coordinator_screen.dart';
 import 'live_group_screen.dart';
 import '../data/session_store.dart';
+import '../widgets/family_shift_bookings.dart';
 
 class ShiftsScreen extends StatefulWidget {
   const ShiftsScreen({super.key, this.initialDate, this.showMyShifts = false});
@@ -71,8 +72,10 @@ class _ShiftsScreenState extends State<ShiftsScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Cancel this signup?'),
-        content: Text(listing.shift.title),
+        title: const Text('Leave this shift?'),
+        content: Text(
+          '${listing.shift.title}\nLeaving also removes any child places you reserved for this shift.',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -80,7 +83,7 @@ class _ShiftsScreenState extends State<ShiftsScreen> {
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Cancel signup'),
+            child: const Text('Leave shift'),
           ),
         ],
       ),
@@ -201,13 +204,10 @@ class _ShiftsScreenState extends State<ShiftsScreen> {
                       signedUp: _store.isSignedUp(listing.shift),
                       checkedIn: _store.isCheckedIn(listing.shift),
                       showSignup:
-                          _tab == 0 &&
-                          !(catalog != null &&
-                              SessionStore.instance.isKidAccount),
+                          _tab == 0 && !SessionStore.instance.isKidAccount,
                       onSignup: _busy ? null : () => _confirmSignup(listing),
                       onCancel:
                           _tab == 1 &&
-                              catalog != null &&
                               !_busy &&
                               !SessionStore.instance.isKidAccount
                           ? () => _cancel(listing)
@@ -228,6 +228,12 @@ class _ShiftsScreenState extends State<ShiftsScreen> {
                     ),
                   ),
                 ),
+              if (_tab == 1 &&
+                  !SessionStore.instance.isKidAccount &&
+                  SessionStore.instance.familyAccount) ...[
+                const SizedBox(height: 24),
+                const FamilyShiftBookings(),
+              ],
             ],
           ),
         ),
@@ -346,7 +352,7 @@ class _ScheduleCard extends StatelessWidget {
                   alignment: Alignment.centerRight,
                   child: TextButton(
                     onPressed: onCancel,
-                    child: const Text('Cancel signup'),
+                    child: const Text('Leave shift'),
                   ),
                 ),
               if (onOpenGroup != null)

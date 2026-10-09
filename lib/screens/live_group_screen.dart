@@ -49,7 +49,7 @@ class _LiveGroupScreenState extends State<LiveGroupScreen> {
       builder: (context) => AlertDialog(
         title: Text(finalize ? 'Complete removal?' : 'Vote to remove $name?'),
         content: Text(
-          'Removal needs $needed votes, at least two-thirds of current adult members. It cancels this member’s signup and any child places they manage. Votes reset when adult membership changes.',
+          'Removal needs $needed votes, at least two-thirds of current adult members. It revokes family points and badges from this shift, even after check-in. It cancels this member’s signup and any child places they manage. Votes reset when adult membership changes.',
         ),
         actions: [
           TextButton(
@@ -96,7 +96,7 @@ class _LiveGroupScreenState extends State<LiveGroupScreen> {
   Widget build(BuildContext context) {
     final store = CatalogScope.maybeOf(context);
     return Scaffold(
-      appBar: AppBar(title: Text(widget.title)),
+      appBar: AppBar(title: Text('${widget.title} · Members')),
       body:
           store == null ||
               !store.signups.contains(widget.shiftId) ||

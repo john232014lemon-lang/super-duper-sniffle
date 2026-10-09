@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import '../models/group_member.dart';
 import 'session_store.dart';
 import 'mock_food_banks.dart';
+import 'shift_store.dart';
 
 class CoordinatorStore extends ChangeNotifier {
   CoordinatorStore._();
@@ -55,7 +56,8 @@ class CoordinatorStore extends ChangeNotifier {
   final Map<String, Set<String>> _votersByTarget = {};
 
   List<GroupMember> get members => List.unmodifiable(_members);
-  int get votesNeeded => (_members.length * 2 / 3).ceil();
+  int get votesNeeded =>
+      (_members.where((member) => member.role != 'Kid').length * 2 / 3).ceil();
   bool containsAccount(String id) => _members.any((member) => member.id == id);
   bool get currentAccountIsMember =>
       containsAccount(SessionStore.instance.accountId);
@@ -63,6 +65,8 @@ class CoordinatorStore extends ChangeNotifier {
       _votersByTarget[id]?.contains(SessionStore.instance.accountId) ?? false;
   bool canVoteFor(String id) =>
       currentAccountIsMember &&
+      !SessionStore.instance.isKidAccount &&
+      _members.any((member) => member.id == id && member.role != 'Kid') &&
       id != SessionStore.instance.accountId &&
       !hasVotedFor(id);
 
@@ -110,6 +114,16 @@ class CoordinatorStore extends ChangeNotifier {
     );
     if (updated.voteCount >= votesNeeded) {
       _members.removeAt(index);
+      if (id == 'parent') {
+        final children = SessionStore.instance.children
+            .map((child) => child.id)
+            .toSet();
+        _members.removeWhere((member) => children.contains(member.id));
+      }
+      ShiftStore.instance.revokeDemoFamily(
+        mockFoodBanks.first.shifts.first,
+        id,
+      );
       notifyListeners();
       return true;
     }

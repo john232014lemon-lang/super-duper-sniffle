@@ -44,6 +44,7 @@ class ShiftStore extends ChangeNotifier {
 
   CatalogStore? _catalog;
   bool get usingLive => _catalog != null;
+  bool lastCheckInConfirmed = false;
   void bindCatalog(CatalogStore store) {
     _catalog?.removeListener(notifyListeners);
     _catalog = store;
@@ -59,6 +60,7 @@ class ShiftStore extends ChangeNotifier {
       a.id != null && b.id != null ? a.id == b.id : identical(a, b);
 
   void reset() {
+    lastCheckInConfirmed = false;
     _available
       ..clear()
       ..addAll(ShiftStore._()._available);
@@ -112,7 +114,7 @@ class ShiftStore extends ChangeNotifier {
     final accountId = SessionStore.instance.accountId;
     final shifts = _myShiftsByAccount.putIfAbsent(
       accountId,
-      () => [_available.first],
+      () => SessionStore.instance.isKidAccount ? [] : [_available.first],
     );
     return List.unmodifiable(
       shifts.where(
@@ -208,6 +210,9 @@ class ShiftStore extends ChangeNotifier {
   }
 
   Future<void> signUp(FoodBank bank, FoodBankShift shift) async {
+    if (SessionStore.instance.isKidAccount) {
+      throw const CatalogException('Ask your parent to manage shift bookings.');
+    }
     if (usingLive) {
       await _catalog!.changeSignup(shift, true);
       return;
@@ -224,6 +229,9 @@ class ShiftStore extends ChangeNotifier {
   }
 
   Future<void> cancelSignup(FoodBankShift shift) async {
+    if (SessionStore.instance.isKidAccount) {
+      throw const CatalogException('Ask your parent to manage shift bookings.');
+    }
     if (usingLive) {
       await _catalog!.changeSignup(shift, false);
       return;
@@ -234,6 +242,57 @@ class ShiftStore extends ChangeNotifier {
     _myShiftsByAccount[account]?.removeWhere(
       (listing) => _sameShift(listing.shift, shift),
     );
+    for (final child in SessionStore.instance.children) {
+      _myShiftsByAccount[child.id]?.removeWhere(
+        (listing) => _sameShift(listing.shift, shift),
+      );
+    }
+    notifyListeners();
+  }
+
+  List<ShiftListing> shiftsForChild(String childId) => usingLive
+      ? available
+            .where(
+              (listing) =>
+                  _catalog!.childSignups[listing.shift.id]?.contains(childId) ??
+                  false,
+            )
+            .toList()
+      : List.unmodifiable(_myShiftsByAccount[childId] ?? []);
+
+  Future<void> setChildBooking(
+    ShiftListing listing,
+    String childId,
+    bool join,
+  ) async {
+    if (SessionStore.instance.isKidAccount) {
+      throw const CatalogException('Ask your parent to manage shift bookings.');
+    }
+    if (!SessionStore.instance.children.any((child) => child.id == childId)) {
+      throw const CatalogException('Child account not found.');
+    }
+    if (usingLive) {
+      await _catalog!.repository.setChildSignup(
+        _catalog!.uid,
+        listing.shift.id!,
+        childId,
+        join,
+      );
+      return;
+    }
+    if (join && !isSignedUp(listing.shift)) {
+      throw const CatalogException(
+        'Sign yourself up before adding your child.',
+      );
+    }
+    final bookings = _myShiftsByAccount.putIfAbsent(childId, () => []);
+    if (join &&
+        !bookings.any((entry) => _sameShift(entry.shift, listing.shift))) {
+      bookings.add(listing);
+    }
+    if (!join) {
+      bookings.removeWhere((entry) => _sameShift(entry.shift, listing.shift));
+    }
     notifyListeners();
   }
 
@@ -250,6 +309,9 @@ class ShiftStore extends ChangeNotifier {
       accountId: accountId,
       name: SessionStore.instance.userName,
     );
+    if (canManageShift(shift)) {
+      lastCheckInConfirmed = confirmAttendance(shift, accountId);
+    }
     notifyListeners();
     return true;
   }
@@ -265,7 +327,31 @@ class ShiftStore extends ChangeNotifier {
     return true;
   }
 
+  void revokeDemoFamily(FoodBankShift shift, String accountId) {
+    if (usingLive) return;
+    final accounts = {
+      accountId,
+      if (accountId == 'parent')
+        ...SessionStore.instance.children.map((child) => child.id),
+    };
+    for (final id in accounts) {
+      _myShiftsByAccount[id]?.removeWhere(
+        (listing) => _sameShift(listing.shift, shift),
+      );
+      _pendingAttendance[shift]?.remove(id);
+      if (_completedByAccount[id]?.remove(shift) ?? false) {
+        _pointsByAccount[id] = ((_pointsByAccount[id] ?? 0) - 100).clamp(
+          0,
+          1 << 30,
+        );
+      }
+    }
+    if (accountId == 'parent') SessionStore.instance.clearDemoBadges();
+    notifyListeners();
+  }
+
   Future<bool> submitCheckIn(FoodBankShift shift) async {
+    lastCheckInConfirmed = false;
     if (!usingLive) return checkIn(shift);
     final catalog = _catalog!;
     if (catalog.attendanceLoading ||
@@ -282,7 +368,7 @@ class ShiftStore extends ChangeNotifier {
         'You need a current signup and a shift QR code.',
       );
     }
-    await catalog.repository.submitAttendance(
+    lastCheckInConfirmed = await catalog.repository.submitAttendance(
       catalog.uid,
       SessionStore.instance.accountId,
       shift.id!,

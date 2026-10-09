@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../data/session_store.dart';
 import '../data/coordinator_store.dart';
 import '../data/catalog_store.dart';
-import '../data/shift_store.dart';
+import '../widgets/family_shift_bookings.dart';
 import '../services/catalog_repository.dart';
 import '../widgets/bushel_navigation_bar.dart';
 import '../widgets/family_entry_dialog.dart';
@@ -186,6 +186,15 @@ class _FamilyCenterScreenState extends State<FamilyCenterScreen> {
           child: ListView(
             padding: const EdgeInsets.all(20),
             children: [
+              if (!kidMode)
+                const Card(
+                  child: Padding(
+                    padding: EdgeInsets.all(16),
+                    child: Text(
+                      'Manage your kids here\n\n1. Tap Add kid to create a child account.\n2. Open Shifts and join a shift yourself first.\n3. Return to Family → Your kids’ shifts. Tap Sign up for shift next to a child.\n4. Use Leave shift for a child to remove only their place. If you leave your own shift, their places are removed too.\n\nSwitch to a kid account only for their check-in and badges. Kids cannot join or leave shifts.',
+                    ),
+                  ),
+                ),
               if (_error != null)
                 Text(
                   _error!,
@@ -264,6 +273,10 @@ class _FamilyCenterScreenState extends State<FamilyCenterScreen> {
                 ),
                 const SizedBox(height: 24),
               ],
+              if (!kidMode) ...[
+                const FamilyShiftBookings(),
+                const SizedBox(height: 24),
+              ],
               Row(
                 children: [
                   const Expanded(
@@ -319,55 +332,6 @@ class _FamilyCenterScreenState extends State<FamilyCenterScreen> {
                     ),
                   ),
                 ),
-              if (catalog != null && !kidMode) ...[
-                const SizedBox(height: 24),
-                const Text(
-                  'Child shift participation',
-                  style: TextStyle(fontSize: 19, fontWeight: FontWeight.bold),
-                ),
-                const Text(
-                  'Sign up for a shift first, then reserve a place for each child. Cancelling your signup also cancels their places.',
-                ),
-                if (catalog.shiftsLoading || catalog.shiftsFailed)
-                  CatalogStatus(store: catalog, shifts: true)
-                else if (ShiftStore.instance.myShifts.isEmpty)
-                  const Text('You have no shifts yet.')
-                else
-                  for (final listing in ShiftStore.instance.myShifts)
-                    Card(
-                      child: Column(
-                        children: [
-                          ListTile(
-                            title: Text(listing.shift.title),
-                            subtitle: Text(
-                              '${listing.shift.date} · ${listing.foodBank.shortName}',
-                            ),
-                          ),
-                          for (final child in _session.children)
-                            CheckboxListTile(
-                              title: Text(child.name),
-                              value:
-                                  catalog.childSignups[listing.shift.id]
-                                      ?.contains(child.id) ??
-                                  false,
-                              onChanged:
-                                  _saving ||
-                                      catalog.familyLoading ||
-                                      catalog.familyFailed
-                                  ? null
-                                  : (value) => _save(
-                                      () => catalog.repository.setChildSignup(
-                                        catalog.uid,
-                                        listing.shift.id!,
-                                        child.id,
-                                        value!,
-                                      ),
-                                    ),
-                            ),
-                        ],
-                      ),
-                    ),
-              ],
             ],
           ),
         ),

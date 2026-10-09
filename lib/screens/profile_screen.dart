@@ -11,6 +11,7 @@ import '../services/profile_service.dart';
 import '../data/coordinator_store.dart';
 import 'home_screen.dart';
 import 'family_center_screen.dart';
+import '../models/contact_phone.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -24,6 +25,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
   bool _signingOut = false;
   bool _saving = false;
   late BushelRole _selectedRole = _session.parentRole;
+  late final _phone = TextEditingController(text: _session.contactPhone);
+  String? _phoneError;
+  @override
+  void dispose() {
+    _phone.dispose();
+    super.dispose();
+  }
 
   Future<void> _signOut(AuthService auth) async {
     setState(() => _signingOut = true);
@@ -50,16 +58,25 @@ class _ProfileScreenState extends State<ProfileScreen> {
     if (_saving) return;
     final scope = ProfileScope.maybeOf(context);
     if (!_session.isKidAccount) {
+      final phone = ContactPhone.normalize(_phone.text.trim());
+      if (!ContactPhone.valid(phone)) {
+        setState(
+          () => _phoneError = 'Enter 7–15 digits, optionally starting with +.',
+        );
+        return;
+      }
       final profile = AdultProfile(
         name: _session.parentName,
         role: _selectedRole,
         family: _session.familyAccount,
+        phone: phone,
       );
       setState(() => _saving = true);
       try {
         if (scope != null) await scope.save(profile);
         if (!mounted || (scope != null && !scope.isCurrent())) return;
         _session.setRole(profile.role);
+        _session.setContactPhone(phone);
         CoordinatorStore.instance.configureParent(profile.name, profile.role);
       } catch (_) {
         if (mounted) {
@@ -126,6 +143,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 style: const TextStyle(fontWeight: FontWeight.w700),
               ),
               const SizedBox(height: 32),
+              if (!_session.isKidAccount)
+                TextField(
+                  controller: _phone,
+                  enabled: !_saving,
+                  keyboardType: TextInputType.phone,
+                  maxLength: 25,
+                  decoration: InputDecoration(
+                    labelText: 'Coordinator phone (optional)',
+                    helperText:
+                        'Shared with signed-in adults for your shifts.\nClear this field to stop sharing.',
+                    errorText: _phoneError,
+                  ),
+                ),
               const Text(
                 'Choose your experience',
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),

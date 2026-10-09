@@ -1,5 +1,21 @@
 # Bushel Development Log
 
+## 2026-09-29 — User-requested shift-data reset
+
+The user requested clearing all shift data. Recursively cleared only `shifts`, `groups` (including votes), `registrations`, and `attendance` in `bushel-volunteer-20260925`, `(default)`. Read-only collection-group verification returned zero remaining shifts, groups, votes, registrations, attendance parent documents, and attendance entries. Banks, accounts/profiles, family definitions/challenges, coordinator applications, and contacts were not modified. Shift-derived points, badges, and challenge progress now have no attendance records to count.
+
+Automatic approval review rejected the initial broader command because it included the entire `rewardPreferences` collection. Narrowed the operation to the four authorized shift-data collections; reward preferences were left untouched. The pre-delete audit found no shift-linked preference documents. No deployment, commit, or push was performed. This supersedes the earlier audit's legacy-shift inventory; no Flutter tests were needed for this data-only operation.
+
+## 2026-09-29 — Parent booking controls, leaving shifts, and coordinator contact
+
+**Request and clarification:** Parents manage children's bookings, adults can leave, parents can see all children's bookings with individual Leave and coordinator call/text actions, and Kid Mode cannot join/leave. The user's later “no” was interpreted as keeping the parent-attendance requirement after they initially chose independent bookings. Independent-booking changes were removed; no such schema or behavior was deployed.
+
+**Implemented:** Replaced family checkboxes with a per-child schedule in Family Center and My shifts, a shift chooser restricted to the parent's booked shifts with open capacity, and individual Leave buttons. Adults have a Leave shift action with no date/attendance cutoff. Parent departure continues to atomically cancel managed child places, with an explicit confirmation message. Kid Mode is blocked by UI/store controls and existing server rules; demo kids no longer receive an automatic default booking.
+
+**Contact:** Added optional coordinator phone editing in Profile and removed the fake hardcoded number. Phone values normalize punctuation/spacing and accept 7–15 digits with an optional leading +. Profile and `coordinatorContacts/{uid}` save atomically; only the explicitly shared phone is readable by signed-in adults, with no list permission and no access to private profiles. The form explains sharing and clearing it. Family booking cards display Call/Text or “no number provided”; load errors show retry. The official Flutter `url_launcher` package opens device handlers and reports unsupported devices; no calls or texts were initiated during implementation.
+
+**Verification:** All thirteen offline smoke tests pass, including one new focused child-leave/missing-contact check and expanded Kid Mode protection coverage. Static analysis is clean after brace-style fixes. Firebase's non-deploying source validation returned no issues. No emulator suite, client backend mutation test, release build, commit, or push was performed. Contact/profile rules require fresh deployment approval; they have not been deployed. Manual device and persistence checks remain pending.
+
 ## 2026-09-29 — Approved shift-form rules deployment
 
 Following the user's explicit approval, deployed `firestore.rules` to `bushel-volunteer-20260925` successfully. The active rules were fetched and verified as an exact match to the local file. Release timestamp: `2026-09-29T22:27:02.110191Z`; ruleset: `e6dfa67d-aad9-4a57-8003-ab0512d2da2d`.
@@ -489,3 +505,11 @@ Both attendance collection-group indexes (`ownerUid` and `leaderUid`) were verif
 - [ ] Replace mock data with Firebase-backed data in a later phase.
 - [ ] Add real food bank photography or branded image assets.
 - [ ] Continue recording each new prompt, result, modification, and bug fix in this file.
+
+## September 29: family removal and coordinator clarity
+
+Implemented locally: removal voting atomically cancels the parent and all child places, restores capacity, and writes an immutable family/shift revocation marker. Pending and confirmed attendance remain as audit records but no longer count toward points, badges, or family challenges. Badges earned on other shifts remain available. Voluntary leaving retains previously confirmed rewards. Removal still requires the existing two-thirds adult vote.
+
+The assigned, approved coordinator now confirms their own parent check-in automatically; other adults and children still need confirmation. Family Center starts with booking instructions and places child booking controls above challenges. Groups shows one card per shift with explicit Members & removal votes and QR & attendance buttons.
+
+Validation: all 14 offline smoke checks passed, Flutter analysis reported no issues, and the non-deploying Firebase Rules API returned no compilation errors. No emulator or signed-in live QA was run. Deployment is pending fresh approval: deploy firestore.rules (including the earlier optional coordinator contact rules) and firestore.indexes.json; wait for both revokedFamilies collection-group indexes to become READY before releasing this client. Earlier approvals do not cover this change.

@@ -17,6 +17,7 @@ import 'package:bushel/screens/attendance_management_screen.dart';
 import 'package:bushel/screens/check_in_screen.dart';
 import 'package:bushel/screens/shifts_screen.dart';
 import 'package:bushel/screens/live_group_screen.dart';
+import 'package:bushel/widgets/family_shift_bookings.dart';
 import 'package:bushel/screens/auth_screen.dart';
 import 'package:bushel/screens/food_bank_detail_screen.dart';
 import 'package:bushel/screens/home_screen.dart';
@@ -61,6 +62,19 @@ final _bank = FirestoreCatalogRepository.decodeBank('bank', {
 });
 
 class _Catalog implements CatalogRepository {
+  (String, String, String, bool)? childRequest;
+  @override
+  Future<void> setChildSignup(
+    String uid,
+    String shiftId,
+    String childId,
+    bool join,
+  ) async {
+    childRequest = (uid, shiftId, childId, join);
+  }
+
+  @override
+  Stream<String> watchCoordinatorPhone(String uid) => Stream.value('');
   @override
   Stream<ShiftGroup> watchGroup(String shiftId) =>
       Stream.value(const ShiftGroup(members: {'adult': 'Adult'}, version: 1));
@@ -155,6 +169,33 @@ void main() {
     ShiftStore.instance.reset();
   });
 
+  testWidgets(
+    'parent can leave one child booking and missing contact stays explicit',
+    (tester) async {
+      final repository = _Catalog();
+      addTearDown(repository.access.close);
+      await tester.pumpWidget(
+        CatalogSession(
+          uid: 'adult',
+          repository: repository,
+          child: const BushelApp(
+            home: Scaffold(
+              body: SingleChildScrollView(child: FamilyShiftBookings()),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Coordinator: no number provided'), findsOneWidget);
+      expect(find.text('Sign up for shift'), findsOneWidget);
+      await tester.tap(find.text('Leave shift for Sam'));
+      await tester.pumpAndSettle();
+      expect(repository.childRequest, ('adult', 'child-shift', 'kid', false));
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox());
+    },
+  );
+
   testWidgets('My shifts exposes groups beyond the selected calendar date', (
     tester,
   ) async {
@@ -197,6 +238,19 @@ void main() {
     expect(rewards.badges('kid'), {'bee'});
     expect(rewards.badges('parent'), isEmpty);
     expect(rewards.familyShifts, 1);
+  });
+
+  test('removed family attendance loses points and claimed badges', () {
+    final rewards = AttendanceRewards([
+      entry('parent', 'confirmed').revoke(),
+      entry('kid', 'confirmed', badge: 'bee').revoke(),
+      entry('other-kid', 'confirmed', badge: 'frog'),
+    ]);
+    expect(rewards.points('parent'), 0);
+    expect(rewards.points('kid'), 0);
+    expect(rewards.badges('kid'), isEmpty);
+    expect(rewards.points('other-kid'), 100);
+    expect(rewards.badges('other-kid'), {'frog'});
   });
 
   test('new shifts reject invalid times and out-of-window starts', () {
@@ -453,5 +507,24 @@ void main() {
       catalog.changeSignup(shifts.available.first.shift, true),
       throwsA(isA<CatalogException>()),
     );
+    await expectLater(
+      shifts.cancelSignup(shifts.myShifts.single.shift),
+      throwsA(isA<CatalogException>()),
+    );
+    await expectLater(
+      shifts.setChildBooking(shifts.myShifts.single, 'kid', false),
+      throwsA(isA<CatalogException>()),
+    );
+    await tester.pumpWidget(
+      CatalogSession(
+        uid: 'adult',
+        repository: repository,
+        child: const BushelApp(home: ShiftsScreen(showMyShifts: true)),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Leave shift'), findsNothing);
+    expect(find.text('Sign up for shift'), findsNothing);
+    await tester.pumpWidget(const SizedBox());
   });
 }

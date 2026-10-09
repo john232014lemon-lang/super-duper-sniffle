@@ -118,9 +118,15 @@ class _CheckInScreenState extends State<CheckInScreen> {
           color: Color(0xFF20B85A),
           size: 58,
         ),
-        title: const Text('Check-in sent!'),
-        content: const Text(
-          'You are checked in and awaiting coordinator confirmation. Points and rewards are added after attendance is confirmed.',
+        title: Text(
+          _store.lastCheckInConfirmed
+              ? 'Attendance confirmed!'
+              : 'Check-in sent!',
+        ),
+        content: Text(
+          _store.lastCheckInConfirmed
+              ? 'Your attendance is confirmed. As the assigned coordinator, you do not need to confirm yourself.'
+              : 'You are checked in and awaiting coordinator confirmation. Points and rewards are added after attendance is confirmed.',
           textAlign: TextAlign.center,
         ),
         actions: [

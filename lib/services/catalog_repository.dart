@@ -22,6 +22,7 @@ class StoredShift {
 }
 
 abstract class CatalogRepository implements AttendanceRepository {
+  Stream<String> watchCoordinatorPhone(String uid);
   Stream<List<FoodBank>> watchBanks();
   Stream<List<StoredShift>> watchShifts();
   Stream<Set<String>> watchSignups(String uid);
@@ -75,6 +76,12 @@ String catalogError(Object error) {
 class FirestoreCatalogRepository extends FirestoreAttendanceRepository
     implements CatalogRepository {
   FirebaseFirestore get _db => FirebaseFirestore.instance;
+  @override
+  Stream<String> watchCoordinatorPhone(String uid) => _db
+      .collection('coordinatorContacts')
+      .doc(uid)
+      .snapshots()
+      .map((doc) => doc.data()?['phone'] as String? ?? '');
 
   static FoodBank decodeBank(String id, Map<String, dynamic> data) => FoodBank(
     id: id,
@@ -365,6 +372,19 @@ class FirestoreCatalogRepository extends FirestoreAttendanceRepository
       'signupCount': (shift['signupCount'] as int) - removedSeats,
     });
     tx.delete(registrationRef);
+    tx.set(
+      _db
+          .collection('attendanceRevocations')
+          .doc(shiftId)
+          .collection('revokedFamilies')
+          .doc(target),
+      {
+        'ownerUid': target,
+        'leaderUid': shift['creatorUid'],
+        'shiftId': shiftId,
+        'revokedAt': FieldValue.serverTimestamp(),
+      },
+    );
   });
 
   @override

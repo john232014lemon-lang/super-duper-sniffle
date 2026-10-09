@@ -16,6 +16,14 @@ class AttendanceEntry {
   final String status;
   final String? badgeId;
   bool get confirmed => status == 'confirmed';
+  AttendanceEntry revoke() => AttendanceEntry(
+    ownerUid: ownerUid,
+    participantId: participantId,
+    shiftId: shiftId,
+    leaderUid: leaderUid,
+    name: name,
+    status: 'revoked',
+  );
   factory AttendanceEntry.decode(Map<String, dynamic> data) => AttendanceEntry(
     ownerUid: data['ownerUid'] as String,
     participantId: data['participantId'] as String,

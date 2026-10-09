@@ -42,7 +42,7 @@ Follow the official [FlutterFire setup](https://firebase.google.com/docs/flutter
 - Volunteer/Coordinator choices only change the mock experience; they grant no backend permissions.
 - Initialization and authentication failures have visible retry/error states. Mock widget tests can instantiate `BushelApp` or `DemoApp` directly; `main()` uses the Firebase startup/auth gate unless `BUSHEL_DEMO=true` is explicitly set.
 
-The testing policy in [plan.md](plan.md) favors manual QA. Only twelve offline smoke checks remain; use a relevant check for a small change, or the small suite for changes spanning several boundaries:
+The testing policy in [plan.md](plan.md) favors manual QA. Only thirteen offline smoke checks remain; use a relevant check for a small change, or the small suite for changes spanning several boundaries:
 
 ```sh
 flutter test --no-pub test/smoke_test.dart
@@ -119,6 +119,14 @@ Use the relevant [manual checks](docs/manual_testing.md) after an authorized dep
 
 ## Attendance and rewards (Slices 22–23)
 
+### Parent bookings and coordinator contact (September 29 update)
+
+Parents must also be signed up for their children's shifts. **Family Center** and **My shifts** now show all kids' bookings, with **Sign up for shift** and **Leave shift for [child]** controls. Leaving a child removes only that place. Adults can use **Leave shift** at any time; the confirmation explains that leaving as a parent also removes their children's places. Kid Mode cannot join or leave, including in the demo.
+
+Coordinators can save an optional phone under **Your profile**. The form explains that it is shared with signed-in adults and can be cleared. Each child's booked-shift card shows **Call coordinator**, **Text coordinator**, or **Coordinator: no number provided**. A device phone/SMS handler is needed; unsupported devices show a message and the selectable number. These actions use the official [Flutter url_launcher plugin](https://pub.dev/packages/url_launcher).
+
+**Contact rules deployment is pending approval.** New profile saves include a phone field and atomically publish only that phone to `coordinatorContacts/{uid}`. Rules deny collection listing, permit signed-in adult document reads, and restrict writes to the owner with matching private profile data. Other profile fields remain private. The previously approved deployment does not include this new contact schema; deploy the prepared rules before using this app revision for profile/onboarding saves. No changes to attendance indexes or existing booking records are needed.
+
 New shifts/groups accept a single local start time from `00:00` to `23:59` and must start in the current minute or within the next 365 days. `0:00` normalizes to `00:00`; `24:00` is invalid. Names allow 40 characters, stations 30, and optional multiline location instructions 500. Instructions are shown on bank shift cards, My shifts, and check-in. **September 29 rules update deployed and verified after explicit approval:** production accepts the corrected time range and optional instructions, and enforces the shorter field limits. New records store `startsAt` and the local `utcOffsetMinutes` alongside the calendar date and normalized time. Deployed rules validate their consistency and the window using [Firebase request time](https://firebase.google.com/docs/reference/rules/rules.firestore.Request). Existing shifts remain readable; the September 29 creation-rule update is deployed.
 
 Check-in handles empty or changing signup lists without retaining obsolete dropdown values. QR generation is available to the assigned approved leader even when the attendance query is loading or fails. An empty bank first needs a shift created by an approved coordinator; QR codes belong to shifts, not banks. The approved rules deployment includes QR permissions; assigned-leader and approved-bank restrictions still apply.
@@ -134,7 +142,7 @@ An approved bank coordinator who created a shift opens **Manage check-ins** on t
 | `rewardPreferences/{uid}/people/{childId}` | Featured badge backed by a confirmed record for that child |
 | `families/{uid}.challengeTargets` | Goal per challenge ID, 1–100 distinct completed family shifts |
 
-Confirmed attendance is the persistent reward ledger: **100 points per participant per shift**, with adult badge thresholds derived from those points. There are no client-writable balances or Cloud Functions to deploy. Every confirmed child shift offers one permanent badge choice in **My badge garden**. Featuring an already earned badge consumes no new choice. Profile links to rewards/badge selection. Loading and failed attendance reads have retry states and never substitute mock rewards.
+Confirmed attendance is the persistent reward ledger: **100 points per participant per shift**, with adult badge thresholds derived from those points. There are no client-writable balances or Cloud Functions to deploy. Every confirmed child shift offers one badge choice (revoked if that family is removed from the shift) in **My badge garden**. Featuring an already earned badge consumes no new choice. Profile links to rewards/badge selection. Loading and failed attendance reads have retry states and never substitute mock rewards.
 
 Challenge progress includes all past confirmed family shifts, counting one shift once even when multiple family members attended. Legacy text-only challenges remain visible with a notice to create a goal-based challenge; titles such as pounds or hours are not interpreted as shift goals. Challenges grant no additional points.
 
@@ -160,3 +168,9 @@ It writes a unique test document, reads from the server, deletes it, and verifie
 Backend QA is developer-driven. Use ordinary authenticated client sessions or the Rules Playground for access checks; administrator operations bypass security rules. Optional manual emulator guidance is in `docs/manual_testing.md`. No automated emulator or live test suite is required before finishing a slice.
 
 Windows native plugin setup still reports a Developer Mode/symlink requirement; Android execution also needs the missing Android SDK/device. The Web diagnostic build succeeds with `--no-pub` using the resolved dependencies.
+
+### Pending removal/attendance update
+
+`attendanceRevocations/{shiftId}/revokedFamilies/{uid}` stores immutable `{ownerUid, leaderUid, shiftId, revokedAt}` markers created atomically by valid removal votes. Attendance readers combine these with the retained audit entries to exclude the entire removed family from points, badges, and challenges. Rules prevent further confirmation or badge awards for revoked attendance. Collection-group indexes on `revokedFamilies.ownerUid` and `revokedFamilies.leaderUid` are required. These rules/indexes, including the pending coordinator contact rules, await fresh deployment approval; deploy them and wait for indexes before releasing the client.
+
+The assigned, approved shift coordinator auto-confirms their own QR check-in. Groups now combines membership voting and QR/attendance navigation into one card per shift. Family Center begins with parent booking instructions and provides child booking controls before challenges. Voluntary leaving retains confirmed rewards; removal by vote revokes that family's rewards for the removed shift only.

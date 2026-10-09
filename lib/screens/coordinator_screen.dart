@@ -17,61 +17,81 @@ class CoordinatorScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final catalog = CatalogScope.maybeOf(context);
     if (catalog != null) {
-      final shifts = ShiftStore.instance.myShifts;
+      final records = catalog.shifts
+          .where(
+            (record) =>
+                record.creatorUid == catalog.uid ||
+                catalog.signups.contains(record.shift.id),
+          )
+          .toList();
       return Scaffold(
-        appBar: AppBar(title: const Text('Groups')),
+        appBar: AppBar(title: const Text('Your shift groups')),
         body: catalog.shiftsLoading || catalog.shiftsFailed
             ? Center(child: CatalogStatus(store: catalog, shifts: true))
             : ListView(
                 padding: const EdgeInsets.all(20),
                 children: [
-                  if (!SessionStore.instance.isKidAccount) ...[
-                    const Text(
-                      'Shifts you lead',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    for (final record in catalog.shifts.where(
-                      (record) => record.creatorUid == catalog.uid,
-                    ))
-                      Card(
-                        child: ListTile(
-                          title: Text(record.shift.title),
-                          subtitle: const Text('Manage QR and attendance'),
-                          trailing: const Icon(Icons.fact_check_outlined),
-                          onTap: () => Navigator.of(context).push(
-                            MaterialPageRoute<void>(
-                              builder: (_) => AttendanceManagementScreen(
-                                shiftId: record.shift.id!,
-                                title: record.shift.title,
+                  const Text(
+                    'Each shift has one group. Members handles removal voting; QR & attendance handles check-in confirmation.',
+                  ),
+                  if (records.isEmpty)
+                    const Text('Join or create a shift to see it here.'),
+                  for (final record in records)
+                    Card(
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              record.shift.title,
+                              style: const TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
                               ),
                             ),
-                          ),
-                        ),
-                      ),
-                    const SizedBox(height: 20),
-                  ],
-                  const Text(
-                    'Your shift groups',
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                  ),
-                  if (shifts.isEmpty)
-                    const Text('Sign up for a shift to join its group.'),
-                  for (final listing in shifts)
-                    Card(
-                      child: ListTile(
-                        title: Text(listing.shift.title),
-                        subtitle: Text(listing.foodBank.shortName),
-                        trailing: const Icon(Icons.chevron_right),
-                        onTap: () => Navigator.of(context).push(
-                          MaterialPageRoute<void>(
-                            builder: (_) => LiveGroupScreen(
-                              shiftId: listing.shift.id!,
-                              title: listing.shift.title,
+                            Text('${record.shift.date} · ${record.shift.time}'),
+                            Wrap(
+                              spacing: 8,
+                              children: [
+                                if (catalog.signups.contains(record.shift.id) &&
+                                    !SessionStore.instance.isKidAccount)
+                                  OutlinedButton.icon(
+                                    icon: const Icon(Icons.groups_outlined),
+                                    label: const Text(
+                                      'Members & removal votes',
+                                    ),
+                                    onPressed: () => Navigator.of(context).push(
+                                      MaterialPageRoute<void>(
+                                        builder: (_) => LiveGroupScreen(
+                                          shiftId: record.shift.id!,
+                                          title: record.shift.title,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                if (record.creatorUid == catalog.uid &&
+                                    !SessionStore.instance.isKidAccount)
+                                  FilledButton.icon(
+                                    icon: const Icon(Icons.fact_check_outlined),
+                                    label: const Text('QR & attendance'),
+                                    onPressed: () => Navigator.of(context).push(
+                                      MaterialPageRoute<void>(
+                                        builder: (_) =>
+                                            AttendanceManagementScreen(
+                                              shiftId: record.shift.id!,
+                                              title: record.shift.title,
+                                            ),
+                                      ),
+                                    ),
+                                  ),
+                              ],
                             ),
-                          ),
+                            if (!catalog.signups.contains(record.shift.id))
+                              const Text(
+                                'Join this shift to take part in its member group and removal voting.',
+                              ),
+                          ],
                         ),
                       ),
                     ),

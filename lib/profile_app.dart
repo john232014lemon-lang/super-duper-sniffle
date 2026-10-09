@@ -39,6 +39,7 @@ class _ProfileAppState extends State<ProfileApp> {
         name: profile.name,
         role: profile.role,
         family: profile.family,
+        phone: profile.phone,
       );
       CoordinatorStore.instance.configureParent(profile.name, profile.role);
     }

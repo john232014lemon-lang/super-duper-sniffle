@@ -27,6 +27,7 @@ class SessionStore extends ChangeNotifier {
   void reset() {
     final initial = SessionStore._();
     _parentName = initial._parentName;
+    _phone = '';
     _parentRole = initial._parentRole;
     _activeChildId = null;
     _familyAccount = false;
@@ -43,6 +44,13 @@ class SessionStore extends ChangeNotifier {
   }
 
   String _parentName = 'Maya';
+  String _phone = '';
+  String get contactPhone => _phone;
+  void setContactPhone(String phone) {
+    _phone = phone;
+    notifyListeners();
+  }
+
   BushelRole _parentRole = BushelRole.volunteer;
   String? _activeChildId;
   bool _familyAccount = false;
@@ -127,16 +135,19 @@ class SessionStore extends ChangeNotifier {
             ? _liveFeatured[accountId]
             : null)
       : _featuredKidBadge;
-  String get phoneNumber =>
-      isKidAccount ? 'Managed by parent' : '(713) 555-0100';
+  String get phoneNumber => isKidAccount
+      ? 'Managed by parent'
+      : (_phone.isEmpty ? 'No number provided' : _phone);
   String get accountId => activeChild?.id ?? 'parent';
 
   void configureParent({
     required String name,
     required BushelRole role,
     required bool family,
+    String phone = '',
   }) {
     _parentName = name;
+    _phone = phone;
     _parentRole = role == BushelRole.kid ? BushelRole.volunteer : role;
     _familyAccount = family;
     if (!_liveFamily) _activeChildId = null;
@@ -188,6 +199,13 @@ class SessionStore extends ChangeNotifier {
     if (_liveFamily) return;
     _unlockedKidBadges.add(id);
     _featuredKidBadge = id;
+    notifyListeners();
+  }
+
+  void clearDemoBadges() {
+    if (_liveFamily) return;
+    _unlockedKidBadges.clear();
+    _featuredKidBadge = null;
     notifyListeners();
   }
 

@@ -2,6 +2,16 @@
   "indexes": [],
   "fieldOverrides": [
     {
+      "collectionGroup": "revokedFamilies",
+      "fieldPath": "ownerUid",
+      "indexes": [{"order": "ASCENDING", "queryScope": "COLLECTION_GROUP"}]
+    },
+    {
+      "collectionGroup": "revokedFamilies",
+      "fieldPath": "leaderUid",
+      "indexes": [{"order": "ASCENDING", "queryScope": "COLLECTION_GROUP"}]
+    },
+    {
       "collectionGroup": "attendanceEntries",
       "fieldPath": "ownerUid",
       "indexes": [{"order": "ASCENDING", "queryScope": "COLLECTION_GROUP"}]

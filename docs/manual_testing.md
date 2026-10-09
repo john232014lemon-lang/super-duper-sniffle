@@ -26,6 +26,10 @@ Pick the 2–4 checks relevant to your change; this is a menu, not a required fu
 
 ## Family Center
 
+- Join a shift as the parent, then use **Sign up for shift** under each child. Expect only the parent's booked shifts with free places. Restart: each child's booking should persist in Family Center and My shifts. Without a parent signup, child signup must fail through an ordinary client too.
+- Use **Leave shift for [child]**: only that child's place is removed and one seat restored. Leave as the parent: the warning appears, and the parent plus all their child places are removed. This should work after the shift starts or attendance is confirmed. Kid Mode must show no join/leave actions and reject attempts through an ordinary client.
+- After deploying the new contact rules, save a coordinator phone in **Your profile** and reopen that coordinator's booked child shift from another adult account. Expect Call/Text and the same number after restart; the buttons should open the device handlers. Clear the phone: expect **no number provided**. Offline/contact-permission failures should show a retry action rather than falsely claiming no number. Verify unauthenticated users cannot read contacts and other adults cannot read private profiles.
+
 - Create a child and challenge, reserve a child place in one of the parent's shifts, and restart. Expect both family entries and the booking to persist. Switch to the child: only that child's bookings should appear, with no signup, voting, or coordinator actions. Switch back to the parent.
 - Fill the last place with a child booking. Further bookings should fail. Cancel or vote out the parent and expect all their managed child places to be cancelled too.
 - Sign in as another adult and verify they cannot read the first family's document or private registrations. Group members should see adult group data, not children's names or the parent's private registration.
@@ -54,3 +58,10 @@ Run `flutter run -d chrome --target lib/firestore_smoke_main.dart`, sign in, and
 The September 28 audit confirmed Slices 20–21/application rules are deployed. Attendance/rewards/scheduling rules and attendance collection-group indexes were subsequently deployed with explicit user approval on September 28. See `docs/firestore_audit.md` for the invalid legacy shifts and verified causes of current failures. After an approved deployment, use the relevant checks above and clean up disposable records/accounts.
 
 - Open Home → **Your upcoming shifts**: expect My shifts to show all bookings, including dates outside today. Tap a card or **View group & members** to see that shift's members. Groups with fewer than three adults should explain why removal cannot reach the existing quorum.
+
+## Family removal and coordinator check-in (after deployment)
+
+- Book a parent and child, scan both, confirm attendance, and claim a child badge. With at least three adult members, reach the two-thirds removal threshold. Both bookings disappear, all their seats return, that shift loses its points/badge/challenge contribution after reload, and neither can rejoin or claim again. Another family and rewards earned on other shifts stay unchanged. Also try removing a family with only pending check-ins.
+- Have the assigned, approved coordinator join and scan their own shift: confirmation and 100 points appear automatically, once. Another coordinator and the assigned coordinator's child must remain pending until confirmed.
+- In parent mode, follow the instructions at the top of Family Center to add a kid, book yourself, then book/leave only that kid. Kid Mode has no signup, leave, or removal-voting action.
+- A coordinator who also joined a shift should see one group card. Members & removal votes opens membership voting; QR & attendance opens QR creation and pending confirmations. A coordinator who has not joined can manage attendance but cannot vote.

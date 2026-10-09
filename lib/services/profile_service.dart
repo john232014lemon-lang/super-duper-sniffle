@@ -2,17 +2,20 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/widgets.dart';
 
 import '../data/session_store.dart';
+import '../models/contact_phone.dart';
 
 class AdultProfile {
   const AdultProfile({
     required this.name,
     required this.role,
     required this.family,
+    this.phone = '',
   });
   final String name;
   // A presentation preference, never an authorization role.
   final BushelRole role;
   final bool family;
+  final String phone;
 
   factory AdultProfile.fromMap(Map<String, dynamic> data) {
     final name = data['name'];
@@ -31,6 +34,7 @@ class AdultProfile {
           ? BushelRole.coordinator
           : BushelRole.volunteer,
       family: family,
+      phone: data['phone'] as String? ?? '',
     );
   }
 
@@ -38,6 +42,7 @@ class AdultProfile {
     'name': name.trim(),
     'preferredRole': role.name,
     'familyAccount': family,
+    'phone': ContactPhone.normalize(phone),
   };
 }
 
@@ -53,15 +58,25 @@ class FirestoreProfileRepository implements ProfileRepository {
         .collection('profiles')
         .doc(uid)
         .get(const GetOptions(source: Source.server));
-    return snapshot.exists ? AdultProfile.fromMap(snapshot.data()!) : null;
+    if (!snapshot.exists) return null;
+    return AdultProfile.fromMap(snapshot.data()!);
   }
 
   @override
-  Future<void> save(String uid, AdultProfile profile) => FirebaseFirestore
-      .instance
-      .collection('profiles')
-      .doc(uid)
-      .set({...profile.toMap(), 'updatedAt': FieldValue.serverTimestamp()});
+  Future<void> save(String uid, AdultProfile profile) async {
+    final phone = ContactPhone.normalize(profile.phone);
+    if (!ContactPhone.valid(phone)) {
+      throw const FormatException('Enter a valid phone number.');
+    }
+    final db = FirebaseFirestore.instance;
+    final batch = db.batch();
+    batch.set(db.collection('profiles').doc(uid), {
+      ...profile.toMap(),
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+    batch.set(db.collection('coordinatorContacts').doc(uid), {'phone': phone});
+    await batch.commit();
+  }
 }
 
 /// Lives above the Navigator, including routes replacing onboarding.

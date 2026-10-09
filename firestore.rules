@@ -15,6 +15,7 @@ service cloud.firestore {
     function regPath(uid, sid) { return /databases/$(database)/documents/registrations/$(uid)/shifts/$(sid); }
     function shiftPath(sid) { return /databases/$(database)/documents/shifts/$(sid); }
     function attendancePath(uid, pid, sid) { return /databases/$(database)/documents/attendance/$(sid)/families/$(uid)/attendanceEntries/$(pid); }
+    function revokedPath(uid, sid) { return /databases/$(database)/documents/attendanceRevocations/$(sid)/revokedFamilies/$(uid); }
     function shiftLeader(sid) {
       let shift = get(shiftPath(sid)).data;
       return signedIn() && shift.creatorUid == request.auth.uid && coordinates(shift.bankId);
@@ -38,7 +39,8 @@ service cloud.firestore {
     function removal(sid, target) {
       return quorum(sid, target) && !existsAfter(regPath(target, sid))
         && !(target in getAfter(groupPath(sid)).data.members)
-        && target in getAfter(groupPath(sid)).data.banned;
+        && target in getAfter(groupPath(sid)).data.banned
+        && getAfter(revokedPath(target, sid)).data.revokedAt == request.time;
     }
     function text(value, limit) { return value is string && value.size() > 0 && value.size() <= limit && value.matches('(?s).*\\S.*'); }
     match /coordinatorApplications/{uid}/banks/{bankId} {
@@ -149,30 +151,49 @@ service cloud.firestore {
     match /{path=**}/attendanceEntries/{pid} {
       allow list: if signedIn() && (resource.data.ownerUid == request.auth.uid || resource.data.leaderUid == request.auth.uid);
     }
+    match /{path=**}/revokedFamilies/{uid} {
+      allow list: if signedIn() && (resource.data.ownerUid == request.auth.uid || resource.data.leaderUid == request.auth.uid);
+    }
+    match /attendanceRevocations/{sid}/revokedFamilies/{uid} {
+      allow get: if signedIn() && (request.auth.uid == uid || get(shiftPath(sid)).data.creatorUid == request.auth.uid);
+      allow create: if parentMode() && quorum(sid, uid)
+        && !existsAfter(regPath(uid, sid))
+        && !(uid in getAfter(groupPath(sid)).data.members)
+        && uid in getAfter(groupPath(sid)).data.banned
+        && request.resource.data.keys().hasOnly(['ownerUid', 'leaderUid', 'shiftId', 'revokedAt'])
+        && request.resource.data.ownerUid == uid && request.resource.data.shiftId == sid
+        && request.resource.data.leaderUid == get(shiftPath(sid)).data.creatorUid
+        && request.resource.data.revokedAt == request.time;
+    }
     match /attendance/{sid}/families/{uid}/attendanceEntries/{pid} {
       function owner() { return signedIn() && request.auth.uid == uid; }
       function childBadge() {
         return owner() && pid != 'parent' && resource.data.status == 'confirmed'
+          && !existsAfter(revokedPath(uid, sid))
           && !('badgeId' in resource.data)
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['badgeId'])
           && request.resource.data.badgeId in ['donkey', 'bunny', 'fox', 'bear', 'panda', 'frog', 'bee', 'butterfly', 'chick', 'turtle', 'carrot', 'corn', 'tomato', 'broccoli', 'pepper', 'pumpkin', 'apple', 'strawberry', 'watermelon', 'grapes', 'sunflower', 'sprout', 'cactus', 'tree', 'clover'];
       }
       allow get: if owner() || (signedIn() && get(shiftPath(sid)).data.creatorUid == request.auth.uid);
       allow create: if owner() && attendingMember(uid, pid, sid)
+        && !existsAfter(revokedPath(uid, sid))
         && (parentMode() || pid == get(/databases/$(database)/documents/families/$(uid)).data.activeChildId)
-        && request.resource.data.keys().hasOnly(['ownerUid', 'participantId', 'shiftId', 'leaderUid', 'name', 'code', 'status', 'checkedInAt'])
+        && request.resource.data.keys().hasOnly(['ownerUid', 'participantId', 'shiftId', 'leaderUid', 'name', 'code', 'status', 'checkedInAt', 'confirmedAt'])
         && request.resource.data.ownerUid == uid && request.resource.data.participantId == pid
         && request.resource.data.shiftId == sid
         && request.resource.data.leaderUid == get(shiftPath(sid)).data.creatorUid
         && text(request.resource.data.name, 80)
         && request.resource.data.code == get(shiftPath(sid)).data.qrCode
-        && request.resource.data.status == 'pending' && request.resource.data.checkedInAt == request.time;
+        && request.resource.data.checkedInAt == request.time
+        && ((request.resource.data.status == 'pending' && !('confirmedAt' in request.resource.data))
+          || (pid == 'parent' && shiftLeader(sid) && request.resource.data.status == 'confirmed' && request.resource.data.confirmedAt == request.time));
       allow update: if childBadge() || (shiftLeader(sid) && attendingMember(uid, pid, sid)
+        && !existsAfter(revokedPath(uid, sid))
         && resource.data.status == 'pending'
         && request.resource.data.status == 'confirmed'
         && request.resource.data.confirmedAt == request.time
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'confirmedAt']));
-      // No deletes, replays, reversals, client point totals, or direct completion creates.
+      // No deletes or client point totals. Removal uses an immutable revocation marker.
     }
     match /rewardPreferences/{uid}/people/{pid} {
       function owner() { return signedIn() && request.auth.uid == uid; }
@@ -180,6 +201,7 @@ service cloud.firestore {
       allow create, update: if owner() && pid != 'parent'
         && request.resource.data.keys().hasOnly(['badgeId', 'shiftId'])
         && request.resource.data.shiftId is string
+        && !existsAfter(revokedPath(uid, request.resource.data.shiftId))
         && getAfter(attendancePath(uid, pid, request.resource.data.shiftId)).data.status == 'confirmed'
         && getAfter(attendancePath(uid, pid, request.resource.data.shiftId)).data.badgeId == request.resource.data.badgeId;
     }
@@ -257,6 +279,16 @@ service cloud.firestore {
         allow create, update: if validVote();
       }
     }
+    // Only the explicitly shared phone is exposed, never private profile fields.
+    match /coordinatorContacts/{uid} {
+      allow get: if signedIn() && (request.auth.uid == uid || parentMode());
+      allow create, update: if parentMode() && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['phone'])
+        && request.resource.data.phone is string
+        && (request.resource.data.phone == '' || request.resource.data.phone.matches('^[+]?[0-9]{7,15}$'))
+        && request.resource.data.phone == getAfter(/databases/$(database)/documents/profiles/$(uid)).data.get('phone', '');
+      allow delete: if parentMode() && request.auth.uid == uid;
+    }
     match /profiles/{uid} {
       function isOwner() {
         return request.auth != null && request.auth.uid == uid;
@@ -264,7 +296,11 @@ service cloud.firestore {
       // preferredRole changes presentation only; no permissions live here.
       allow get, delete: if isOwner();
       allow create, update: if isOwner()
-        && request.resource.data.keys().hasOnly(['name', 'preferredRole', 'familyAccount', 'updatedAt'])
+        && request.resource.data.keys().hasOnly(['name', 'preferredRole', 'familyAccount', 'phone', 'updatedAt'])
+        && request.resource.data.get('phone', '') is string
+        && (request.resource.data.get('phone', '') == '' || request.resource.data.phone.matches('^[+]?[0-9]{7,15}$'))
+        && (request.resource.data.get('phone', '') == (resource == null ? '' : resource.data.get('phone', ''))
+          || (parentMode() && getAfter(/databases/$(database)/documents/coordinatorContacts/$(uid)).data.phone == request.resource.data.get('phone', '')))
         && request.resource.data.name is string
         && request.resource.data.name.size() > 0
         && request.resource.data.name.size() <= 80

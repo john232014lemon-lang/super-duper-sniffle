@@ -203,10 +203,7 @@ class _FoodBankDetailScreenState extends State<FoodBankDetailScreen> {
                         signedUp: ShiftStore.instance.isSignedUp(
                           _shifts[index],
                         ),
-                        onTap:
-                            _busy ||
-                                (catalog != null &&
-                                    SessionStore.instance.isKidAccount)
+                        onTap: _busy || SessionStore.instance.isKidAccount
                             ? null
                             : () => _confirmSignup(_shifts[index]),
                       ),

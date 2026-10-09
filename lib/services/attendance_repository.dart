@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/attendance.dart';
 import 'catalog_repository.dart' show CatalogException;
@@ -9,7 +10,7 @@ abstract class AttendanceRepository {
   });
   Stream<Map<String, String>> watchFeaturedBadges(String uid);
   Future<void> publishQr(String shiftId);
-  Future<void> submitAttendance(
+  Future<bool> submitAttendance(
     String uid,
     String participantId,
     String shiftId,
@@ -43,15 +44,78 @@ class FirestoreAttendanceRepository implements AttendanceRepository {
   Stream<List<AttendanceEntry>> watchAttendance(
     String uid, {
     bool asLeader = false,
-  }) => _firestore
-      .collectionGroup('attendanceEntries')
-      .where(asLeader ? 'leaderUid' : 'ownerUid', isEqualTo: uid)
-      .snapshots()
-      .map(
-        (snapshot) => snapshot.docs
-            .map((doc) => AttendanceEntry.decode(doc.data()))
-            .toList(),
-      );
+  }) {
+    late StreamController<List<AttendanceEntry>> controller;
+    final subscriptions = <StreamSubscription<dynamic>>[];
+    List<AttendanceEntry>? entries;
+    Set<(String, String)>? revoked;
+    void emit() {
+      if (entries != null && revoked != null) {
+        controller.add(
+          entries!
+              .map(
+                (entry) => revoked!.contains((entry.ownerUid, entry.shiftId))
+                    ? entry.revoke()
+                    : entry,
+              )
+              .toList(),
+        );
+      }
+    }
+
+    controller = StreamController<List<AttendanceEntry>>(
+      onListen: () {
+        final field = asLeader ? 'leaderUid' : 'ownerUid';
+        subscriptions.add(
+          _firestore
+              .collectionGroup('attendanceEntries')
+              .where(field, isEqualTo: uid)
+              .snapshots()
+              .listen(
+                (snapshot) {
+                  entries = snapshot.docs
+                      .map((doc) => AttendanceEntry.decode(doc.data()))
+                      .toList();
+                  emit();
+                },
+                onError: (Object error, StackTrace stack) {
+                  entries = null;
+                  controller.addError(error, stack);
+                },
+              ),
+        );
+        subscriptions.add(
+          _firestore
+              .collectionGroup('revokedFamilies')
+              .where(field, isEqualTo: uid)
+              .snapshots()
+              .listen(
+                (snapshot) {
+                  revoked = snapshot.docs
+                      .map(
+                        (doc) => (
+                          doc.data()['ownerUid'] as String,
+                          doc.data()['shiftId'] as String,
+                        ),
+                      )
+                      .toSet();
+                  emit();
+                },
+                onError: (Object error, StackTrace stack) {
+                  revoked = null;
+                  controller.addError(error, stack);
+                },
+              ),
+        );
+      },
+      onCancel: () async {
+        for (final subscription in subscriptions) {
+          await subscription.cancel();
+        }
+      },
+    );
+    return controller.stream;
+  }
 
   @override
   Stream<Map<String, String>> watchFeaturedBadges(String uid) => _firestore
@@ -79,7 +143,7 @@ class FirestoreAttendanceRepository implements AttendanceRepository {
       });
 
   @override
-  Future<void> submitAttendance(
+  Future<bool> submitAttendance(
     String uid,
     String participantId,
     String shiftId,
@@ -88,12 +152,31 @@ class FirestoreAttendanceRepository implements AttendanceRepository {
   ) => _firestore.runTransaction((tx) async {
     final ref = _entry(uid, participantId, shiftId);
     final existing = await tx.get(ref);
-    if (existing.exists) return;
     final shift = await tx.get(_firestore.collection('shifts').doc(shiftId));
     if (!shift.exists || shift.data()!['qrCode'] != code) {
       throw const CatalogException(
         'This code does not match the shift. Try scanning again.',
       );
+    }
+    var selfConfirmed = false;
+    if (participantId == 'parent' && shift.data()!['creatorUid'] == uid) {
+      final approval = await tx.get(
+        _firestore
+            .collection('coordinatorApplications')
+            .doc(uid)
+            .collection('banks')
+            .doc(shift.data()!['bankId'] as String),
+      );
+      selfConfirmed = approval.data()?['status'] == 'approved';
+    }
+    if (existing.exists) {
+      if (selfConfirmed && existing.data()!['status'] == 'pending') {
+        tx.update(ref, {
+          'status': 'confirmed',
+          'confirmedAt': FieldValue.serverTimestamp(),
+        });
+      }
+      return selfConfirmed || existing.data()!['status'] == 'confirmed';
     }
     tx.set(ref, {
       'ownerUid': uid,
@@ -102,9 +185,11 @@ class FirestoreAttendanceRepository implements AttendanceRepository {
       'leaderUid': shift.data()!['creatorUid'],
       'name': name,
       'code': code,
-      'status': 'pending',
+      'status': selfConfirmed ? 'confirmed' : 'pending',
+      if (selfConfirmed) 'confirmedAt': FieldValue.serverTimestamp(),
       'checkedInAt': FieldValue.serverTimestamp(),
     });
+    return selfConfirmed;
   });
 
   @override
