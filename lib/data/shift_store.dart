@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import '../data/mock_food_banks.dart';
 import '../models/food_bank.dart';
 import '../models/shift_schedule.dart';
+import '../models/check_in_token.dart';
 import 'coordinator_store.dart';
 import 'session_store.dart';
 import 'catalog_store.dart';
@@ -46,12 +47,14 @@ class ShiftStore extends ChangeNotifier {
   bool get usingLive => _catalog != null;
   bool lastCheckInConfirmed = false;
   void bindCatalog(CatalogStore store) {
+    _qrCodes.clear();
     _catalog?.removeListener(notifyListeners);
     _catalog = store;
     store.addListener(notifyListeners);
   }
 
   void unbindCatalog(CatalogStore store) {
+    _qrCodes.clear();
     store.removeListener(notifyListeners);
     if (identical(_catalog, store)) _catalog = null;
   }
@@ -76,7 +79,7 @@ class ShiftStore extends ChangeNotifier {
   final Map<String, List<ShiftListing>> _myShiftsByAccount = {};
   final Map<String, Set<FoodBankShift>> _completedByAccount = {};
   final Map<String, int> _pointsByAccount = {};
-  final Map<FoodBankShift, String> _qrCodes = {};
+  final Map<FoodBankShift, CheckInToken> _qrCodes = {};
   final Map<FoodBankShift, Map<String, AttendanceRecord>> _pendingAttendance =
       {};
 
@@ -152,12 +155,25 @@ class ShiftStore extends ChangeNotifier {
               SessionStore.instance.accountId,
             ) ??
             false;
-  String? qrCodeFor(FoodBankShift shift) => usingLive
-      ? _catalog!.shifts
-            .where((e) => e.shift.id == shift.id)
-            .firstOrNull
-            ?.qrCode
-      : _qrCodes[shift];
+  String? qrCodeFor(FoodBankShift shift) =>
+      canManageShift(shift) ? _qrCodes[shift]?.code : null;
+  CheckInToken? leaderToken(FoodBankShift shift) =>
+      canManageShift(shift) ? _qrCodes[shift] : null;
+  String tokenShiftId(FoodBankShift shift) =>
+      shift.id ??
+      'demo-${_available.indexWhere((entry) => identical(entry.shift, shift))}';
+  DateTime? tokenStart(FoodBankShift shift) =>
+      shift.startsAt ??
+      (ShiftSchedule.minutes(shift.time) == null
+          ? null
+          : ShiftSchedule.start(shift.scheduledDate, shift.time));
+  bool hasAttendance(FoodBankShift shift, String participantId) => usingLive
+      ? _catalog!.attendance.any(
+          (entry) =>
+              entry.shiftId == shift.id && entry.participantId == participantId,
+        )
+      : (_completedByAccount[participantId]?.contains(shift) ?? false) ||
+            (_pendingAttendance[shift]?.containsKey(participantId) ?? false);
   List<AttendanceRecord> pendingAttendance(FoodBankShift shift) =>
       List.unmodifiable(_pendingAttendance[shift]?.values ?? const []);
   ShiftListing? listingFor(FoodBankShift shift) {
@@ -176,6 +192,7 @@ class ShiftStore extends ChangeNotifier {
     }
     final listing = listingFor(shift);
     return listing != null &&
+        !SessionStore.instance.isKidAccount &&
         SessionStore.instance.role == BushelRole.coordinator &&
         listing.leaderAccountId == SessionStore.instance.accountId;
   }
@@ -183,13 +200,21 @@ class ShiftStore extends ChangeNotifier {
   String? generateQrCode(FoodBankShift shift) {
     if (usingLive) return null;
     if (!canManageShift(shift)) return null;
-    final index = _available.indexWhere(
-      (listing) => identical(listing.shift, shift),
-    );
-    final code = 'BUSHEL-SHIFT-${index + 1}-${shift.station.hashCode.abs()}';
-    _qrCodes[shift] = code;
+    final start = tokenStart(shift);
+    if (start == null) {
+      throw const CatalogException(
+        'This shift needs a valid start time before generating a QR.',
+      );
+    }
+    late CheckInToken token;
+    try {
+      token = CheckInToken.generate(tokenShiftId(shift), start);
+    } on FormatException catch (error) {
+      throw CatalogException(error.message);
+    }
+    _qrCodes[shift] = token;
     notifyListeners();
-    return code;
+    return token.code;
   }
 
   Future<void> addAvailable(FoodBank bank, FoodBankShift shift) async {
@@ -296,20 +321,49 @@ class ShiftStore extends ChangeNotifier {
     notifyListeners();
   }
 
-  bool checkIn(FoodBankShift shift) {
+  bool checkIn(
+    FoodBankShift shift,
+    String code, {
+    String participantId = 'parent',
+    String? name,
+  }) {
     if (usingLive) return false;
-    if (!isSignedUp(shift) ||
-        isCheckedIn(shift) ||
-        isAwaitingConfirmation(shift) ||
-        qrCodeFor(shift) == null) {
-      return false;
+    if (SessionStore.instance.isKidAccount) {
+      throw const CatalogException('Ask your parent to check you in.');
     }
-    final accountId = SessionStore.instance.accountId;
+    if (!isSignedUp(shift) ||
+        (participantId != 'parent' &&
+            !shiftsForChild(
+              participantId,
+            ).any((entry) => _sameShift(entry.shift, shift)))) {
+      throw const CatalogException(
+        'You need a current booking for this participant.',
+      );
+    }
+    if (hasAttendance(shift, participantId)) {
+      throw const CatalogException(
+        'This participant has already checked in for this shift.',
+      );
+    }
+    final token = _qrCodes[shift];
+    final start = tokenStart(shift);
+    if (start == null) {
+      throw const CatalogException('This shift is unavailable for check-in.');
+    }
+    final error = CheckInToken.validate(
+      code,
+      tokenShiftId(shift),
+      token == null ? null : CheckInToken.verifier(token.code),
+      token?.expiresAt,
+      start,
+    );
+    if (error != null) throw CatalogException(error);
+    final accountId = participantId;
     (_pendingAttendance[shift] ??= {})[accountId] = AttendanceRecord(
       accountId: accountId,
-      name: SessionStore.instance.userName,
+      name: name ?? SessionStore.instance.userName,
     );
-    if (canManageShift(shift)) {
+    if (accountId == 'parent' && canManageShift(shift)) {
       lastCheckInConfirmed = confirmAttendance(shift, accountId);
     }
     notifyListeners();
@@ -350,9 +404,19 @@ class ShiftStore extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<bool> submitCheckIn(FoodBankShift shift) async {
+  Future<bool> submitCheckIn(
+    FoodBankShift shift,
+    String code, {
+    String participantId = 'parent',
+    String? name,
+  }) async {
     lastCheckInConfirmed = false;
-    if (!usingLive) return checkIn(shift);
+    if (SessionStore.instance.isKidAccount) {
+      throw const CatalogException('Ask your parent to check you in.');
+    }
+    if (!usingLive) {
+      return checkIn(shift, code, participantId: participantId, name: name);
+    }
     final catalog = _catalog!;
     if (catalog.attendanceLoading ||
         catalog.attendanceFailed ||
@@ -362,17 +426,19 @@ class ShiftStore extends ChangeNotifier {
         'Wait for your shifts and attendance to load, then retry.',
       );
     }
-    final code = qrCodeFor(shift);
-    if (!isSignedUp(shift) || code == null) {
+    if (!isSignedUp(shift) ||
+        (participantId != 'parent' &&
+            !(catalog.childSignups[shift.id]?.contains(participantId) ??
+                false))) {
       throw const CatalogException(
-        'You need a current signup and a shift QR code.',
+        'You need a current booking for this participant.',
       );
     }
     lastCheckInConfirmed = await catalog.repository.submitAttendance(
       catalog.uid,
-      SessionStore.instance.accountId,
+      participantId,
       shift.id!,
-      SessionStore.instance.userName,
+      name ?? SessionStore.instance.userName,
       code,
     );
     return true;

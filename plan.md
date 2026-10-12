@@ -1,53 +1,21 @@
----
-name: Bushel Incremental Plan
-overview: Build one small slice at a time; favor manual QA and minimal smoke tests.
-isProject: false
----
-
 # Bushel build plan
 
-Bushel helps families find food banks, join shifts, check in, and earn rewards. Work in this existing Flutter repository; the app starts at `lib/main.dart`.
+Bushel is the existing Flutter app starting at `lib/main.dart`. Use Firebase project `bushel-volunteer-20260925`, `(default)` database in Dallas (`us-south1`); do not create another project/database.
 
 ## Current state
 
-**September 29 data reset:** At the user's request, all live shifts, groups/votes, registrations, and attendance were cleared and verified empty. The earlier malformed legacy shifts are no longer present. Banks, profiles, family definitions, applications, contacts, and account preferences were preserved. This reset does not deploy the pending coordinator-contact rules.
+- Slices 0–11 and 14–21: implemented, including local demo, discovery, shifts, groups, family bookings, and administrator-approved coordination.
+- Slices 12–13: complete. Developer manual verification on Web (Edge/Chrome) and Android emulator (Pixel 7): Firebase sign-in works, the session persists across app restart, logout returns to the sign-in screen, and an invalid password shows an error without opening the app.
+- Slices 22–23: implemented attendance, leader confirmation, derived rewards, badges, and family goals; signed-in client QA remains pending.
+- September 29 reset cleared shifts, groups/votes, registrations, and attendance; preserved banks, profiles, family definitions, applications, contacts, and account preferences.
+- Scheduling rules were deployed September 29. On October 9, the developer reported manually publishing the entire repository rules file (including coordinator contacts and family removal/reward revocations) and creating the indexes. Active-source equality and index READY status have not been independently verified. The earlier CLI deployment failed with 403. Future deployment remains the developer's manual task; agents must not attempt it.
+- Slice 24: implemented locally October 12. Secure 256-bit random QR tokens, rotation, 15-minute expiry bounded to 30 minutes before / 4 hours after shift start, hash-proof validation, current-member/parent-only check-in, and parent-managed child attendance. New rules require developer manual publication. Source compilation passed; six unique affected offline smoke checks passed across Slices 24–25. Final Flutter analysis is clean (rerun after brace-style fixes). Slice 25: implemented locally with real leader QRs and Android/Web camera scanning plus manual fallback. Publish the updated rules manually; no new indexes. Camera and signed-in client QA remain developer work.
 
-| Slices | Status |
-| --- | --- |
-| 0–11 | Complete local mock app: discovery, shifts, groups/voting, families, provisional check-in, confirmation, and rewards |
-| 12–13 | Firebase initialization and auth implemented; interactive Android/Web launch, login/logout, and restart verification still pending |
-| 14–15 | Complete: explicit local demo mode and working shift calendar |
-| 16–19 | Complete: Firestore foundation, private adult profiles, banks, shifts, capacity enforcement, and adult signups |
-| 20 | Groups/voting implemented; live rules confirmed deployed by September 28 audit |
-| 21 | Persistent family profiles, profile switching, and child places implemented; live rules confirmed deployed; goal-based challenge fields deployed September 28 |
-| Additional | Bank-page coordinator applications implemented; only administrator database approval grants coordination under the new rules |
-| 22–23 | Implemented: persistent QR/check-in/leader confirmation, derived points, earned badges, and family challenge progress; rules/indexes deployed September 28; manual client QA pending |
+Demo: `flutter run -d chrome --dart-define=BUSHEL_DEMO=true`. It initializes no Firebase services; Reset demo clears local state. Normal startup requires Firebase authentication; live failures never fall back to demo data.
 
-Use the existing Firebase project `bushel-volunteer-20260925`, `(default)` database in Dallas (`us-south1`). Do not create another project/database. Android still needs an SDK and device/emulator. Setup, schema, and application approval instructions are in `README.md`.
+Keep parent-managed child bookings, Kid Mode permission restrictions, two-thirds adult removal voting, assigned approved leader confirmation, and immutable attendance/reward history. Removal revokes the family's rewards for that shift; voluntary leaving retains confirmed rewards. Pending attendance earns nothing; confirmed attendance earns 100 points per participant, and family goals count distinct shifts. See README for schema details.
 
-**Deployment approved and completed September 28.** The September 28 deployment includes attendance/QR/reward permissions and the earlier scheduling validation. September 29 time-range, text-limit, and instructions rules were subsequently approved, deployed, and verified against the local file. Both attendance collection-group indexes were verified READY; verification is recorded in the development log. See `docs/firestore_audit.md` for the three malformed legacy shifts and consistent group/registration counts. Legacy records were not changed; their intended schedules must not be guessed.
-
-Demo runs with `flutter run -d chrome --dart-define=BUSHEL_DEMO=true`; it initializes no Firebase services and resets all local state with **Reset demo**. Normal startup requires Firebase authentication. Live failures must never fall back to demo data.
-
-## Slice boundaries and next work
-
-| Slice | Required behavior |
-| --- | --- |
-| 20: Groups | Adult signup/cancellation atomically maintains private group membership. One vote per adult/target per membership version. Two-thirds of all current adults must agree to removal. Removal cancels the adult and their child places, restores capacity, revokes group/My Shifts access, and prevents immediate rejoining. Adult membership changes invalidate old votes |
-| 21: Families | Parent-owned kids, challenge titles, selected profile, and child bookings persist privately. Parents reserve children into their own shifts; each child consumes capacity. Kid Mode shows that child's bookings and cannot independently sign up, vote, or coordinate |
-| Applications | Adults apply on the bank page. An administrator reviews `coordinatorApplications/{uid}/banks/{bankId}` and sets `status` to `approved` or `rejected`. Profile role preferences and legacy access records confer no permissions under the new rules |
-| 22: Attendance | Persist per-shift mock QR, provisional check-in, and assigned-leader confirmation. Only members check in; only the assigned leader confirms; completion is recorded once |
-| 23: Rewards | Confirmed attendance drives persistent points, badges, kid badge selection, and challenge progress. Trusted updates prevent forged rewards and duplicate awards |
-
-Next: manually check Slices 20–23 against the deployed rules and indexes. Keep demo behavior local. Real scanning hardware/camera integration, secure QR tokens, notifications, AI features, map scaling, and production launch hardening remain later work.
-
-Attendance uses one completion record per family participant/shift, with separate immutable family-removal markers. Pending check-ins earn nothing; the assigned, approved bank leader confirms current participants. Confirmed records derive 100 points each without a client-writable balance. Each confirmed child shift grants one badge choice, retained unless that family is removed from the shift; earned badges can be featured again. Family challenges use explicit goals of 1–100 distinct confirmed family shifts, including past shifts; several family members on one shift count once. Legacy text-only challenges need a new goal-based challenge and do not invent progress from their titles. See README for schema and deployment instructions.
-
-## Testing policy for future agents
-
-Parent-managed bookings: parents must first join a shift before booking a child. Family Center and My shifts show every child's booked shifts, with per-child signup/Leave controls and coordinator Call/Text actions. Adults can leave at any time; leaving the parent cancels their children's places as explained in the confirmation. Kid Mode cannot join or leave in live or demo mode. Coordinator phone sharing is optional in Profile; signed-in adults can read only the shared phone document, not the private profile. These contact/profile rules are prepared locally and await deployment approval; prior September 29 deployment does not include them.
-
-New volunteer groups/shifts use a single local start time from `00:00` through `23:59`; `0:00` normalizes to `00:00` and `24:00` is rejected. Shift names allow 40 characters, stations 30, and optional location instructions 500. Instructions appear on shift cards and check-in. These September 29 rules changes were deployed after fresh explicit approval; the active rules exactly match the local file. Creation is limited to the current minute through the next 365 days, validated in the form/repository and deployed server rules. New records include `startsAt` and `utcOffsetMinutes`; existing shifts remain readable. Check-in uses stable dropdown values and handles an empty signup list. Leader QR controls remain available independently of attendance-query loading/errors.
+## Testing policy
 
 **Manual testing is the default. Automated tests are a small smoke alarm, not a completion checklist.** The previous large Flutter and emulator/live suites have been deliberately retired; do not restore them as routine cleanup.
 
@@ -61,7 +29,7 @@ New volunteer groups/shifts use a single local start time from `00:00` through `
 
 My shifts lists all bookings with clickable cards and a **View group & members** action. Home's upcoming-shifts shortcut opens that tab. Removal voting explains why fewer than three adults cannot satisfy the existing two-thirds rule without self-votes.
 
-The retained offline suite is `test/smoke_test.dart` (fourteen checks). Run a relevant check with:
+The retained offline suite is `test/smoke_test.dart`. Run a relevant check with:
 
 ```sh
 flutter test --no-pub test/smoke_test.dart --plain-name "part of the test name"
@@ -82,11 +50,3 @@ See `docs/manual_testing.md` for a menu of manual checks. Select only what the c
 - Every final slice/feature response must briefly state what changed and what was actually verified, then give developers **2–4 specific manual test ideas with expected results**. Include at least one relevant failure/permission boundary when applicable. Do not just say “test manually.”
 - Clearly distinguish implemented work, pending deployment, and checks not performed. Do not claim manual or live verification that did not happen.
 - Stop at the slice boundary. Do not commit, push, or deploy without user authorization.
-
-## September 29: family removal and coordinator clarity
-
-Implemented locally: removal voting atomically cancels the parent and all child places, restores capacity, and writes an immutable family/shift revocation marker. Pending and confirmed attendance remain as audit records but no longer count toward points, badges, or family challenges. Badges earned on other shifts remain available. Voluntary leaving retains previously confirmed rewards. Removal still requires the existing two-thirds adult vote.
-
-The assigned, approved coordinator now confirms their own parent check-in automatically; other adults and children still need confirmation. Family Center starts with booking instructions and places child booking controls above challenges. Groups shows one card per shift with explicit Members & removal votes and QR & attendance buttons.
-
-Validation: all 14 offline smoke checks passed, Flutter analysis reported no issues, and the non-deploying Firebase Rules API returned no compilation errors. No emulator or signed-in live QA was run. Deployment is pending fresh approval: deploy firestore.rules (including the earlier optional coordinator contact rules) and firestore.indexes.json; wait for both revokedFamilies collection-group indexes to become READY before releasing this client. Earlier approvals do not cover this change.

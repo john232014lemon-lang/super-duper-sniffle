@@ -1,8 +1,8 @@
-# Firestore audit — 2026-09-28
+# Archived Firestore audit — 2026-09-28
 
 **September 29 cleanup:** The user subsequently requested clearing all shift data. Shifts, groups/votes, registrations, and attendance were deleted and verified empty. The legacy records listed below are historical and no longer exist. Non-shift account/bank/family data was preserved.
 
-**Post-audit update:** The user approved the prepared rules/index deployment. Deployment succeeded September 28 (release timestamp `2026-09-29T02:15:18.620415Z`). The active rules exactly match the repository, and both attendance collection-group indexes were verified READY; details are recorded in `docs/development_log.md`. The findings below describe the pre-deployment snapshot. Legacy shift records remain unchanged.
+**Post-audit update:** The user approved the prepared rules/index deployment. Deployment succeeded September 28 (release timestamp `2026-09-29T02:15:18.620415Z`). The active rules exactly match the repository, and both attendance collection-group indexes were verified READY; details are recorded in `docs/development_log.md`. The findings below describe the pre-deployment snapshot. Those shift records were subsequently deleted in the September 29 reset.
 
 Read-only inspection of `bushel-volunteer-20260925`, `(default)`. No live records or active rules were changed. Three shifts and three corresponding groups were returned, with no additional pages. The reported fourth shift was not present in this database snapshot.
 
@@ -34,4 +34,4 @@ Removal currently requires two-thirds of **all** adult members; self-votes are f
 
 After authorized deployment, wait for both collection-group indexes to reach READY, restart the client, and manually create a valid shift, generate its QR, and load attendance. Test removal with three distinct adult members: two votes should remove the target and restore their booked capacity. Also verify another coordinator cannot manage the shift's attendance.
 
-The audit itself was read-only; the subsequently approved deployment is recorded above. Legacy-data cleanup was not performed.
+The audit itself was read-only; the subsequently approved deployment is recorded above. The September 29 reset subsequently deleted these records. This document is historical, not a current inventory or deployment checklist.

@@ -13,12 +13,14 @@ class StoredShift {
     required this.bankId,
     required this.creatorUid,
     required this.shift,
-    this.qrCode,
+    this.qrTokenHash,
+    this.qrExpiresAt,
   });
   final String bankId;
   final String creatorUid;
   final FoodBankShift shift;
-  final String? qrCode;
+  final String? qrTokenHash;
+  final DateTime? qrExpiresAt;
 }
 
 abstract class CatalogRepository implements AttendanceRepository {
@@ -105,9 +107,11 @@ class FirestoreCatalogRepository extends FirestoreAttendanceRepository
     return StoredShift(
       bankId: data['bankId'] as String,
       creatorUid: data['creatorUid'] as String,
-      qrCode: data['qrCode'] as String?,
+      qrTokenHash: data['qrTokenHash'] as String?,
+      qrExpiresAt: (data['qrExpiresAt'] as Timestamp?)?.toDate(),
       shift: FoodBankShift(
         id: id,
+        startsAt: (data['startsAt'] as Timestamp?)?.toDate(),
         title: data['title'] as String,
         // Date-only scheduling: preserve the stored calendar day in every timezone.
         scheduledDate: DateTime(date.year, date.month, date.day),

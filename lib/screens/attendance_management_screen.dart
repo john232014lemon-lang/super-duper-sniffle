@@ -3,7 +3,8 @@ import '../data/catalog_store.dart';
 import '../data/session_store.dart';
 import '../models/attendance.dart';
 import '../services/catalog_repository.dart';
-import '../widgets/mock_qr_code.dart';
+import '../models/check_in_token.dart';
+import '../widgets/station_token_display.dart';
 
 class AttendanceManagementScreen extends StatefulWidget {
   const AttendanceManagementScreen({
@@ -24,6 +25,8 @@ class _AttendanceManagementScreenState
   late Stream<List<AttendanceEntry>> _entries;
   bool _saving = false;
   String? _error;
+  CheckInToken? _token;
+  String? _tokenOwner;
   void _subscribe() => _entries = _store!.repository.watchAttendance(
     _store!.uid,
     asLeader: true,
@@ -117,24 +120,37 @@ class _AttendanceManagementScreenState
                           ),
                         ),
                         const Text(
-                          'Simulated QR for this shift. Camera scanning is a later feature.',
+                          'Codes last at most 15 minutes. Rotating invalidates the previous code. Reopening this screen requires a new code.',
                         ),
                         const SizedBox(height: 16),
-                        if (shift.qrCode == null)
-                          FilledButton(
-                            onPressed: _saving
-                                ? null
-                                : () => _save(
-                                    () => store.repository.publishQr(
-                                      widget.shiftId,
-                                    ),
-                                  ),
-                            child: const Text('Generate shift QR'),
-                          )
-                        else
-                          Center(
-                            child: MockQrCode(value: shift.qrCode!, size: 180),
+                        FilledButton(
+                          onPressed: _saving
+                              ? null
+                              : () => _save(() async {
+                                  final owner = store.uid;
+                                  final token = await store.repository
+                                      .publishQr(widget.shiftId);
+                                  if (mounted &&
+                                      identical(_store, store) &&
+                                      !SessionStore.instance.isKidAccount) {
+                                    setState(() {
+                                      _token = token;
+                                      _tokenOwner = owner;
+                                    });
+                                  }
+                                }),
+                          child: Text(
+                            shift.qrTokenHash == null
+                                ? 'Generate shift QR'
+                                : 'Rotate shift QR',
                           ),
+                        ),
+                        if (_token != null &&
+                            _tokenOwner == store.uid &&
+                            CheckInToken.verifier(_token!.code) ==
+                                shift.qrTokenHash) ...[
+                          StationTokenDisplay(token: _token!),
+                        ],
                         const SizedBox(height: 24),
                         if (snapshot.hasError) ...[
                           const Text(

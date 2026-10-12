@@ -5,7 +5,7 @@ import '../data/session_store.dart';
 import '../data/shift_store.dart';
 import '../models/group_member.dart';
 import '../widgets/bushel_navigation_bar.dart';
-import '../widgets/mock_qr_code.dart';
+import '../widgets/station_token_display.dart';
 import '../data/catalog_store.dart';
 import 'live_group_screen.dart';
 import 'attendance_management_screen.dart';
@@ -330,12 +330,34 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
                         if (qrCode == null)
                           FilledButton.icon(
                             key: const ValueKey('generate-shift-qr'),
-                            onPressed: () => shiftStore.generateQrCode(shift),
+                            onPressed: () {
+                              try {
+                                shiftStore.generateQrCode(shift);
+                              } catch (error) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text(error.toString())),
+                                );
+                              }
+                            },
                             icon: const Icon(Icons.qr_code_2),
                             label: const Text('Generate QR for this shift'),
                           )
                         else ...[
-                          MockQrCode(value: qrCode, size: 160),
+                          StationTokenDisplay(
+                            token: shiftStore.leaderToken(shift)!,
+                          ),
+                          TextButton(
+                            onPressed: () {
+                              try {
+                                shiftStore.generateQrCode(shift);
+                              } catch (error) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text(error.toString())),
+                                );
+                              }
+                            },
+                            child: const Text('Rotate shift QR'),
+                          ),
                           const SizedBox(height: 8),
                           const Text(
                             'This code works only for this shift.',

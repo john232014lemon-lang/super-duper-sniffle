@@ -44,7 +44,7 @@ Pick the 2–4 checks relevant to your change; this is a menu, not a required fu
 
 Slices 22–23 rules/indexes were deployed September 28 after authorization; manual client QA is now the next step.
 
-- As an approved shift creator, open **Manage check-ins** from bank details or **Shifts you lead** in Groups and generate the QR. As a signed-up adult or booked child, simulate scanning and submit. Restart: attendance should remain pending with zero new points and no badge choice. Demo mode should still work without Firebase.
+- As an approved shift creator, open **Manage check-ins** from bank details or **Shifts you lead** in Groups and generate the QR. As a signed-up adult, scan the current leader QR or enter it manually, selecting yourself or a booked child in parent mode. Restart: attendance should remain pending with zero new points and no badge choice. Demo mode should still work without Firebase.
 - Confirm with the assigned approved leader: the participant should gain exactly 100 points, surviving restart and retries. Using ordinary clients, try confirming as another coordinator or creating confirmed attendance directly as a participant; both must be denied. Cancel/remove an unconfirmed participant and verify confirmation is denied.
 - In Kid Mode, choose a badge after confirmation, then feature another previously earned badge and restart. Expect one permanent choice per confirmed child shift and the featured choice restored. Pending attendance and a sibling's attendance must not unlock this child's badges.
 - Create a two-shift family goal. Confirm parent and child on the same shift: expect 1/2, not 2/2. Confirm a second distinct shift: expect completion. Past confirmed shifts count; old text-only challenges show an explicit legacy notice instead of guessed progress. Disconnect and retry: expect a visible error/loading state rather than demo rewards.
@@ -55,7 +55,7 @@ Run `flutter run -d chrome --target lib/firestore_smoke_main.dart`, sign in, and
 
 ## Current deployment boundary
 
-The September 28 audit confirmed Slices 20–21/application rules are deployed. Attendance/rewards/scheduling rules and attendance collection-group indexes were subsequently deployed with explicit user approval on September 28. See `docs/firestore_audit.md` for the invalid legacy shifts and verified causes of current failures. After an approved deployment, use the relevant checks above and clean up disposable records/accounts.
+The developer reported manually publishing the full repository rules and creating the indexes on October 9, including coordinator contacts, family removal, and revokedFamilies indexes. Verify both revokedFamilies collection-group indexes are READY before running removal/reward checks. Publication and index readiness have not been independently verified. The non-deploying Rules API authentication blocker cleared October 12. Slices 24–25 are implemented locally; publish the new secure-token rules before checking this revision. No new indexes are required.
 
 - Open Home → **Your upcoming shifts**: expect My shifts to show all bookings, including dates outside today. Tap a card or **View group & members** to see that shift's members. Groups with fewer than three adults should explain why removal cannot reach the existing quorum.
 
@@ -65,3 +65,28 @@ The September 28 audit confirmed Slices 20–21/application rules are deployed. 
 - Have the assigned, approved coordinator join and scan their own shift: confirmation and 100 points appear automatically, once. Another coordinator and the assigned coordinator's child must remain pending until confirmed.
 - In parent mode, follow the instructions at the top of Family Center to add a kid, book yourself, then book/leave only that kid. Kid Mode has no signup, leave, or removal-voting action.
 - A coordinator who also joined a shift should see one group card. Members & removal votes opens membership voting; QR & attendance opens QR creation and pending confirmations. A coordinator who has not joined can manage attendance but cannot vote.
+
+## Authentication closeout (Slices 12–13)
+
+Developer-reported verification completed on Web (Edge/Chrome) and Android emulator (Pixel 7): Firebase sign-in works, the session persists across app restart, logout returns to the sign-in screen, and an invalid password shows an error without opening the app. This records only those checks; account-switching and backend permissions are separate checks.
+
+Optional future regression checks (not rerun by the agent):
+
+- On Web and Pixel 7, sign in and restart the app: expect the signed-in session to restore.
+- Log out, then attempt an invalid password: expect the sign-in screen to remain with a visible error and no app access.
+
+Slices 24–25 manual checks below are pending developer execution after publication of the updated rules.
+
+## Slice 24 secure tokens (after publishing updated rules; unperformed)
+
+- Use ordinary signed-in clients. The assigned approved leader generates a QR within 30 minutes before / 4 hours after startsAt; another coordinator or member must be denied generation/rotation. Read the shift as a member: expect only qrTokenHash and qrExpiresAt, no raw secure code; attempts to submit the public verifier as a proof must fail.
+- Save a code, rotate it, then enter the old code or a different shift's code: expect a clear rejection with no attendance. Wait to the displayed expiry (at most 15 minutes) and retry: expect expiry rejection. The new current code should still work within its window.
+- Check in an ordinary booked adult and a booked child from parent mode: both remain pending with no rewards until the assigned leader confirms. Retry the same participant: expect already checked in, with one attendance record and one 100-point award after confirmation. The assigned approved leader's own adult check-in retains automatic confirmation.
+- Cancel/remove a booking and attempt check-in with a valid QR through an ordinary client: expect denial. Switch to Kid Mode: expect no scan/entry/check-in actions and direct attendance creates denied. Demo mode follows the same local flow without Firebase.
+
+## Slice 25 camera scanning (unperformed)
+
+- Display a generated leader QR and scan it from a booked ordinary account on Pixel 7 and Web (Edge/Chrome over HTTPS or localhost). Select the correct shift and confirm: expect one pending attendance record and no new points until leader confirmation. Scan the same code for a booked child from parent mode: expect the child's own pending record. Demo uses the same local flow; its first seeded shift starts when the app launches.
+- Deny camera permission on Android and Web: expect a clear denial message and **Enter code instead**. Enter the current code from the leader: expect the same pending attendance behavior. With no camera, a busy camera, or an unsupported platform, expect an explanatory message and the same manual fallback.
+- Scan a QR for a different shift or a saved expired/rotated QR, then confirm: expect rejection and no new attendance. Scan the newest current QR: expect success only for a current booked participant. Double detection must not submit automatically or create duplicate attendance.
+- Open/close the scanner and background/restore the app: expect the camera to release/pause and resume without duplicate results. Switch to Kid Mode: expect no camera or manual-entry/check-in controls; direct client attendance writes are denied. Scanning requires parent mode even for booked children.

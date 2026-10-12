@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/attendance.dart';
+import '../models/check_in_token.dart';
 import 'catalog_repository.dart' show CatalogException;
 
 abstract class AttendanceRepository {
@@ -9,7 +10,7 @@ abstract class AttendanceRepository {
     bool asLeader = false,
   });
   Stream<Map<String, String>> watchFeaturedBadges(String uid);
-  Future<void> publishQr(String shiftId);
+  Future<CheckInToken> publishQr(String shiftId);
   Future<bool> submitAttendance(
     String uid,
     String participantId,
@@ -131,15 +132,28 @@ class FirestoreAttendanceRepository implements AttendanceRepository {
       );
 
   @override
-  Future<void> publishQr(String shiftId) =>
+  Future<CheckInToken> publishQr(String shiftId) =>
       _firestore.runTransaction((tx) async {
         final ref = _firestore.collection('shifts').doc(shiftId);
         final shift = await tx.get(ref);
-        if (!shift.exists) {
-          throw const CatalogException('This shift no longer exists.');
+        final start = (shift.data()?['startsAt'] as Timestamp?)?.toDate();
+        if (!shift.exists || start == null) {
+          throw const CatalogException(
+            'This shift needs a valid start time before generating a QR.',
+          );
         }
-        if (shift.data()!['qrCode'] != null) return;
-        tx.update(ref, {'qrCode': 'BUSHEL-SHIFT-$shiftId'});
+        late CheckInToken token;
+        try {
+          token = CheckInToken.generate(shiftId, start);
+        } on FormatException catch (error) {
+          throw CatalogException(error.message);
+        }
+        tx.update(ref, {
+          'qrTokenHash': CheckInToken.verifier(token.code),
+          'qrExpiresAt': Timestamp.fromDate(token.expiresAt),
+          'qrCode': FieldValue.delete(),
+        });
+        return token;
       });
 
   @override
@@ -149,48 +163,83 @@ class FirestoreAttendanceRepository implements AttendanceRepository {
     String shiftId,
     String name,
     String code,
-  ) => _firestore.runTransaction((tx) async {
-    final ref = _entry(uid, participantId, shiftId);
-    final existing = await tx.get(ref);
-    final shift = await tx.get(_firestore.collection('shifts').doc(shiftId));
-    if (!shift.exists || shift.data()!['qrCode'] != code) {
-      throw const CatalogException(
-        'This code does not match the shift. Try scanning again.',
-      );
-    }
-    var selfConfirmed = false;
-    if (participantId == 'parent' && shift.data()!['creatorUid'] == uid) {
-      final approval = await tx.get(
-        _firestore
-            .collection('coordinatorApplications')
-            .doc(uid)
-            .collection('banks')
-            .doc(shift.data()!['bankId'] as String),
-      );
-      selfConfirmed = approval.data()?['status'] == 'approved';
-    }
-    if (existing.exists) {
-      if (selfConfirmed && existing.data()!['status'] == 'pending') {
-        tx.update(ref, {
-          'status': 'confirmed',
-          'confirmedAt': FieldValue.serverTimestamp(),
+  ) async {
+    try {
+      return await _firestore.runTransaction((tx) async {
+        final ref = _entry(uid, participantId, shiftId);
+        final existing = await tx.get(ref);
+        final shift = await tx.get(
+          _firestore.collection('shifts').doc(shiftId),
+        );
+        final registration = await tx.get(
+          _firestore
+              .collection('registrations')
+              .doc(uid)
+              .collection('shifts')
+              .doc(shiftId),
+        );
+        final data = shift.data();
+        final start = (data?['startsAt'] as Timestamp?)?.toDate();
+        if (!registration.exists ||
+            (participantId != 'parent' &&
+                !(registration.data()?['childIds'] as List? ?? []).contains(
+                  participantId,
+                ))) {
+          throw const CatalogException(
+            'You need a current booking for this participant.',
+          );
+        }
+        if (existing.exists) {
+          throw const CatalogException(
+            'This participant has already checked in for this shift.',
+          );
+        }
+        if (data == null || start == null) {
+          throw const CatalogException(
+            'This shift is unavailable for check-in.',
+          );
+        }
+        final error = CheckInToken.validate(
+          code,
+          shiftId,
+          data['qrTokenHash'] as String?,
+          (data['qrExpiresAt'] as Timestamp?)?.toDate(),
+          start,
+        );
+        if (error != null) throw CatalogException(error);
+        var selfConfirmed = false;
+        if (participantId == 'parent' && data['creatorUid'] == uid) {
+          final approval = await tx.get(
+            _firestore
+                .collection('coordinatorApplications')
+                .doc(uid)
+                .collection('banks')
+                .doc(data['bankId'] as String),
+          );
+          selfConfirmed = approval.data()?['status'] == 'approved';
+        }
+        tx.set(ref, {
+          'ownerUid': uid,
+          'participantId': participantId,
+          'shiftId': shiftId,
+          'leaderUid': data['creatorUid'],
+          'name': name,
+          'tokenProof': CheckInToken.proof(code),
+          'status': selfConfirmed ? 'confirmed' : 'pending',
+          if (selfConfirmed) 'confirmedAt': FieldValue.serverTimestamp(),
+          'checkedInAt': FieldValue.serverTimestamp(),
         });
+        return selfConfirmed;
+      });
+    } on FirebaseException catch (error) {
+      if (error.code == 'permission-denied') {
+        throw const CatalogException(
+          'Check-in was denied. The QR may have expired or rotated, or your membership or parent-mode access changed. Refresh and scan the newest QR.',
+        );
       }
-      return selfConfirmed || existing.data()!['status'] == 'confirmed';
+      rethrow;
     }
-    tx.set(ref, {
-      'ownerUid': uid,
-      'participantId': participantId,
-      'shiftId': shiftId,
-      'leaderUid': shift.data()!['creatorUid'],
-      'name': name,
-      'code': code,
-      'status': selfConfirmed ? 'confirmed' : 'pending',
-      if (selfConfirmed) 'confirmedAt': FieldValue.serverTimestamp(),
-      'checkedInAt': FieldValue.serverTimestamp(),
-    });
-    return selfConfirmed;
-  });
+  }
 
   @override
   Future<void> confirmEntry(AttendanceEntry entry) =>

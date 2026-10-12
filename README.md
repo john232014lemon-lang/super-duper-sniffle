@@ -28,9 +28,9 @@ dart pub global run flutterfire_cli:flutterfire configure --project=bushel-volun
 
 `lib/firebase_options.dart` now contains real generated configuration for Android and Web. Other platforms intentionally report unsupported configuration. The Firebase client identifiers are not admin credentials; never commit service-account files or login tokens.
 
-**Authentication status:** the Slice 16 live test successfully created and deleted temporary Email/Password users. The earlier `CONFIGURATION_NOT_FOUND` error no longer occurs. Full login/logout/restart testing in Flutter remains pending; the reported school-account restriction on console access was not changed by this work.
+**Authentication status:** Slices 12–13 are complete based on developer manual verification on Web (Edge/Chrome) and Android emulator (Pixel 7): sign-in works, sessions persist across app restart, logout returns to sign-in, and invalid passwords show an error without opening the app.
 
-`flutter pub get` and the Web release build pass on this machine. Android cannot yet be built or launched because `flutter doctor -v` reports a missing Android SDK and no Android device/emulator is connected. Install the Android toolchain and connect a device or emulator, then run `flutter run -d <android-device-id>`. Native Windows is not configured for Firebase.
+Web and Android emulator authentication were manually verified by the developer. Native Windows is not configured for Firebase.
 
 Follow the official [FlutterFire setup](https://firebase.google.com/docs/flutter/setup) and [Email/Password authentication](https://firebase.google.com/docs/auth/flutter/password-auth) instructions when finishing project configuration.
 
@@ -42,7 +42,7 @@ Follow the official [FlutterFire setup](https://firebase.google.com/docs/flutter
 - Volunteer/Coordinator choices only change the mock experience; they grant no backend permissions.
 - Initialization and authentication failures have visible retry/error states. Mock widget tests can instantiate `BushelApp` or `DemoApp` directly; `main()` uses the Firebase startup/auth gate unless `BUSHEL_DEMO=true` is explicitly set.
 
-The testing policy in [plan.md](plan.md) favors manual QA. Only thirteen offline smoke checks remain; use a relevant check for a small change, or the small suite for changes spanning several boundaries:
+The testing policy in [plan.md](plan.md) favors manual QA. The retained offline smoke suite is intentionally small; use a relevant check for a small change, or the small suite for changes spanning several boundaries:
 
 ```sh
 flutter test --no-pub test/smoke_test.dart
@@ -83,7 +83,7 @@ Use the adult's Firebase Authentication UID, not their email or local `parent` I
 
 ## Coordinator applications and Slices 20–21
 
-**Deployment status:** The September 28 read-only audit confirmed Slices 20–21 rules are deployed. At audit time, Slices 22–23 and scheduling fields were absent from those rules, and the attendance collection-group indexes were missing. This explained the reported shift-creation, QR, and attendance failures. The user subsequently approved deployment; it completed September 28. Active rules match the repository, and index readiness is recorded in the development log. All three existing shifts have groups and consistent checked registration counts, but malformed legacy schedules; see [database audit](docs/firestore_audit.md).
+**Deployment status:** On October 9, the developer reported manually publishing the full repository rules file and creating the indexes, including coordinator contacts, family removal, and revokedFamilies indexes. Active-source equality and index READY status remain unverified. The September 29 reset deleted the previously audited shifts. Future deployment remains the developer's manual task.
 
 On a bank's detail page, an adult selects **Apply to coordinate** and provides their name, contact information, and experience/reason. The form retains input after a failed save. A successful submission stays **pending** and cannot grant privileges. Each adult has one application per bank; rejected applications require administrator follow-up.
 
@@ -125,20 +125,20 @@ Parents must also be signed up for their children's shifts. **Family Center** an
 
 Coordinators can save an optional phone under **Your profile**. The form explains that it is shared with signed-in adults and can be cleared. Each child's booked-shift card shows **Call coordinator**, **Text coordinator**, or **Coordinator: no number provided**. A device phone/SMS handler is needed; unsupported devices show a message and the selectable number. These actions use the official [Flutter url_launcher plugin](https://pub.dev/packages/url_launcher).
 
-**Contact rules deployment is pending approval.** New profile saves include a phone field and atomically publish only that phone to `coordinatorContacts/{uid}`. Rules deny collection listing, permit signed-in adult document reads, and restrict writes to the owner with matching private profile data. Other profile fields remain private. The previously approved deployment does not include this new contact schema; deploy the prepared rules before using this app revision for profile/onboarding saves. No changes to attendance indexes or existing booking records are needed.
+**Contact rules were reported manually published by the developer on October 9; independent verification is pending.** New profile saves include a phone field and atomically publish only that phone to `coordinatorContacts/{uid}`. Rules deny collection listing, permit signed-in adult document reads, and restrict writes to the owner with matching private profile data. Other profile fields remain private. Verify the manually published rules include this contact schema before checking profile/onboarding saves. No changes to attendance indexes or existing booking records are needed.
 
 New shifts/groups accept a single local start time from `00:00` to `23:59` and must start in the current minute or within the next 365 days. `0:00` normalizes to `00:00`; `24:00` is invalid. Names allow 40 characters, stations 30, and optional multiline location instructions 500. Instructions are shown on bank shift cards, My shifts, and check-in. **September 29 rules update deployed and verified after explicit approval:** production accepts the corrected time range and optional instructions, and enforces the shorter field limits. New records store `startsAt` and the local `utcOffsetMinutes` alongside the calendar date and normalized time. Deployed rules validate their consistency and the window using [Firebase request time](https://firebase.google.com/docs/reference/rules/rules.firestore.Request). Existing shifts remain readable; the September 29 creation-rule update is deployed.
 
 Check-in handles empty or changing signup lists without retaining obsolete dropdown values. QR generation is available to the assigned approved leader even when the attendance query is loading or fails. An empty bank first needs a shift created by an approved coordinator; QR codes belong to shifts, not banks. The approved rules deployment includes QR permissions; assigned-leader and approved-bank restrictions still apply.
 
-Rules and indexes were deployed September 28 after user approval. Active rules were verified against the repository; manual client behavior checks remain pending. The QR is a persisted simulation, not camera scanning or a secure attendance token.
+The developer reported manually publishing the entire earlier rules file and creating its indexes October 9. Slice 24 changes the local rules again and requires manual publication before using secure check-in. Index READY status and signed-in token/camera behavior remain unverified.
 
-An approved bank coordinator who created a shift opens **Manage check-ins** on the bank page, or **Shifts you lead** under Groups. Generate the shift QR once. Booked adults and children can simulate scanning on Check-in; submission stays pending until that assigned, still-approved leader confirms. Removed/cancelled participants cannot be confirmed. Duplicate submissions/confirmations use the same record and cannot award twice.
+The assigned approved bank leader opens **Manage check-ins** on the bank page or **Shifts you lead** under Groups. Generate or rotate a real QR within 30 minutes before through 4 hours after the shift start. Each QR expires after at most 15 minutes. Raw codes exist only in leader app memory; reopening the screen requires rotation, invalidating codes displayed in other sessions. Members scan on Android/Web or enter the displayed code manually. Parents choose themselves or a booked child; Kid Mode cannot scan or check in independently. Ordinary member submissions remain pending until the assigned approved leader confirms; the existing leader adult self-confirmation exception remains. Removed/cancelled participants cannot be confirmed. Duplicate participant check-in is rejected; confirmation retries cannot award twice.
 
 | Path | Purpose |
 | --- | --- |
-| `shifts/{shiftId}.qrCode` | Immutable mock shift code, published by the assigned approved leader |
-| `attendance/{shiftId}/families/{ownerUid}/attendanceEntries/{participantId}` | `parent` or child ID; pending then confirmed with server timestamps; owner and assigned leader can read |
+| `shifts/{shiftId}.qrTokenHash`, `.qrExpiresAt` | Public verification hash and expiry only; assigned approved leader generates/rotates |
+| `attendance/{shiftId}/families/{ownerUid}/attendanceEntries/{participantId}` | `parent` or child ID; `tokenProof` (hash, never raw QR), pending then confirmed with server timestamps; owner and assigned leader can read |
 | `rewardPreferences/{uid}/people/{childId}` | Featured badge backed by a confirmed record for that child |
 | `families/{uid}.challengeTargets` | Goal per challenge ID, 1–100 distinct completed family shifts |
 
@@ -167,10 +167,28 @@ It writes a unique test document, reads from the server, deletes it, and verifie
 
 Backend QA is developer-driven. Use ordinary authenticated client sessions or the Rules Playground for access checks; administrator operations bypass security rules. Optional manual emulator guidance is in `docs/manual_testing.md`. No automated emulator or live test suite is required before finishing a slice.
 
-Windows native plugin setup still reports a Developer Mode/symlink requirement; Android execution also needs the missing Android SDK/device. The Web diagnostic build succeeds with `--no-pub` using the resolved dependencies.
+Developer Mode is needed for Windows plugin symlinks. Android/Web authentication was manually verified by the developer; camera testing remains pending.
 
 ### Pending removal/attendance update
 
-`attendanceRevocations/{shiftId}/revokedFamilies/{uid}` stores immutable `{ownerUid, leaderUid, shiftId, revokedAt}` markers created atomically by valid removal votes. Attendance readers combine these with the retained audit entries to exclude the entire removed family from points, badges, and challenges. Rules prevent further confirmation or badge awards for revoked attendance. Collection-group indexes on `revokedFamilies.ownerUid` and `revokedFamilies.leaderUid` are required. These rules/indexes, including the pending coordinator contact rules, await fresh deployment approval; deploy them and wait for indexes before releasing the client.
+`attendanceRevocations/{shiftId}/revokedFamilies/{uid}` stores immutable `{ownerUid, leaderUid, shiftId, revokedAt}` markers created atomically by valid removal votes. Attendance readers combine these with the retained audit entries to exclude the entire removed family from points, badges, and challenges. Rules prevent further confirmation or badge awards for revoked attendance. Collection-group indexes on `revokedFamilies.ownerUid` and `revokedFamilies.leaderUid` are required. The developer reported manually publishing these rules and creating the indexes on October 9. Verify both revokedFamilies indexes are READY before releasing the client.
 
 The assigned, approved shift coordinator auto-confirms their own QR check-in. Groups now combines membership voting and QR/attendance navigation into one card per shift. Family Center begins with parent booking instructions and provides child booking controls before challenges. Voluntary leaving retains confirmed rewards; removal by vote revokes that family's rewards for the removed shift only.
+
+## Secure tokens and camera scanning (Slices 24–25)
+
+A token is `BUSHEL1:<URI-encoded shift ID>:<64 lowercase hex characters>` containing 256 cryptographically random bits from Random.secure. Let H(x) be lowercase hex SHA-256 of UTF-8 x: the client computes `tokenProof = H(rawCode)`, and the shift stores `qrTokenHash = H(tokenProof)`. Firestore rules validate `hashing.sha256(tokenProof).toHexString().lower() == qrTokenHash` plus server-time expiry, current group membership, current participant registration, parent mode, and the canonical create-only attendance path. This two-stage hash prevents the readable shift verifier from becoming a check-in credential. Raw secure tokens are never stored in Firestore. Attendance proofs are sensitive bearer credentials in private owner/leader records; do not publish them. Codes may be shared across booked participants; replay rejection is per participant/shift, not consumption by the first scanner.
+
+`qrExpiresAt` is bounded to 15 minutes after generation and 4 hours after immutable `startsAt`; check-in opens 30 minutes before start. Expired, rotated, malformed/wrong-shift codes and repeated attendance receive visible errors. Generation requires valid startsAt; legacy shifts without it require trusted schedule repair, never guessed times. Publishing a new token removes the old mock qrCode field; old clients cannot create new mock codes or check in under the updated rules. Existing attendance history remains readable and confirmable under its existing member/revocation checks. No Cloud Functions or paid-plan features are introduced.
+
+Leaders display real QRs with [qr_flutter](https://pub.dev/packages/qr_flutter). Members use [mobile_scanner](https://pub.dev/packages/mobile_scanner) on Android/Web. Android declares CAMERA permission with optional camera hardware, so devices without a camera keep manual entry. Camera access occurs only after **Scan QR with camera**; scanner routes pause/resume and release the camera through the plugin lifecycle. Denied, busy, missing, or unsupported cameras offer **Enter code instead**. Web requires HTTPS or localhost and may load a barcode-reader library on first use; initialization/network errors retain manual entry. Camera scanning and manual entry submit through the same token/attendance code; neither automatically grants attendance.
+
+### Developer manual deployment
+
+No agent deployment is authorized. The October 9 manual publication predates these secure-token rules.
+
+1. In Firebase Console, open project `bushel-volunteer-20260925` → Firestore Database → `(default)` → Rules. Replace the entire editor contents with the current local `firestore.rules` and **Publish**. This includes the coordinator-contact and family-removal rules already reported published plus the new token/parent-mode rules. Alternatively, after fixing CLI permissions, run `firebase deploy --only firestore:rules --project bushel-volunteer-20260925` (use `firebase.cmd` for the npm CLI on Windows if the standalone executable is blocked).
+2. No indexes changed for Slices 24–25. Verify the existing COLLECTION_GROUP ascending indexes on `revokedFamilies.ownerUid`, `revokedFamilies.leaderUid`, `attendanceEntries.ownerUid`, and `attendanceEntries.leaderUid` are READY. If the earlier indexes were not fully created, deploy the unchanged `firestore.indexes.json` with `firebase deploy --only "firestore:rules,firestore:indexes" --project bushel-volunteer-20260925` and wait for readiness.
+3. Restart updated ordinary signed-in clients and perform the relevant secure-token and camera checks in `docs/manual_testing.md`. Offline tests and source compilation do not prove live permissions or camera operation.
+
+The current rules source passed the non-deploying Rules API check October 12. Developer Android/Web camera, permissions, persistence, and token checks remain unperformed by the agent.

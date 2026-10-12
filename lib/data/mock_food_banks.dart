@@ -20,6 +20,7 @@ final mockFoodBanks = <FoodBank>[
     shifts: [
       FoodBankShift(
         title: 'Sorting & Packing Line',
+        startsAt: DateTime.now(),
         scheduledDate: _seedDay,
         time: '9:00 AM–12:00 PM',
         station: 'Warehouse A',

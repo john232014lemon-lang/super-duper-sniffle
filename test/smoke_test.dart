@@ -13,8 +13,13 @@ import 'package:bushel/main.dart';
 import 'package:bushel/models/food_bank.dart';
 import 'package:bushel/models/attendance.dart';
 import 'package:bushel/models/shift_schedule.dart';
+import 'package:bushel/models/check_in_token.dart';
 import 'package:bushel/screens/attendance_management_screen.dart';
 import 'package:bushel/screens/check_in_screen.dart';
+import 'package:bushel/screens/camera_scan_screen.dart';
+import 'package:bushel/widgets/station_qr_code.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 import 'package:bushel/screens/shifts_screen.dart';
 import 'package:bushel/screens/live_group_screen.dart';
 import 'package:bushel/widgets/family_shift_bookings.dart';
@@ -28,6 +33,7 @@ import 'package:bushel/services/community_models.dart';
 import 'package:bushel/services/profile_service.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 // Fixtures only supply inputs. Unexpected calls fail instead of simulating
@@ -153,6 +159,137 @@ class _Catalog implements CatalogRepository {
 }
 
 void main() {
+  testWidgets('camera QR manual fallback uses pending attendance path', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(900, 1200);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final session = SessionStore.instance;
+    final store = ShiftStore.instance;
+    session.setRole(BushelRole.coordinator);
+    final listing = store.available.first;
+    final code = store.generateQrCode(listing.shift)!;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(body: StationQrCode(code: code)),
+      ),
+    );
+    expect(find.byType(QrImageView), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    session.setRole(BushelRole.volunteer);
+    await tester.pumpWidget(const BushelApp(home: CheckInScreen()));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), code);
+    await tester.tap(find.text('Use entered code'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Confirm station check-in'));
+    await tester.tap(find.text('Confirm station check-in'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'Check in'));
+    await tester.pumpAndSettle();
+    expect(store.pendingAttendance(listing.shift), hasLength(1));
+    expect(store.points, 0);
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets(
+    'camera QR Kid Mode cannot scan and unsupported camera has fallback',
+    (tester) async {
+      SessionStore.instance.addChild('Child');
+      SessionStore.instance.switchToChild(
+        SessionStore.instance.children.single.id,
+      );
+      await tester.pumpWidget(const BushelApp(home: CheckInScreen()));
+      expect(find.text('Scan QR with camera'), findsNothing);
+      expect(find.byType(TextField), findsNothing);
+      await tester.pumpWidget(const MaterialApp(home: CameraScanScreen()));
+      expect(find.byType(MobileScanner), findsNothing);
+      expect(find.text('Enter code instead'), findsNothing);
+      SessionStore.instance.switchToParent();
+      // Widget tests default to Android. Explicitly use an unsupported platform
+      // to check the fallback without touching a camera or platform channel.
+      debugDefaultTargetPlatformOverride = TargetPlatform.windows;
+      addTearDown(() => debugDefaultTargetPlatformOverride = null);
+      await tester.pumpAndSettle();
+      expect(find.byType(MobileScanner), findsNothing);
+      expect(find.text('Enter code instead'), findsOneWidget);
+      await tester.pumpWidget(const SizedBox());
+      debugDefaultTargetPlatformOverride = null;
+    },
+  );
+
+  test(
+    'secure QR rejects expired rotated wrong-shift and public-hash codes',
+    () {
+      final start = DateTime(2026, 10, 12, 12);
+      final token = CheckInToken.generate('shift', start, now: start);
+      final next = CheckInToken.generate('shift', start, now: start);
+      String? validate(
+        String code, {
+        String sid = 'shift',
+        String? hash,
+        DateTime? now,
+      }) => CheckInToken.validate(
+        code,
+        sid,
+        hash ?? CheckInToken.verifier(token.code),
+        token.expiresAt,
+        start,
+        now: now ?? start,
+      );
+      expect(validate(token.code), isNull);
+      expect(validate(token.code, now: token.expiresAt), contains('expired'));
+      expect(validate(token.code, sid: 'other'), contains('another shift'));
+      expect(
+        validate(token.code, hash: CheckInToken.verifier(next.code)),
+        contains('rotated'),
+      );
+      expect(
+        validate('BUSHEL1:shift:${CheckInToken.verifier(token.code)}'),
+        isNotNull,
+      );
+      expect(
+        CheckInToken.digest('abc'),
+        'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad',
+      );
+    },
+  );
+
+  test(
+    'secure QR demo denies nonmembers kids and repeated attendance',
+    () async {
+      final session = SessionStore.instance;
+      final store = ShiftStore.instance;
+      session.setRole(BushelRole.coordinator);
+      final listing = store.available.first;
+      final code = store.generateQrCode(listing.shift)!;
+      session.setRole(BushelRole.volunteer);
+      expect(store.qrCodeFor(listing.shift), isNull);
+      await store.cancelSignup(listing.shift);
+      await expectLater(
+        store.submitCheckIn(listing.shift, code),
+        throwsA(isA<CatalogException>()),
+      );
+      await store.signUp(listing.foodBank, listing.shift);
+      session.addChild('Child');
+      session.switchToChild(session.children.single.id);
+      await expectLater(
+        store.submitCheckIn(listing.shift, code),
+        throwsA(isA<CatalogException>()),
+      );
+      session.switchToParent();
+      expect(await store.submitCheckIn(listing.shift, code), isTrue);
+      expect(store.points, 0);
+      await expectLater(
+        store.submitCheckIn(listing.shift, code),
+        throwsA(isA<CatalogException>()),
+      );
+      expect(store.pendingAttendance(listing.shift), hasLength(1));
+    },
+  );
+
   AttendanceEntry entry(String person, String status, {String? badge}) =>
       AttendanceEntry(
         ownerUid: 'adult',
