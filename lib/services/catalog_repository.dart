@@ -69,10 +69,12 @@ class CatalogException implements Exception {
 
 String catalogError(Object error) {
   if (error is CatalogException) return error.message;
+  debugPrint('Catalog error (${error.runtimeType}): $error');
   if (error is FirebaseException && error.code == 'permission-denied') {
     return 'You do not have permission for this action. Refresh and try again.';
   }
-  return 'Could not save this change. Check your connection and try again.';
+  final code = error is FirebaseException ? ' (${error.code})' : '';
+  return 'Could not save this change$code. Check your connection and try again.';
 }
 
 class FirestoreCatalogRepository extends FirestoreAttendanceRepository
