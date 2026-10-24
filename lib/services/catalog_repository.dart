@@ -70,7 +70,12 @@ class CatalogException implements Exception {
 String catalogError(Object error) {
   if (error is CatalogException) return error.message;
   debugPrint('Catalog error (${error.runtimeType}): $error');
-  if (error is FirebaseException && error.code == 'permission-denied') {
+  final text = error.toString();
+  final denied =
+      (error is FirebaseException && error.code == 'permission-denied') ||
+      text.contains('permission-denied') ||
+      text.contains('Missing or insufficient permissions');
+  if (denied) {
     return 'You do not have permission for this action. Refresh and try again.';
   }
   final code = error is FirebaseException ? ' (${error.code})' : '';

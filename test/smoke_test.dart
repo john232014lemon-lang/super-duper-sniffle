@@ -17,7 +17,9 @@ import 'package:bushel/models/shift_schedule.dart';
 import 'package:bushel/models/check_in_token.dart';
 import 'package:bushel/screens/attendance_management_screen.dart';
 import 'package:bushel/screens/check_in_screen.dart';
+import 'package:bushel/data/mock_qr_presentation_store.dart';
 import 'package:bushel/screens/camera_scan_screen.dart';
+import 'package:bushel/screens/mock_camera_scan_screen.dart';
 import 'package:bushel/widgets/station_qr_code.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:qr_flutter/qr_flutter.dart';
@@ -413,6 +415,50 @@ void main() {
       ]);
       await tester.pumpAndSettle();
       expect(store.points, 100);
+      await tester.pumpWidget(const SizedBox());
+    },
+    skip: !mockQrMode,
+  );
+
+  testWidgets(
+    'mock camera shows session QR and scan returns the code',
+    (tester) async {
+      expect(mockQrMode, isTrue);
+      await tester.binding.setSurfaceSize(const Size(800, 1200));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final now = DateTime(2026, 10, 24, 12);
+      final token = CheckInToken.generateMock('demo-shift', now: now);
+      MockQrPresentationStore.instance.remember('demo-shift', token);
+      addTearDown(MockQrPresentationStore.instance.clear);
+      String? scanned;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Builder(
+            builder: (context) => Scaffold(
+              body: TextButton(
+                onPressed: () async {
+                  scanned = await Navigator.of(context).push<String>(
+                    MaterialPageRoute(
+                      builder: (_) =>
+                          const MockCameraScanScreen(shiftId: 'demo-shift'),
+                    ),
+                  );
+                },
+                child: const Text('Open mock camera'),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.text('Open mock camera'));
+      await tester.pumpAndSettle();
+      expect(find.byType(MobileScanner), findsNothing);
+      expect(find.byType(QrImageView), findsOneWidget);
+      expect(find.text('Scan this QR'), findsOneWidget);
+      await tester.tap(find.text('Scan this QR'));
+      await tester.pumpAndSettle();
+      expect(scanned, token.code);
+      expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox());
     },
     skip: !mockQrMode,

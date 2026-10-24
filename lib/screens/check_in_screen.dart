@@ -7,6 +7,7 @@ import '../widgets/bushel_navigation_bar.dart';
 import '../widgets/attendance_status.dart';
 import 'shifts_screen.dart';
 import 'camera_scan_screen.dart';
+import 'mock_camera_scan_screen.dart';
 
 class CheckInScreen extends StatefulWidget {
   const CheckInScreen({super.key});
@@ -74,9 +75,14 @@ class _CheckInScreenState extends State<CheckInScreen> {
     }
     final shift = _key(_selected!);
     final owner = _account;
-    final code = await Navigator.of(
-      context,
-    ).push<String>(MaterialPageRoute(builder: (_) => const CameraScanScreen()));
+    final shiftId = _selected!.shift.id;
+    final code = await Navigator.of(context).push<String>(
+      MaterialPageRoute(
+        builder: (_) => _store.usingMockQr && shiftId != null
+            ? MockCameraScanScreen(shiftId: shiftId)
+            : const CameraScanScreen(),
+      ),
+    );
     if (!mounted ||
         SessionStore.instance.isKidAccount ||
         owner != _account ||

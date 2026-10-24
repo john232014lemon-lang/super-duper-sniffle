@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../data/catalog_store.dart';
+import '../data/mock_qr_presentation_store.dart';
 import '../data/session_store.dart';
 import '../models/attendance.dart';
 import '../services/catalog_repository.dart';
@@ -135,6 +136,12 @@ class _AttendanceManagementScreenState
                                   final owner = store.uid;
                                   final token = await store.repository
                                       .publishQr(widget.shiftId);
+                                  if (mockQrMode) {
+                                    MockQrPresentationStore.instance.remember(
+                                      widget.shiftId,
+                                      token,
+                                    );
+                                  }
                                   if (mounted &&
                                       identical(_store, store) &&
                                       !SessionStore.instance.isKidAccount) {

@@ -1,5 +1,49 @@
 # Bushel Development Log
 
+## 2026-10-24 — Demo data cleanup: points, mock-bank shifts, MCFB slate
+
+User requested a clean presentation dataset. Using the Firebase CLI admin token: deleted mock-bank (test) shifts `ImxyCfMPV5pux7t394Ps` and `ZkSpsN4flrXJLdqE1ngn` plus their groups/registrations; also removed extra non-imported MCFB shift `OuYjhB58U98e9KBBlNLJ` so only the two imported Montgomery County shifts remain. Cleared all registrations, attendance entries, mockQrTokens, and emptied groups for `mcfb-32fb545a-…` and `mcfb-26c13c3d-…`, resetting `signupCount` to 0. Deleted the only confirmed attendance entry (points are derived from attendance), so all accounts show zero reward points; rewardPreferences had no people docs. Banks, profiles, and coordinator approvals were not modified. `settings/mockQr` left enabled.
+
+Verified read-back: exactly two shifts (both MCFB, signupCount 0), zero registrations, zero attendanceEntries, empty groups, zero mockQrTokens. No app/rules changes, smoke tests, or Flutter analysis. No commit or push. Signed-in UI confirmation unperformed (hot restart recommended).
+
+Manual checks:
+- Discovery/Shifts: only Produce Rescue Center (PM) and Evening Volunteer Shift under Montgomery County; mock-bank test shifts gone.
+- Rewards for previous testers: 0 points until new confirmations.
+- MCFB Manage check-ins: no pending/confirmed rows; Generate mock QR still available for john.
+
+## 2026-10-24 — BUSHEL_MOCK fake camera scan for presentation
+
+Under BUSHEL_MOCK only, Scan QR with camera opens MockCameraScanScreen instead of MobileScanner. Generating/rotating a mock QR remembers the raw code in MockQrPresentationStore for this app session (not Firestore). The fake viewfinder shows that QR in a mock frame; Scan this QR returns the code into the existing check-in confirm path. Missing/expired session codes show guidance and Enter code instead. Without BUSHEL_MOCK, CameraScanScreen and real camera behavior are unchanged.
+
+Verified: flutter analyze --no-pub on the touched Dart files reported no issues; smoke check “mock camera shows session QR and scan returns the code” passed with BUSHEL_MOCK=true; existing “camera QR Kid Mode…” check rerun without the mock flag. No rules/index changes. No commit or push. Signed-in two-account presentation QA unperformed.
+
+Manual checks:
+- BUSHEL_MOCK: as john generate mock QR, switch to a booked Volunteer in the same browser session, Scan → see QR → Scan this QR → confirm check-in pending.
+- Without BUSHEL_MOCK: Scan still opens the real camera path.
+- Mock camera with no prior generate for that shift: empty guidance; manual code entry still works.
+
+## 2026-10-24 — Fix mock QR permission-denied + food bank shift layout
+
+Generate mock QR failed with a generic save error. Chrome logs showed `[cloud_firestore/permission-denied]`; live ruleset lacked `mockQrTokens` / `mockQrEnabled` even though local `firestore.rules` and `settings/mockQr` were present. Deployed the complete local rules to `bushel-volunteer-20260925`; read-back confirmed the new ruleset includes mock QR. Improved `catalogError` so Web `NativeError` permission failures surface the permission message instead of a connection error.
+
+Food bank details: replaced the fixed-height horizontal shift carousel (overflow with long MCFB instructions) with a vertical list inside the page `ListView`, and added bottom padding between Manage check-ins buttons. Shift cards use a column layout so instructions wrap fully.
+
+Verified: rules deploy succeeded; live ruleset contains mockQrTokens/mockQrEnabled; `flutter analyze --no-pub` on the two changed Dart files reported no issues. Signed-in Generate mock QR after deploy unperformed (needs hot restart). No smoke tests (UI/data/rules only). No commit or push.
+
+Manual checks:
+- Hot restart with BUSHEL_MOCK, sign in as john, Generate mock QR on Produce Rescue Center (PM): expect a BUSHELMOCK code, not a save/permission error.
+- Food bank details: long instructions fully visible; page scrolls; Manage check-ins buttons are separated.
+- Without mock allowlist or as a non-leader: generation still denied with a clear permission/session message.
+
+## 2026-10-24 — Demo: approve john + transfer MCFB shift leadership for mock QR
+
+User could not sign in as original John C (`tU7Za7rhdlcETyHVIxyLkyHAyft1`) and needed mock QR generation. Using the Firebase CLI admin token (client rules bypassed), created approved `coordinatorApplications/pw3Z0Mwp8JaXaeQ3Rvk2j5OC5AG2/banks/montgomery-county-food-bank` for profile `john`, set that profile's `preferredRole` to `coordinator`, and updated both imported shifts' `creatorUid` to `pw3Z0Mwp8JaXaeQ3Rvk2j5OC5AG2`. Original John C bank approval was left in place. Earlier the same day, `settings/mockQr` was created (`enabled=true`, `expiresAt=2026-11-01T05:00:00Z`, both MCFB shift IDs). Read-back verified approval, preferredRole, both creatorUid values, and mockQr settings. No app code, rules, or index changes. No smoke tests or Flutter analysis (data-only). No commit or push. Signed-in Generate mock QR / volunteer redeem / confirm remain unperformed.
+
+Manual checks:
+- Sign in as john with BUSHEL_MOCK=true, Coordinator preference: Groups → QR & attendance on either MCFB shift should offer Generate mock QR and show a BUSHELMOCK code.
+- A different adult Volunteer booked on that shift should redeem pending attendance; john confirms → 100 points. john must not redeem their own mock code.
+- After the demo, set settings/mockQr.enabled to false.
+
 ## 2026-10-23 — Correction: only QR credentials are mocked; Firebase remains live
 
 User clarified that BUSHEL_MOCK must retain Firebase. This supersedes the earlier Firebase-free mock QR implementation below. BUSHEL_MOCK now starts FirebaseBootstrap and takes precedence over BUSHEL_DEMO; BUSHEL_DEMO alone retains its separate local sandbox. Added a persistent “Mock QR · Firebase data is live” banner. Removed the local mock QR generation cards and immediate local point awards.

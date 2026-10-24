@@ -189,27 +189,19 @@ class _FoodBankDetailScreenState extends State<FoodBankDetailScreen> {
                       _shifts.isEmpty))
                 CatalogStatus(store: catalog, shifts: true)
               else
-                SizedBox(
-                  height: 190,
-                  child: ListView.separated(
-                    key: const ValueKey('shift-carousel'),
-                    scrollDirection: Axis.horizontal,
-                    itemCount: _shifts.length,
-                    separatorBuilder: (_, _) => const SizedBox(width: 12),
-                    itemBuilder: (context, index) => SizedBox(
-                      width: 330,
-                      child: _ShiftCard(
-                        shift: _shifts[index],
-                        signedUp: ShiftStore.instance.isSignedUp(
-                          _shifts[index],
-                        ),
-                        onTap: _busy || SessionStore.instance.isKidAccount
-                            ? null
-                            : () => _confirmSignup(_shifts[index]),
-                      ),
+                ...[
+                  for (var index = 0; index < _shifts.length; index++) ...[
+                    if (index > 0) const SizedBox(height: 12),
+                    _ShiftCard(
+                      key: ValueKey(_shifts[index].id ?? _shifts[index]),
+                      shift: _shifts[index],
+                      signedUp: ShiftStore.instance.isSignedUp(_shifts[index]),
+                      onTap: _busy || SessionStore.instance.isKidAccount
+                          ? null
+                          : () => _confirmSignup(_shifts[index]),
                     ),
-                  ),
-                ),
+                  ],
+                ],
               const SizedBox(height: 18),
               if (catalog != null && !SessionStore.instance.isKidAccount)
                 for (final record in catalog.shifts.where(
@@ -217,17 +209,20 @@ class _FoodBankDetailScreenState extends State<FoodBankDetailScreen> {
                       record.bankId == _bank.id &&
                       record.creatorUid == catalog.uid,
                 ))
-                  OutlinedButton.icon(
-                    onPressed: () => Navigator.of(context).push(
-                      MaterialPageRoute<void>(
-                        builder: (_) => AttendanceManagementScreen(
-                          shiftId: record.shift.id!,
-                          title: record.shift.title,
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: OutlinedButton.icon(
+                      onPressed: () => Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => AttendanceManagementScreen(
+                            shiftId: record.shift.id!,
+                            title: record.shift.title,
+                          ),
                         ),
                       ),
+                      icon: const Icon(Icons.fact_check_outlined),
+                      label: Text('Manage check-ins: ${record.shift.title}'),
                     ),
-                    icon: const Icon(Icons.fact_check_outlined),
-                    label: Text('Manage check-ins: ${record.shift.title}'),
                   ),
               const Text(
                 'Recommended food banks',
@@ -362,6 +357,7 @@ class _InfoRow extends StatelessWidget {
 
 class _ShiftCard extends StatelessWidget {
   const _ShiftCard({
+    super.key,
     required this.shift,
     required this.signedUp,
     required this.onTap,
@@ -377,64 +373,71 @@ class _ShiftCard extends StatelessWidget {
       margin: EdgeInsets.zero,
       child: Padding(
         padding: const EdgeInsets.all(16),
-        child: Row(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(
-              width: 52,
-              height: 52,
-              decoration: BoxDecoration(
-                color: const Color(0xFFE5F7EA),
-                borderRadius: BorderRadius.circular(15),
-              ),
-              child: const Icon(Icons.calendar_month, color: Color(0xFF169B4B)),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    shift.title,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontWeight: FontWeight.w900),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 52,
+                  height: 52,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE5F7EA),
+                    borderRadius: BorderRadius.circular(15),
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    '${shift.date} · ${shift.time}',
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
+                  child: const Icon(
+                    Icons.calendar_month,
+                    color: Color(0xFF169B4B),
                   ),
-                  Text(
-                    '${shift.station} · ${shift.spotsLeft} spots left',
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: Color(0xFF718078),
-                      fontSize: 12,
-                    ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        shift.title,
+                        style: const TextStyle(fontWeight: FontWeight.w900),
+                      ),
+                      const SizedBox(height: 4),
+                      Text('${shift.date} · ${shift.time}'),
+                      Text(
+                        '${shift.station} · ${shift.spotsLeft} spots left',
+                        style: const TextStyle(
+                          color: Color(0xFF718078),
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
                   ),
-                  if (shift.instructions.isNotEmpty) ...[
-                    const SizedBox(height: 8),
-                    Text('Location instructions: ${shift.instructions}'),
-                  ],
-                ],
-              ),
+                ),
+                FilledButton(
+                  onPressed: signedUp || shift.spotsLeft <= 0 ? null : onTap,
+                  style: FilledButton.styleFrom(
+                    minimumSize: const Size(0, 42),
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                  ),
+                  child: Text(
+                    signedUp
+                        ? 'Added'
+                        : shift.spotsLeft <= 0
+                        ? 'Full'
+                        : 'Sign up',
+                  ),
+                ),
+              ],
             ),
-            FilledButton(
-              onPressed: signedUp || shift.spotsLeft <= 0 ? null : onTap,
-              style: FilledButton.styleFrom(
-                minimumSize: const Size(0, 42),
-                padding: const EdgeInsets.symmetric(horizontal: 12),
+            if (shift.instructions.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Text(
+                'Location instructions: ${shift.instructions}',
+                style: const TextStyle(
+                  color: Color(0xFF5F6D65),
+                  height: 1.4,
+                ),
               ),
-              child: Text(
-                signedUp
-                    ? 'Added'
-                    : shift.spotsLeft <= 0
-                    ? 'Full'
-                    : 'Sign up',
-              ),
-            ),
+            ],
           ],
         ),
       ),

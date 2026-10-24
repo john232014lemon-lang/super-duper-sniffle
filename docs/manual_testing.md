@@ -5,6 +5,7 @@ Pick the 2–4 checks relevant to your change; this is a menu, not a required fu
 ## Launch and accounts
 
 - Run `flutter run -d chrome --dart-define=BUSHEL_DEMO=true`. Onboard, add a child or shift, then **Reset demo**. Expect onboarding again with previous private data cleared; no Firebase sign-in is needed.
+- Run `flutter run -d chrome --dart-define=BUSHEL_MOCK=true`. As the approved leader, generate a mock QR; as a booked Volunteer in the same browser session, **Scan QR with camera** should open a fake viewfinder with that QR and **Scan this QR** (no real camera). Confirm check-in still goes pending until leader confirmation. Without `BUSHEL_MOCK`, Scan should still open the real camera path.
 - Run `flutter run -d chrome` for Firebase. Sign in, restart, sign out, and sign in as another adult. Expect the first account to restore after restart and its family/profile/signups to disappear on account change. An invalid password must not open the app.
 - Disconnect during a save or load, then reconnect and retry. Expect a visible error and no false success or replacement of live data with demo content.
 
