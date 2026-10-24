@@ -9,6 +9,8 @@ class CheckInToken {
   final String code;
   final DateTime expiresAt;
   static const lifetime = Duration(minutes: 15);
+  // Rules cap expiry at server time + lifetime; device clocks may run ahead.
+  static const clockSkewAllowance = Duration(minutes: 2);
   static const earlyWindow = Duration(minutes: 30);
   static const lateWindow = Duration(hours: 4);
   static String digest(String value) =>
@@ -69,7 +71,7 @@ class CheckInToken {
       32,
       (_) => random.nextInt(256).toRadixString(16).padLeft(2, '0'),
     ).join();
-    final expiry = clock.add(lifetime);
+    final expiry = clock.add(lifetime - clockSkewAllowance);
     return CheckInToken(
       'BUSHEL1:${Uri.encodeComponent(shiftId)}:$secret',
       expiry.isBefore(end) ? expiry : end,
