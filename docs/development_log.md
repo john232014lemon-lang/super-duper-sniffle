@@ -1,5 +1,65 @@
 # Bushel Development Log
 
+## 2026-10-23 — Correction: only QR credentials are mocked; Firebase remains live
+
+User clarified that BUSHEL_MOCK must retain Firebase. This supersedes the earlier Firebase-free mock QR implementation below. BUSHEL_MOCK now starts FirebaseBootstrap and takes precedence over BUSHEL_DEMO; BUSHEL_DEMO alone retains its separate local sandbox. Added a persistent “Mock QR · Firebase data is live” banner. Removed the local mock QR generation cards and immediate local point awards.
+
+Live assigned/approved coordinators use the existing QR & attendance screen to generate/rotate distinct BUSHELMOCK tokens. Firestore mockQrTokens/{shiftId} stores only the double-hash verifier and expiry; real shift token fields are untouched. Mock tokens expire in 15 minutes and bypass only the shift-time restriction during an enabled presentation session. Adult volunteers with real bookings redeem via the existing scan/manual path into pending canonical Firebase attendance marked mockQr=true. Kids, child participants, Coordinator-role users, and the assigned leader cannot redeem; server rules enforce parent mode, participant ID, profile preference, and creator exclusion. Existing membership/booking checks, revocation handling, one record per participant/shift, leader confirmation and derived rewards remain in effect. Confirmation awards 100 real persisted points; restarting or using other devices does not clear them. One shift cannot earn points again later via the real QR path.
+
+Added backend enforcement separate from the build flag: administrator-owned settings/mockQr must contain enabled=true, an expiresAt Timestamp in the future, and a shiftIds array explicitly listing presentation shifts. Missing/disabled/expired settings deny mock writes; normal QR rules keep their current hash/expiry/shift-time checks. Clients cannot enable the setting. No application validation or real attendance rule was weakened to make tests pass.
+
+Required developer action before the mock QR flow can run: manually publish the complete current firestore.rules and provision the expiring settings/mockQr allowlist in bushel-volunteer-20260925 / (default). Exact fields and the two imported shift IDs are in README. No new indexes. The project plan reserves rules publication for the developer, so no deployment was attempted. No settings, tokens, attendance, rewards or other live documents were written during this correction; only the non-deploying Rules API compilation request was sent.
+
+Verified: Flutter analysis reports no issues after fixing two brace-style findings. Six affected offline checks passed without mock flags (two camera/fallback checks, two existing secure QR checks, mock/real proof separation check, and leader QR availability during attendance query failure). One additional offline check passed with BUSHEL_MOCK=true, confirming Firebase startup selection, a bound live catalog, kid/child/coordinator rejection before repository submission, real repository submission for adults, and points derived from the attendance stream after confirmation. Replaced the old local mock points test; the fixture records calls and supplies stream inputs, without simulating backend persistence or authorization. The Firebase Rules API compiled the complete rules with zero issues, using an empty test suite (no deployment or data tests). git diff --check passed.
+
+Unperformed: signed-in client permission/persistence checks, actual browser/Android/camera rehearsal, emulator suite, full suite and release builds. Admin compilation and offline smoke checks do not establish runtime client security. Preserved the existing pubspec.lock changes and earlier real catalog import files. No commit or push.
+
+Manual checks (unperformed; after developer backend setup):
+
+- Launch with BUSHEL_MOCK=true, sign in as John C, and open Montgomery County Food Bank: real shifts should appear. Generate a mock code before its shift window; a different booked adult Volunteer should submit pending Firebase attendance. John C confirms, and the volunteer gains 100 points that remain after restart.
+- Try child selection/Kid Mode, Coordinator role and an unapproved adult: mock redemption or generation should be unavailable/denied. A matching code must not bypass an absent booking, removal or duplicate attendance.
+- Rotate a code, then try the old/expired/wrong-shift code: no attendance or points should be added. Disable or expire settings/mockQr: mock generation/redemption should fail even in a mock build.
+- Launch without mock flags: normal real QR generation/check-in must retain its shift-time window and must reject BUSHELMOCK codes; Firebase accounts and catalog should be the same.
+
+## 2026-10-23 — Montgomery County Food Bank real catalog import
+
+User requested adding Montgomery County Food Bank, assigning existing user John C, and copying the timing/open slots from two linked real VolunteerHub events. Refreshed the existing Firebase CLI session and read the configured `bushel-volunteer-20260925` / `(default)` database. Found exactly one `John C` profile, already with coordinator presentation preference; no existing real bank or matching shifts. Preserved existing mock bank, shifts, registrations, profile data, and earlier mock QR work.
+
+Created these six documents atomically with create-only preconditions:
+
+- `banks/montgomery-county-food-bank`: official name/address and office hours from https://mcfoodbank.org/contact-us/. Approximate map pin at 30.2164421, -95.4440575 is the OpenStreetMap Food for Life Way street geocode (way 21893929), not a verified building entrance.
+- `coordinatorApplications/tU7Za7rhdlcETyHVIxyLkyHAyft1/banks/montgomery-county-food-bank`: approved assignment for the existing John C profile, with administrator-assignment provenance rather than a fabricated user application. Existing profile preference and other approvals were unchanged.
+- `shifts/mcfb-32fb545a-9d5d-476a-8127-e8c4621e3456`: Produce Rescue Center (PM), October 26, 2026, 13:00–16:00 America/Chicago (CDT); capacity 1, signupCount 0; startsAt 18:00Z.
+- `shifts/mcfb-26c13c3d-8a03-4f49-b73d-59fa2447b82a`: Evening Volunteer Shift, October 27, 2026, 17:00–19:00 America/Chicago (CDT); capacity 3, signupCount 0; startsAt 22:00Z.
+- Matching `groups/{shiftId}` for both shifts, with empty members/seats/banned and version 0. John C is creator/leader; no registration was invented for him or external volunteers, so all imported places remain open.
+
+Sources: https://mcfoodbank.volunteerhub.com/vv2/event/32fb545a-9d5d-476a-8127-e8c4621e3456 and https://mcfoodbank.volunteerhub.com/vv2/event/26c13c3d-8a03-4f49-b73d-59fa2447b82a. Web lookup could not read the JavaScript pages and the Browser skill found no connected browser. Read their public event-detail API instead. Confirmed the page rendering uses `evt.disposition.longStatusText`: 1 slot / 3 slots remaining. The top-level `evt.slotsRemaining` values were 25 / 16, which were not the displayed availability and were not imported. Rechecked titles, start/end times and displayed availability immediately before the write. These are one-time snapshots; external slots may change. Instructions include age/supervision requirements, arrival guidance, source URLs and separate VolunteerHub registration notice. End times are in instructions and the source manifest because the existing live schedule schema stores only start times; no schema/rules change was made. The app does not enforce the source site's age eligibility or complete its registration/waiver process.
+
+Added a source manifest and a narrowly scoped create-only importer in `tools/firebase/`. The default invocation validates locally without network or writes; `--apply` verifies the coordinator and public source, creates all records atomically, and compares all saved fields on read-back. Existing documents cause the whole commit to fail rather than overwrite. No ongoing synchronization or new app behavior was added.
+
+Verified: local manifest validation, fresh public source checks, successful atomic Firebase commit and field-by-field read-back of all six records, `git diff --check`. Administrator read-back establishes stored data only, not client permissions. No Dart changes in this task, so Flutter analysis/tests were not run. No signed-in client QA, emulator, release build, rule/index deployment, commit or push was performed.
+
+Manual checks (unperformed):
+
+- Launch normal Firebase mode (without demo/mock flags), sign in, open Montgomery County Food Bank: both shifts should show the correct dates/start times, 1 and 3 available places, and full time ranges in instructions. Local demo mode intentionally will not load these database records.
+- Sign in as John C in adult mode: the new bank should have approved coordinator access and both shifts should appear in Groups / QR & attendance. Another unapproved adult should not gain those management controls.
+- As an eligible volunteer, book and then cancel a place: availability should decrease and restore. A second booking on the 1-place shift while full should fail; this still does not reserve a VolunteerHub place.
+
+## 2026-10-23 — Congressional App Challenge mock QR mode
+
+Added explicit `BUSHEL_MOCK=true` command-line mode selecting the local, Firebase-free demo. Preserved normal Firebase startup and the existing secure QR implementation. Assigned demo coordinators generate/rotate shift-specific BUSHELMOCK codes in Groups, including shifts outside the real attendance time window. Codes expire after 15 minutes. Only booked adult volunteers can redeem; coordinators, Kid Mode, and parent check-in for child participants are denied in the store as well as the UI. Successful mock redemption immediately earns 100 points once per shift, using existing Rewards thresholds (five shifts unlock Harvesting Hero). Added generation cards for every managed demo shift, a mock banner, check-in instructions, and README presentation steps. State stays in one app instance and clears on reset/restart. No Firestore/rules changes or deployment needed for mock mode.
+
+Verified: cached SDK formatting completed; Flutter analysis passed with no issues; two existing secure QR smoke checks passed without the mock flag; one new focused mock permission/duplicate-points smoke check passed with `--dart-define=BUSHEL_MOCK=true`; `git diff --check` passed. The first mock test failed because a seeded shift has no parseable start time; fixed mock generation/check-in to ignore schedules entirely, then reran analysis and the failed check successfully. Standard SDK launch stalled; direct cached SDK execution initially hit tool-state sandbox permissions, then ran with scoped escalation. Preserved the pre-existing pubspec.lock changes.
+
+Unperformed: browser/device launch, camera, signed-in/live backend, emulator, release build, full suite. No commit, push, or deployment.
+
+Manual rehearsal ideas (unperformed):
+
+- Start with BUSHEL_MOCK, choose Coordinator, generate codes in Groups, switch to Volunteer via Profile, book and redeem five different shifts within 15 minutes: points should reach 500 and Harvesting Hero should unlock in Rewards.
+- Rotate a code, then try the old code or a different shift's code as a booked volunteer: it should fail with no points; the newest matching code should award 100 only once.
+- Try Scan as Coordinator and Kid Mode: mock redemption should be unavailable. As an adult volunteer with booked children, only the adult should be offered for mock check-in.
+- Reset demo: points/codes should clear and onboarding should reopen. Launch without flags: Firebase startup and real QR rules should remain in effect.
+
 ## 2026-10-12 — Slice 25: Android/Web camera QR scanning and handoff
 
 Replaced the mock QR painter with qr_flutter real QR rendering, an expiry-aware leader display, and selectable manual code. Added mobile_scanner camera routes on Android/Web; camera acquisition happens only on user action. The plugin-owned controller handles app lifecycle and disposal. Denied permission, unavailable/busy cameras, unsupported platforms, and insecure Web origins show messages with manual entry fallback. Android declares CAMERA and optional camera hardware. Camera results and typed codes feed the same Slice 24 check-in method; detection alone never submits. Kid Mode has no scanner/manual/check-in controls, and direct server creates require parentMode. Token expiry hides the displayed QR; rotation changes the verifier. No Cloud Functions or paid-plan features.

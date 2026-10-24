@@ -16,6 +16,42 @@ class CheckInToken {
   static String proof(String code) => digest(code);
   static String verifier(String code) => digest(proof(code));
 
+  static CheckInToken generateMock(String shiftId, {DateTime? now}) {
+    final clock = now ?? DateTime.now();
+    final token = generate(shiftId, clock, now: clock);
+    return CheckInToken(
+      token.code.replaceFirst('BUSHEL1:', 'BUSHELMOCK:'),
+      token.expiresAt,
+    );
+  }
+
+  static String? validateMock(
+    String code,
+    String shiftId,
+    String? hash,
+    DateTime? expiry, {
+    DateTime? now,
+  }) {
+    final clock = now ?? DateTime.now();
+    // Keep mock proofs separate from real token proofs, even for the same secret.
+    if (!code.startsWith('BUSHELMOCK:')) {
+      return 'Use a coordinator-generated mock code.';
+    }
+    final formatError = validate(
+      code.replaceFirst('BUSHELMOCK:', 'BUSHEL1:'),
+      shiftId,
+      verifier(code.replaceFirst('BUSHELMOCK:', 'BUSHEL1:')),
+      expiry,
+      clock,
+      now: clock,
+    );
+    if (formatError != null) return formatError;
+    if (hash == null || verifier(code) != hash) {
+      return 'This mock code is wrong or has been rotated. Ask the leader for the newest code.';
+    }
+    return null;
+  }
+
   static CheckInToken generate(
     String shiftId,
     DateTime start, {

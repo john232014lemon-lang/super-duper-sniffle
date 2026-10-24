@@ -13,6 +13,25 @@ flutter run -d chrome --dart-define=BUSHEL_DEMO=true
 
 The explicit `BUSHEL_DEMO` flag opens mock onboarding without initializing Firebase. Choose Volunteer or Coordinator; enable family mode to create and switch to kid profiles. A persistent **Local demo** bar labels every screen. **Reset demo** immediately clears local profiles, kids, custom shifts, signups, votes, attendance, points, and badges, then returns to onboarding. Restarting also loses in-memory changes. Map tiles still require internet.
 
+For the Congressional App Challenge presentation, run:
+
+```sh
+flutter run -d chrome --dart-define=BUSHEL_MOCK=true
+```
+
+`BUSHEL_MOCK` uses normal Firebase initialization, sign-in, profiles, banks, shifts, bookings, attendance, and rewards. The banner reads **Mock QR · Firebase data is live**. It also takes precedence over `BUSHEL_DEMO` if both flags are supplied. The separate `BUSHEL_DEMO` flag alone still opens the fully local sandbox.
+
+An assigned, approved coordinator (such as John C for Montgomery County Food Bank) opens **Groups → QR & attendance → Generate mock QR**, then shares the displayed code or QR image. A different signed-in adult Volunteer books that shift and scans or enters the code on **Scan**. The check-in is saved as pending in Firebase. The coordinator confirms it in **QR & attendance**, awarding the existing **100 points per shift**. Reloading, signing out/back in, or using separate devices retains this Firebase history. Normal badge thresholds remain unchanged (Harvesting Hero starts at 500 points).
+
+Only the QR credential is simulated: mock codes use a distinct `BUSHELMOCK` prefix, expire after 15 minutes, rotate independently of real tokens, and can work outside the scheduled shift window during an enabled presentation session. Kid Mode, child participants, coordinators using the Coordinator role, and the shift's assigned coordinator cannot redeem them. Bookings, membership, family-removal revocations, duplicate attendance protection, leader confirmation and rewards remain real. Mock attendance is marked `mockQr: true`; it uses the same per-person/per-shift attendance record, so it cannot award a second set of points for that shift later.
+
+**Backend setup required before mock QR works:**
+
+1. In the Firebase Console for `bushel-volunteer-20260925`, manually publish the complete current `firestore.rules`. No index changes are needed. Publishing remains a developer task; the agent has not deployed these rules.
+2. In Firestore `(default)`, create/update the administrator-owned document `settings/mockQr` with Boolean `enabled: true`, Timestamp `expiresAt` set to the intended presentation end, and Array `shiftIds` containing the exact shift IDs you will demonstrate. For the imported shifts those are `mcfb-32fb545a-9d5d-476a-8127-e8c4621e3456` and `mcfb-26c13c3d-8a03-4f49-b73d-59fa2447b82a`. Clients cannot write this setting. A missing/disabled/expired setting or unlisted shift denies mock generation and redemption; the build flag alone grants no backend access. Set `enabled: false` when finished.
+
+Mock verifiers are stored separately at `mockQrTokens/{shiftId}` with `qrTokenHash` and `expiresAt`; raw codes are not saved. Real shift QR fields and real check-in time windows are unchanged. Run without `BUSHEL_MOCK` for the real QR path. Live failures never fall back to local mock data.
+
 On Shifts, use the month arrows, select a day, or tap **Today**. Dots mark dates with shifts in the selected Available/My Shifts tab. Mock shifts start on the launch date and span three days. Coordinators can add shifts from bank details with the date picker or a valid `YYYY-MM-DD` date; those shifts remain available throughout the current session.
 
 To build the local demo: `flutter build web --dart-define=BUSHEL_DEMO=true`. To use normal Firebase startup, run `flutter run -d chrome` without the flag. Firebase errors never switch into demo mode automatically.

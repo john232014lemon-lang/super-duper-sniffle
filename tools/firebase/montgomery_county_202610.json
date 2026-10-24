@@ -1,0 +1,45 @@
+{
+  "bank": {
+    "id": "montgomery-county-food-bank",
+    "name": "Montgomery County Food Bank",
+    "shortName": "Montgomery County Food Bank",
+    "description": "Montgomery County Food Bank collects, sorts, and distributes food through community partners across Montgomery County, Texas. Volunteer opportunities include sorting food, rescuing produce, and preparing food boxes. Bushel listings are a snapshot; register separately with VolunteerHub to reserve a place with the food bank.",
+    "address": "1 Food for Life Way, Conroe, TX 77385",
+    "hours": "Monday-Thursday: 8:00 AM-5:00 PM; Friday: 8:00 AM-4:00 PM. Volunteer shift times vary.",
+    "latitude": 30.2164421,
+    "longitude": -95.4440575
+  },
+  "coordinatorUid": "tU7Za7rhdlcETyHVIxyLkyHAyft1",
+  "coordinatorName": "John C",
+  "sources": {
+    "bank": "https://mcfoodbank.org/contact-us/",
+    "coordinates": "https://www.openstreetmap.org/way/21893929",
+    "coordinatesNote": "Approximate map pin on Food for Life Way from OpenStreetMap street geocoding; use the official address for arrival."
+  },
+  "shifts": [
+    {
+      "id": "mcfb-32fb545a-9d5d-476a-8127-e8c4621e3456",
+      "eventId": "32fb545a-9d5d-476a-8127-e8c4621e3456",
+      "title": "Produce Rescue Center (PM)",
+      "date": "2026-10-26",
+      "time": "13:00",
+      "endTime": "16:00",
+      "utcOffsetMinutes": -300,
+      "capacity": 1,
+      "station": "Produce Rescue Center",
+      "instructions": "Oct 26, 1:00-4:00 PM Central. Arrive 10 minutes early at 1 Food for Life Way, Conroe, TX 77385. Ages 12+; under 16 with an adult. Refrigerated room: bring a coat, gloves and warm headwear. Register separately on VolunteerHub; a Bushel booking does not reserve an external slot. https://mcfoodbank.volunteerhub.com/vv2/event/32fb545a-9d5d-476a-8127-e8c4621e3456"
+    },
+    {
+      "id": "mcfb-26c13c3d-8a03-4f49-b73d-59fa2447b82a",
+      "eventId": "26c13c3d-8a03-4f49-b73d-59fa2447b82a",
+      "title": "Evening Volunteer Shift",
+      "date": "2026-10-27",
+      "time": "17:00",
+      "endTime": "19:00",
+      "utcOffsetMinutes": -300,
+      "capacity": 3,
+      "station": "Welcome Center",
+      "instructions": "Oct 27, 5:00-7:00 PM Central. Arrive 10 minutes early via Welcome Center, 1 Food for Life Way, Conroe. After 5:05 PM, reschedule. Ages 12+; under 16 with adult; under 18 needs guardian waiver. Bring warm layers; wear closed-toe/back shoes. Complete VolunteerHub registration/waiver separately; Bushel does not reserve external slots. https://mcfoodbank.volunteerhub.com/vv2/event/26c13c3d-8a03-4f49-b73d-59fa2447b82a"
+    }
+  ]
+}

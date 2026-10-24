@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import '../demo_config.dart';
 
 import '../data/mock_food_banks.dart';
 import '../models/food_bank.dart';
@@ -45,6 +46,7 @@ class ShiftStore extends ChangeNotifier {
 
   CatalogStore? _catalog;
   bool get usingLive => _catalog != null;
+  bool get usingMockQr => mockQrMode && usingLive;
   bool lastCheckInConfirmed = false;
   void bindCatalog(CatalogStore store) {
     _qrCodes.clear();
@@ -411,6 +413,13 @@ class ShiftStore extends ChangeNotifier {
     String? name,
   }) async {
     lastCheckInConfirmed = false;
+    if (usingMockQr &&
+        (SessionStore.instance.role != BushelRole.volunteer ||
+            participantId != 'parent')) {
+      throw const CatalogException(
+        'Mock QR codes are for adult volunteers only.',
+      );
+    }
     if (SessionStore.instance.isKidAccount) {
       throw const CatalogException('Ask your parent to check you in.');
     }

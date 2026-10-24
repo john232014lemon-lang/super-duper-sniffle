@@ -3,8 +3,9 @@ import 'package:flutter/material.dart';
 import 'screens/onboarding_screen.dart';
 import 'firebase_bootstrap.dart';
 import 'demo_app.dart';
+import 'demo_config.dart';
 
-const demoMode = bool.fromEnvironment('BUSHEL_DEMO');
+const demoMode = bool.fromEnvironment('BUSHEL_DEMO') && !mockQrMode;
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -34,7 +35,25 @@ class BushelApp extends StatelessWidget {
     return MaterialApp(
       title: 'Bushel',
       debugShowCheckedModeBanner: false,
-      builder: builder,
+      builder: (context, child) {
+        final content = builder?.call(context, child) ?? child!;
+        if (!mockQrMode) return content;
+        return Column(
+          children: [
+            const Material(
+              color: Color(0xFFFFE9BD),
+              child: SafeArea(
+                bottom: false,
+                child: Padding(
+                  padding: EdgeInsets.all(8),
+                  child: Center(child: Text('Mock QR · Firebase data is live')),
+                ),
+              ),
+            ),
+            Expanded(child: content),
+          ],
+        );
+      },
       theme: ThemeData(
         colorScheme: colorScheme,
         scaffoldBackgroundColor: const Color(0xFFFCFDFB),

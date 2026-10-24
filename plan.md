@@ -4,6 +4,8 @@ Bushel is the existing Flutter app starting at `lib/main.dart`. Use Firebase pro
 
 ## Current state
 
+- October 23 real catalog addition: created `banks/montgomery-county-food-bank` in the existing Firebase database and approved the existing John C coordinator profile for that bank. Created Produce Rescue Center (PM), October 26, 2026, 1–4 PM Central with 1 open place, and Evening Volunteer Shift, October 27, 2026, 5–7 PM Central with 3 open places, plus their empty groups. Counts match the public VolunteerHub pages' displayed availability at import time. Full time ranges and external registration links are in instructions; the existing schema stores normalized start time only. These are independent snapshots, not VolunteerHub reservations or synchronization. Read-back verified all six documents. Signed-in app QA remains unperformed. Create-only import and source manifest are in `tools/firebase/import_montgomery_county.py` and `tools/firebase/montgomery_county_202610.json`; do not rerun apply expecting updates (existing records are protected).
+
 - Slices 0–11 and 14–21: implemented, including local demo, discovery, shifts, groups, family bookings, and administrator-approved coordination.
 - Slices 12–13: complete. Developer manual verification on Web (Edge/Chrome) and Android emulator (Pixel 7): Firebase sign-in works, the session persists across app restart, logout returns to the sign-in screen, and an invalid password shows an error without opening the app.
 - Slices 22–23: implemented attendance, leader confirmation, derived rewards, badges, and family goals; signed-in client QA remains pending.
@@ -16,6 +18,12 @@ Demo: `flutter run -d chrome --dart-define=BUSHEL_DEMO=true`. It initializes no 
 Keep parent-managed child bookings, Kid Mode permission restrictions, two-thirds adult removal voting, assigned approved leader confirmation, and immutable attendance/reward history. Removal revokes the family's rewards for that shift; voluntary leaving retains confirmed rewards. Pending attendance earns nothing; confirmed attendance earns 100 points per participant, and family goals count distinct shifts. See README for schema details.
 
 ## Testing policy
+
+### Congressional App Challenge mock QR demo (October 23)
+
+Corrected after user clarification: `flutter run -d chrome --dart-define=BUSHEL_MOCK=true` uses Firebase startup and all live data; only QR credentials are simulated. The flag takes precedence over BUSHEL_DEMO. Assigned approved coordinators publish separate mock tokens; booked adult volunteers submit pending Firebase attendance; coordinator confirmation earns the usual 100 points once per shift. Kids/child participants and the assigned coordinator cannot redeem. Mock tokens expire in 15 minutes, ignore shift times during the enabled presentation session, and never overwrite real shift QR fields. Fully local BUSHEL_DEMO remains separate.
+
+Backend setup is pending developer action: manually publish the complete updated firestore.rules, then create/update administrator-owned settings/mockQr with enabled=true, expiresAt as the presentation-end Timestamp, and shiftIds as the intended shift-ID array. Missing/disabled/expired settings deny the mock path. No new indexes. The agent must not publish rules. No live settings or attendance were written in this correction. See README for exact setup and the development log for actual verification. Signed-in client/camera QA is unperformed.
 
 **Manual testing is the default. Automated tests are a small smoke alarm, not a completion checklist.** The previous large Flutter and emulator/live suites have been deliberately retired; do not restore them as routine cleanup.
 

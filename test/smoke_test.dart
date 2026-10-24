@@ -8,6 +8,7 @@ import 'package:bushel/data/coordinator_store.dart';
 import 'package:bushel/data/session_store.dart';
 import 'package:bushel/data/shift_store.dart';
 import 'package:bushel/demo_app.dart';
+import 'package:bushel/demo_config.dart';
 import 'package:bushel/firebase_bootstrap.dart';
 import 'package:bushel/main.dart';
 import 'package:bushel/models/food_bank.dart';
@@ -158,6 +159,27 @@ class _Catalog implements CatalogRepository {
       throw StateError('Unexpected catalog call: ${invocation.memberName}');
 }
 
+class _MockQrCatalog extends _Catalog {
+  Stream<List<AttendanceEntry>>? entries;
+  (String, String, String, String)? request;
+  @override
+  Stream<List<AttendanceEntry>> watchAttendance(
+    String uid, {
+    bool asLeader = false,
+  }) => entries!;
+  @override
+  Future<bool> submitAttendance(
+    String uid,
+    String participantId,
+    String shiftId,
+    String name,
+    String code,
+  ) async {
+    request = (uid, participantId, shiftId, code);
+    return false;
+  }
+}
+
 void main() {
   testWidgets('camera QR manual fallback uses pending attendance path', (
     tester,
@@ -288,6 +310,112 @@ void main() {
       );
       expect(store.pendingAttendance(listing.shift), hasLength(1));
     },
+  );
+
+  test('mock QR tokens stay separate and reject invalid proofs', () {
+    final now = DateTime(2026, 10, 23, 12);
+    final token = CheckInToken.generateMock('shift', now: now);
+    final rotated = CheckInToken.generateMock('shift', now: now);
+    String? validate(
+      String code, {
+      String sid = 'shift',
+      String? hash,
+      DateTime? at,
+    }) => CheckInToken.validateMock(
+      code,
+      sid,
+      hash ?? CheckInToken.verifier(token.code),
+      token.expiresAt,
+      now: at ?? now,
+    );
+    expect(validate(token.code), isNull);
+    expect(validate(token.code, sid: 'other'), isNotNull);
+    expect(validate(token.code, at: token.expiresAt), isNotNull);
+    expect(
+      validate(token.code, hash: CheckInToken.verifier(rotated.code)),
+      isNotNull,
+    );
+    expect(
+      validate(token.code.replaceFirst('BUSHELMOCK:', 'BUSHEL1:')),
+      isNotNull,
+    );
+    expect(
+      validate('BUSHELMOCK:shift:${CheckInToken.verifier(token.code)}'),
+      isNotNull,
+    );
+    expect(
+      CheckInToken.validate(
+        token.code,
+        'shift',
+        CheckInToken.verifier(token.code),
+        token.expiresAt,
+        now,
+        now: now,
+      ),
+      isNotNull,
+    );
+  });
+
+  testWidgets(
+    'mock QR uses live catalog and denies child and coordinator redemption',
+    (tester) async {
+      expect(demoMode, isFalse);
+      final repository = _MockQrCatalog();
+      final attendance = StreamController<List<AttendanceEntry>>();
+      repository.entries = attendance.stream;
+      addTearDown(attendance.close);
+      addTearDown(repository.access.close);
+      await tester.pumpWidget(
+        CatalogSession(
+          uid: 'adult',
+          repository: repository,
+          child: const BushelApp(home: Scaffold()),
+        ),
+      );
+      attendance.add([]);
+      await tester.pumpAndSettle();
+      final store = ShiftStore.instance;
+      final session = SessionStore.instance;
+      expect(store.usingLive, isTrue);
+      expect(store.usingMockQr, isTrue);
+      expect(store.available.first.foodBank.name, 'Live bank');
+      final shift = store.myShifts.first.shift;
+      session.setRole(BushelRole.coordinator);
+      await expectLater(
+        store.submitCheckIn(shift, 'code'),
+        throwsA(isA<CatalogException>()),
+      );
+      session.setRole(BushelRole.volunteer);
+      await expectLater(
+        store.submitCheckIn(shift, 'code', participantId: 'kid'),
+        throwsA(isA<CatalogException>()),
+      );
+      session.switchToChild('kid');
+      await expectLater(
+        store.submitCheckIn(shift, 'code'),
+        throwsA(isA<CatalogException>()),
+      );
+      expect(repository.request, isNull);
+      session.switchToParent();
+      expect(await store.submitCheckIn(shift, 'code'), isTrue);
+      expect(repository.request, ('adult', 'parent', shift.id, 'code'));
+      expect(store.lastCheckInConfirmed, isFalse);
+      expect(store.points, 0);
+      attendance.add([
+        AttendanceEntry(
+          ownerUid: 'adult',
+          participantId: 'parent',
+          shiftId: shift.id!,
+          leaderUid: 'leader',
+          name: 'Adult',
+          status: 'confirmed',
+        ),
+      ]);
+      await tester.pumpAndSettle();
+      expect(store.points, 100);
+      await tester.pumpWidget(const SizedBox());
+    },
+    skip: !mockQrMode,
   );
 
   AttendanceEntry entry(String person, String status, {String? badge}) =>

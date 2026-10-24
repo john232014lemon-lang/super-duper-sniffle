@@ -2,6 +2,8 @@ import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/attendance.dart';
 import '../models/check_in_token.dart';
+import '../demo_config.dart';
+import '../data/session_store.dart';
 import 'catalog_repository.dart' show CatalogException;
 
 abstract class AttendanceRepository {
@@ -29,6 +31,21 @@ abstract class AttendanceRepository {
 
 class FirestoreAttendanceRepository implements AttendanceRepository {
   FirebaseFirestore get _firestore => FirebaseFirestore.instance;
+
+  Future<void> _requireMockAccess(Transaction tx, String shiftId) async {
+    final settings = await tx.get(_firestore.doc('settings/mockQr'));
+    final data = settings.data();
+    final expiry = (data?['expiresAt'] as Timestamp?)?.toDate();
+    if (data?['enabled'] != true ||
+        expiry == null ||
+        !DateTime.now().isBefore(expiry) ||
+        !(data?['shiftIds'] as List? ?? []).contains(shiftId)) {
+      throw const CatalogException(
+        'Mock QR is not enabled for this shift. Ask the project administrator to enable the presentation session.',
+      );
+    }
+  }
+
   DocumentReference<Map<String, dynamic>> _entry(
     String uid,
     String pid,
@@ -134,8 +151,22 @@ class FirestoreAttendanceRepository implements AttendanceRepository {
   @override
   Future<CheckInToken> publishQr(String shiftId) =>
       _firestore.runTransaction((tx) async {
+        if (SessionStore.instance.isKidAccount) {
+          throw const CatalogException(
+            'Only the approved adult coordinator can generate codes.',
+          );
+        }
         final ref = _firestore.collection('shifts').doc(shiftId);
         final shift = await tx.get(ref);
+        if (mockQrMode) {
+          await _requireMockAccess(tx, shiftId);
+          final token = CheckInToken.generateMock(shiftId);
+          tx.set(_firestore.collection('mockQrTokens').doc(shiftId), {
+            'qrTokenHash': CheckInToken.verifier(token.code),
+            'expiresAt': Timestamp.fromDate(token.expiresAt),
+          });
+          return token;
+        }
         final start = (shift.data()?['startsAt'] as Timestamp?)?.toDate();
         if (!shift.exists || start == null) {
           throw const CatalogException(
@@ -164,6 +195,14 @@ class FirestoreAttendanceRepository implements AttendanceRepository {
     String name,
     String code,
   ) async {
+    if (mockQrMode &&
+        (SessionStore.instance.isKidAccount ||
+            SessionStore.instance.role != BushelRole.volunteer ||
+            participantId != 'parent')) {
+      throw const CatalogException(
+        'Mock QR codes are for adult volunteers only.',
+      );
+    }
     try {
       return await _firestore.runTransaction((tx) async {
         final ref = _entry(uid, participantId, shiftId);
@@ -199,16 +238,37 @@ class FirestoreAttendanceRepository implements AttendanceRepository {
             'This shift is unavailable for check-in.',
           );
         }
-        final error = CheckInToken.validate(
-          code,
-          shiftId,
-          data['qrTokenHash'] as String?,
-          (data['qrExpiresAt'] as Timestamp?)?.toDate(),
-          start,
-        );
+        if (mockQrMode && data['creatorUid'] == uid) {
+          throw const CatalogException(
+            'The assigned coordinator cannot redeem their own mock code.',
+          );
+        }
+        String? error;
+        if (mockQrMode) {
+          await _requireMockAccess(tx, shiftId);
+          final mock = await tx.get(
+            _firestore.collection('mockQrTokens').doc(shiftId),
+          );
+          error = CheckInToken.validateMock(
+            code,
+            shiftId,
+            mock.data()?['qrTokenHash'] as String?,
+            (mock.data()?['expiresAt'] as Timestamp?)?.toDate(),
+          );
+        } else {
+          error = CheckInToken.validate(
+            code,
+            shiftId,
+            data['qrTokenHash'] as String?,
+            (data['qrExpiresAt'] as Timestamp?)?.toDate(),
+            start,
+          );
+        }
         if (error != null) throw CatalogException(error);
         var selfConfirmed = false;
-        if (participantId == 'parent' && data['creatorUid'] == uid) {
+        if (!mockQrMode &&
+            participantId == 'parent' &&
+            data['creatorUid'] == uid) {
           final approval = await tx.get(
             _firestore
                 .collection('coordinatorApplications')
@@ -225,6 +285,7 @@ class FirestoreAttendanceRepository implements AttendanceRepository {
           'leaderUid': data['creatorUid'],
           'name': name,
           'tokenProof': CheckInToken.proof(code),
+          if (mockQrMode) 'mockQr': true,
           'status': selfConfirmed ? 'confirmed' : 'pending',
           if (selfConfirmed) 'confirmedAt': FieldValue.serverTimestamp(),
           'checkedInAt': FieldValue.serverTimestamp(),

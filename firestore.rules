@@ -43,6 +43,43 @@ service cloud.firestore {
         && getAfter(revokedPath(target, sid)).data.revokedAt == request.time;
     }
     function text(value, limit) { return value is string && value.size() > 0 && value.size() <= limit && value.matches('(?s).*\\S.*'); }
+    // Administrator-owned, expiring allowlist. A client build flag grants no access.
+    function mockQrEnabled(sid) {
+      let config = get(/databases/$(database)/documents/settings/mockQr).data;
+      return config.enabled == true && request.time < config.expiresAt
+        && sid in config.shiftIds;
+    }
+    function realQrProof(sid) {
+      let shift = get(shiftPath(sid)).data;
+      return hashing.sha256(request.resource.data.tokenProof).toHexString().lower() == shift.qrTokenHash
+        && request.time >= shift.startsAt - duration.value(30, 'm')
+        && request.time < shift.qrExpiresAt
+        && request.time < shift.startsAt + duration.value(4, 'h');
+    }
+    function mockQrProof(sid, pid) {
+      let token = get(/databases/$(database)/documents/mockQrTokens/$(sid)).data;
+      return mockQrEnabled(sid) && pid == 'parent'
+        && get(/databases/$(database)/documents/profiles/$(request.auth.uid)).data.preferredRole == 'volunteer'
+        && request.auth.uid != get(shiftPath(sid)).data.creatorUid
+        && request.resource.data.status == 'pending'
+        && hashing.sha256(request.resource.data.tokenProof).toHexString().lower() == token.qrTokenHash
+        && request.time < token.expiresAt;
+    }
+    match /settings/mockQr {
+      allow get: if signedIn();
+      // Trusted administrator writes only.
+    }
+    match /mockQrTokens/{sid} {
+      allow get: if signedIn() && (shiftLeader(sid) || (parentMode() && member(sid)));
+      allow create, update: if shiftLeader(sid) && mockQrEnabled(sid)
+        && request.resource.data.keys().hasOnly(['qrTokenHash', 'expiresAt'])
+        && request.resource.data.qrTokenHash is string
+        && request.resource.data.qrTokenHash.matches('^[0-9a-f]{64}$')
+        && (resource == null || request.resource.data.qrTokenHash != resource.data.qrTokenHash)
+        && request.resource.data.expiresAt is timestamp
+        && request.resource.data.expiresAt > request.time
+        && request.resource.data.expiresAt <= request.time + duration.value(15, 'm');
+    }
     match /coordinatorApplications/{uid}/banks/{bankId} {
       allow read: if signedIn() && request.auth.uid == uid;
       allow create: if parentMode() && request.auth.uid == uid
@@ -184,17 +221,15 @@ service cloud.firestore {
       allow get: if owner() || (signedIn() && get(shiftPath(sid)).data.creatorUid == request.auth.uid);
       allow create: if owner() && parentMode() && member(sid) && attendingMember(uid, pid, sid)
         && !existsAfter(revokedPath(uid, sid))
-        && request.resource.data.keys().hasOnly(['ownerUid', 'participantId', 'shiftId', 'leaderUid', 'name', 'tokenProof', 'status', 'checkedInAt', 'confirmedAt'])
+        && request.resource.data.keys().hasOnly(['ownerUid', 'participantId', 'shiftId', 'leaderUid', 'name', 'tokenProof', 'status', 'checkedInAt', 'confirmedAt', 'mockQr'])
         && request.resource.data.ownerUid == uid && request.resource.data.participantId == pid
         && request.resource.data.shiftId == sid
         && request.resource.data.leaderUid == get(shiftPath(sid)).data.creatorUid
         && text(request.resource.data.name, 80)
         && request.resource.data.tokenProof is string
         && request.resource.data.tokenProof.matches('^[0-9a-f]{64}$')
-        && hashing.sha256(request.resource.data.tokenProof).toHexString().lower() == get(shiftPath(sid)).data.qrTokenHash
-        && request.time >= get(shiftPath(sid)).data.startsAt - duration.value(30, 'm')
-        && request.time < get(shiftPath(sid)).data.qrExpiresAt
-        && request.time < get(shiftPath(sid)).data.startsAt + duration.value(4, 'h')
+        && ((request.resource.data.get('mockQr', false) == true && mockQrProof(sid, pid))
+          || (!('mockQr' in request.resource.data) && realQrProof(sid)))
         && request.resource.data.checkedInAt == request.time
         && ((request.resource.data.status == 'pending' && !('confirmedAt' in request.resource.data))
           || (pid == 'parent' && shiftLeader(sid) && request.resource.data.status == 'confirmed' && request.resource.data.confirmedAt == request.time));

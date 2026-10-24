@@ -5,6 +5,7 @@ import '../models/attendance.dart';
 import '../services/catalog_repository.dart';
 import '../models/check_in_token.dart';
 import '../widgets/station_token_display.dart';
+import '../demo_config.dart';
 
 class AttendanceManagementScreen extends StatefulWidget {
   const AttendanceManagementScreen({
@@ -113,14 +114,18 @@ class _AttendanceManagementScreenState
                           ),
                         if (_saving) const LinearProgressIndicator(),
                         const Text(
-                          'Shift check-in QR',
+                          mockQrMode
+                              ? 'Mock shift check-in QR'
+                              : 'Shift check-in QR',
                           style: TextStyle(
                             fontSize: 22,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
                         const Text(
-                          'Codes last at most 15 minutes. Rotating invalidates the previous code. Reopening this screen requires a new code.',
+                          mockQrMode
+                              ? 'Mock codes work during the enabled presentation session, regardless of shift time. Only adult volunteers can redeem. Confirm attendance below to award points in Firebase. Codes expire in 15 minutes; rotating invalidates the old code.'
+                              : 'Codes last at most 15 minutes. Rotating invalidates the previous code. Reopening this screen requires a new code.',
                         ),
                         const SizedBox(height: 16),
                         FilledButton(
@@ -140,15 +145,20 @@ class _AttendanceManagementScreenState
                                   }
                                 }),
                           child: Text(
-                            shift.qrTokenHash == null
+                            mockQrMode
+                                ? (_token == null
+                                      ? 'Generate mock QR'
+                                      : 'Rotate mock QR')
+                                : shift.qrTokenHash == null
                                 ? 'Generate shift QR'
                                 : 'Rotate shift QR',
                           ),
                         ),
                         if (_token != null &&
                             _tokenOwner == store.uid &&
-                            CheckInToken.verifier(_token!.code) ==
-                                shift.qrTokenHash) ...[
+                            (mockQrMode ||
+                                CheckInToken.verifier(_token!.code) ==
+                                    shift.qrTokenHash)) ...[
                           StationTokenDisplay(token: _token!),
                         ],
                         const SizedBox(height: 24),

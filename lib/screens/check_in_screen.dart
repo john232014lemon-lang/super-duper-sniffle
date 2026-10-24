@@ -31,7 +31,8 @@ class _CheckInScreenState extends State<CheckInScreen> {
       if (!_store.hasAttendance(entry.shift, 'parent'))
         'parent': session.userName,
       for (final child in session.children)
-        if (_store
+        if (!_store.usingMockQr &&
+            _store
                 .shiftsForChild(child.id)
                 .any((booking) => _key(booking) == _key(entry)) &&
             !_store.hasAttendance(entry.shift, child.id))
@@ -166,13 +167,19 @@ class _CheckInScreenState extends State<CheckInScreen> {
   @override
   Widget build(BuildContext context) {
     final catalog = CatalogScope.maybeOf(context);
-    if (SessionStore.instance.isKidAccount) {
+    if (SessionStore.instance.isKidAccount ||
+        (_store.usingMockQr &&
+            SessionStore.instance.role != BushelRole.volunteer)) {
       _code = null;
       _codeInput.clear();
       return Scaffold(
         appBar: AppBar(title: const Text('Station check-in')),
-        body: const Center(
-          child: Text('Ask your parent to scan and check you in.'),
+        body: Center(
+          child: Text(
+            _store.usingMockQr
+                ? 'Mock QR check-in is for adult volunteers only. Coordinators generate codes in Groups.'
+                : 'Ask your parent to scan and check you in.',
+          ),
         ),
         bottomNavigationBar: const BushelNavigationBar(selectedIndex: 2),
       );
@@ -316,8 +323,10 @@ class _CheckInScreenState extends State<CheckInScreen> {
                     ),
                   ),
                 const SizedBox(height: 20),
-                const Text(
-                  'Use the current code displayed by your assigned leader. Codes expire after at most 15 minutes.',
+                Text(
+                  _store.usingMockQr
+                      ? 'Scan or enter your coordinator’s mock code. Attendance is saved to Firebase; coordinator confirmation earns 100 points. Codes expire in 15 minutes.'
+                      : 'Use the current code displayed by your assigned leader. Codes expire after at most 15 minutes.',
                 ),
                 FilledButton.icon(
                   onPressed: _saving ? null : _scan,
