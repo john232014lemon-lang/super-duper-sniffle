@@ -137,6 +137,22 @@ class ShiftStore extends ChangeNotifier {
   bool isSignedUp(FoodBankShift shift) =>
       myShifts.any((listing) => _sameShift(listing.shift, shift));
 
+  int get demoBadgeChoices => usingLive
+      ? 0
+      : ((_completedByAccount[SessionStore.instance.accountId]?.length ?? 0) -
+                SessionStore.instance.unlockedKidBadges.length)
+            .clamp(0, 50);
+
+  void claimDemoBadge(String badgeId) {
+    if (usingLive ||
+        !SessionStore.instance.isKidAccount ||
+        demoBadgeChoices == 0) {
+      return;
+    }
+    SessionStore.instance.unlockKidBadge(badgeId);
+    notifyListeners();
+  }
+
   bool isCheckedIn(FoodBankShift shift) => usingLive
       ? _catalog!.attendance.any(
           (e) =>
@@ -333,6 +349,11 @@ class ShiftStore extends ChangeNotifier {
     if (SessionStore.instance.isKidAccount) {
       throw const CatalogException('Ask your parent to check you in.');
     }
+    if (participantId != 'parent') {
+      throw const CatalogException(
+        'Check in the parent to include their booked children.',
+      );
+    }
     if (!isSignedUp(shift) ||
         (participantId != 'parent' &&
             !shiftsForChild(
@@ -365,6 +386,17 @@ class ShiftStore extends ChangeNotifier {
       accountId: accountId,
       name: name ?? SessionStore.instance.userName,
     );
+    for (final child in SessionStore.instance.children) {
+      if (shiftsForChild(
+            child.id,
+          ).any((entry) => _sameShift(entry.shift, shift)) &&
+          !hasAttendance(shift, child.id)) {
+        _pendingAttendance[shift]![child.id] = AttendanceRecord(
+          accountId: child.id,
+          name: child.name,
+        );
+      }
+    }
     if (accountId == 'parent' && canManageShift(shift)) {
       lastCheckInConfirmed = confirmAttendance(shift, accountId);
     }
@@ -375,10 +407,23 @@ class ShiftStore extends ChangeNotifier {
   bool confirmAttendance(FoodBankShift shift, String accountId) {
     if (usingLive) return false;
     if (!canManageShift(shift)) return false;
+    if (accountId != 'parent' &&
+        !(_completedByAccount['parent']?.contains(shift) ?? false)) {
+      return false;
+    }
     final record = _pendingAttendance[shift]?.remove(accountId);
     if (record == null) return false;
     (_completedByAccount[accountId] ??= {}).add(shift);
     _pointsByAccount[accountId] = (_pointsByAccount[accountId] ?? 0) + 100;
+    if (accountId == 'parent') {
+      for (final child in SessionStore.instance.children) {
+        if (shiftsForChild(
+          child.id,
+        ).any((entry) => _sameShift(entry.shift, shift))) {
+          confirmAttendance(shift, child.id);
+        }
+      }
+    }
     notifyListeners();
     return true;
   }
@@ -413,6 +458,11 @@ class ShiftStore extends ChangeNotifier {
     String? name,
   }) async {
     lastCheckInConfirmed = false;
+    if (participantId != 'parent') {
+      throw const CatalogException(
+        'Check in the parent to include their booked children.',
+      );
+    }
     if (usingMockQr &&
         (SessionStore.instance.role != BushelRole.volunteer ||
             participantId != 'parent')) {

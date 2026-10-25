@@ -1,5 +1,9 @@
 # Bushel Development Log
 
+## 2026-10-25 — Clear MCFB signups and check-ins
+
+Admin pass on both Montgomery County shifts (`mcfb-32fb545a-…`, `mcfb-26c13c3d-…`): reset groups to empty members/seats/childMembers/banned and version 0; set signupCount 0. Collection-group/list scans found zero registrations, attendanceEntries, votes, mockQrTokens, or revokedFamilies (already empty). Capacities remain 1 and 3. No app/rules changes. No commit or push. Hot-restart the mock client if the UI still shows old bookings.
+
 ## 2026-10-25 — Fix child vote-out registration read
 
 Bugbot high finding: `finalizeRemoval` for a voted-out child called `tx.get` on `registrations/{parentUid}/shifts/{shiftId}`. Rules allow only the registration owner to read that path, while finalization runs as a non-parent voter after quorum, so the transaction always permission-denied and rolled back. Fix: derive remaining `childIds` from group `childMembers` (already loaded) and `tx.update` the registration without a prior get, same privacy pattern as adult removal using group seats. No rules change.
@@ -32,6 +36,33 @@ John C (`tU7Za7rhdlcETyHVIxyLkyHAyft1`) was already approved for `montgomery-cou
 ## 2026-10-24 — Clear MCFB signups again (demo slots)
 
 Evening Volunteer Shift had signupCount 3; Produce Rescue Center (PM) was already 0. Deleted remaining MCFB registrations for those two shift IDs, reset both groups to empty, set signupCount 0, and confirmed capacities 3 and 1. Read-back: Evening open 3, Produce Rescue open 1. No attendance entries found for MCFB on this pass. No app changes.
+
+## 2026-10-24 — Parent family check-in and child status/rewards
+
+Implemented one parent scan for all children already booked for that shift, in Firebase real and mock QR modes. Check-in now reads the current registration and family names within the transaction, creates the parent and missing child attendance records atomically, and preserves pre-existing child attendance. Parent records snapshot checkedInChildIds; automatically included children carry familyCheckIn=true. No additional booking or capacity is created by scanning; unbooked children are excluded. UI lists the included children before the parent confirms check-in, instead of offering separate participant selection. Independent child submissions are denied in the repository/store as well as Kid Mode.
+
+Confirming a parent's attendance now reads current child bookings and confirms pending included children atomically; cancelled children are skipped. Parent confirmation grants each confirmed participant the existing 100 points and each child one badge choice through the existing canonical attendance ledger. No separate writable balances, alternate mock reward store, new indexes or migrations. Existing historical parent-only attendance is not backfilled. Linked child attendance cannot be confirmed before the parent. Leader-owned real self-check-in still confirms the parent and included children together; mock leader redemption remains denied.
+
+Removed the Kid Mode Check in navigation destination and home scan CTA, fixing the remaining navigation indexes. Kid Home now lists each booked shift as Not checked in until confirmed, then Checked in, with points and available badge choices. Pending/loading/failed attendance cannot present new confirmed rewards. Added the same family-confirmation behavior to the fully local demo and stored demo badges/features separately per child so two siblings can each claim their own choice.
+
+Updated firestore.rules to validate linked child creation against the same-transaction parent proof, child-ID snapshot, status and server check-in timestamp; all existing ownership, booking, member, parent-mode, QR proof, mock-session, revocation and duplicate protections remain. Assigned approved leaders can get the specific shift registration to read current child bookings before confirmation; list access to others' registrations and private profile access remain denied. Current complete rules must be manually published before Firebase family check-in works. This task did not deploy rules or write live attendance/data; the October 24 earlier publication predates this change.
+
+Verified: Flutter analysis is clean. The first analysis reported two brace-style findings and an unused local variable, all corrected before final analysis. Nine affected offline smoke checks passed (two new family/Kid Home checks plus retained camera restrictions/manual pending path, secure demo membership, pending/duplicate rewards, removal rewards, demo reset, and child-booking permission checks). One retained mock-mode catalog/child/coordinator permission check passed with BUSHEL_MOCK=true. The new local test confirms two booked children accrue rewards once and keep independent badge choices, while an unbooked sibling earns nothing. The new stream-driven widget check verifies both children's home status/points, pending-vs-confirmed badge eligibility and navigation. Fixtures supply stream inputs only; they do not simulate Firestore transactions/rules. The initial Rules API compile request returned 401 due to an expired CLI token; refreshed the existing login, then the non-deploying empty-suite compilation returned no issues. git diff --check passed.
+
+Unperformed: signed-in client family submission/confirmation and permission QA, real or mock browser/camera rehearsal, emulator, full suite, release build and deployment. Offline checks and compilation do not establish runtime Firestore permissions or persistence. Existing pubspec.lock changes and earlier troubleshooting documentation were preserved. No commit or push. Four concrete manual checks with expected results are in docs/manual_testing.md under Parent check-in and child rewards.
+
+## 2026-10-24 — Flutter terminal debugDumpApp crash diagnosis
+
+Inspected the user-supplied `flutter_01.log` and installed SDK source at `C:/flutter/packages/flutter_tools/lib/src/resident_runner.dart`. The command was `flutter run -d chrome --dart-define=BUSHEL_MOCK=true`, with Flutter 3.44.8. The trace originates at debugDumpApp line 610, where the SDK uses `device!.vmService!` without checking availability. The terminal handler maps both `w` and `W` to this method. The report establishes that the widget-tree dump command was invoked; it does not establish how that key reached the terminal or why the service was unavailable, nor does it show an application QR exception.
+
+Added README recovery guidance: return to a shell prompt, restart the same command, interact with the browser, avoid typing/pasting shell commands into Flutter's active terminal, and use supported reload/restart keys only once connected. Preserve preceding startup output if it recurs without terminal input. No application code or shared SDK modification, dependency change, Firebase operation, deployment, commit or push.
+
+Verified: inspected crash report and matching installed source, checked Flutter's official hot-reload guidance, and `git diff --check`. Documentation-only change: no Flutter analysis/tests/builds or app launch performed. Preserved pre-existing pubspec.lock changes.
+
+Manual checks (unperformed):
+
+- At a fresh PowerShell prompt, launch the BUSHEL_MOCK command and interact only in Chrome: Firebase sign-in/app should open without invoking the terminal widget dump.
+- Once connected, press `r` or `R` in the running terminal: Flutter should reload/restart rather than enter debugDumpApp. Capture preceding connection output if this fails.
 
 ## 2026-10-24 — Demo data cleanup: points, mock-bank shifts, MCFB slate
 

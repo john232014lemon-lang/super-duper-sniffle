@@ -2,6 +2,15 @@
 
 Pick the 2–4 checks relevant to your change; this is a menu, not a required full regression run. Use disposable developer accounts and records. Automated smoke checks do not prove backend permissions or persistence.
 
+## Parent check-in and child rewards (October 24)
+
+Publish the current complete `firestore.rules` manually first. Use ordinary signed-in clients for permission checks. These checks are unperformed.
+
+- Reserve three places for a parent and two children (for example, the 3-place Evening Volunteer Shift if still available). Scan once as the parent, using a real QR during its window or an enabled mock QR session. Expect one pending parent record and one pending record for each booked child, with no new points or badge choices. An unbooked sibling must not be included or consume capacity.
+- In each child's Kid Mode, expect Home/Shifts/Badges/Family navigation with no Check in tab or scan CTA. Home should show Not checked in while pending. As the approved assigned leader, confirm the parent once; both children should show Checked in, gain 100 points each and one independent badge choice. Claiming one child's badge must not consume the sibling's choice. Reload and expect the Firebase state to persist.
+- Retry check-in/confirmation or attempt a direct child check-in: expect no duplicate records/points or independent child submission. Cancel a child's place before family confirmation: that child should receive no confirmation or rewards; the still-booked family members can be confirmed.
+- Remove a family by the existing vote process: attendance remains in history but its points/badges are excluded. Other families and other shifts should be unaffected. An unapproved coordinator must not confirm attendance or read another family's registration.
+
 ## Launch and accounts
 
 - Run `flutter run -d chrome --dart-define=BUSHEL_DEMO=true`. Onboard, add a child or shift, then **Reset demo**. Expect onboarding again with previous private data cleared; no Firebase sign-in is needed.
@@ -45,7 +54,7 @@ Pick the 2–4 checks relevant to your change; this is a menu, not a required fu
 
 Slices 22–23 rules/indexes were deployed September 28 after authorization; manual client QA is now the next step.
 
-- As an approved shift creator, open **Manage check-ins** from bank details or **Shifts you lead** in Groups and generate the QR. As a signed-up adult, scan the current leader QR or enter it manually, selecting yourself or a booked child in parent mode. Restart: attendance should remain pending with zero new points and no badge choice. Demo mode should still work without Firebase.
+- As an approved shift creator, open **Manage check-ins** from bank details or **Shifts you lead** in Groups and generate the QR. As a signed-up adult, scan the current leader QR or enter it manually, checking in the parent and all booked children together in parent mode. Restart: attendance should remain pending with zero new points and no badge choice. Demo mode should still work without Firebase.
 - Confirm with the assigned approved leader: the participant should gain exactly 100 points, surviving restart and retries. Using ordinary clients, try confirming as another coordinator or creating confirmed attendance directly as a participant; both must be denied. Cancel/remove an unconfirmed participant and verify confirmation is denied.
 - In Kid Mode, choose a badge after confirmation, then feature another previously earned badge and restart. Expect one permanent choice per confirmed child shift and the featured choice restored. Pending attendance and a sibling's attendance must not unlock this child's badges.
 - Create a two-shift family goal. Confirm parent and child on the same shift: expect 1/2, not 2/2. Confirm a second distinct shift: expect completion. Past confirmed shifts count; old text-only challenges show an explicit legacy notice instead of guessed progress. Disconnect and retry: expect a visible error/loading state rather than demo rewards.
@@ -62,7 +71,7 @@ The developer reported manually publishing the full repository rules and creatin
 
 ## Family removal and coordinator check-in (after deployment)
 
-- Book a parent and child, scan both, confirm attendance, and claim a child badge. With at least three adult members, reach the two-thirds removal threshold. Both bookings disappear, all their seats return, that shift loses its points/badge/challenge contribution after reload, and neither can rejoin or claim again. Another family and rewards earned on other shifts stay unchanged. Also try removing a family with only pending check-ins.
+- Book a parent and child, scan once as the parent, confirm family attendance, and claim a child badge. With at least three adult members, reach the two-thirds removal threshold. Both bookings disappear, all their seats return, that shift loses its points/badge/challenge contribution after reload, and neither can rejoin or claim again. Another family and rewards earned on other shifts stay unchanged. Also try removing a family with only pending check-ins.
 - Have the assigned, approved coordinator join and scan their own shift: confirmation and 100 points appear automatically, once. Another coordinator and the assigned coordinator's child must remain pending until confirmed.
 - In parent mode, follow the instructions at the top of Family Center to add a kid, book yourself, then book/leave only that kid. Kid Mode has no signup, leave, or removal-voting action.
 - A coordinator who also joined a shift should see one group card. Members & removal votes opens membership voting; QR & attendance opens QR creation and pending confirmations. A coordinator who has not joined can manage attendance but cannot vote.
@@ -82,7 +91,7 @@ Slices 24–25 manual checks below are pending developer execution after publica
 
 - Use ordinary signed-in clients. The assigned approved leader generates a QR within 30 minutes before / 4 hours after startsAt; another coordinator or member must be denied generation/rotation. Read the shift as a member: expect only qrTokenHash and qrExpiresAt, no raw secure code; attempts to submit the public verifier as a proof must fail.
 - Save a code, rotate it, then enter the old code or a different shift's code: expect a clear rejection with no attendance. Wait to the displayed expiry (at most 15 minutes) and retry: expect expiry rejection. The new current code should still work within its window.
-- Check in an ordinary booked adult and a booked child from parent mode: both remain pending with no rewards until the assigned leader confirms. Retry the same participant: expect already checked in, with one attendance record and one 100-point award after confirmation. The assigned approved leader's own adult check-in retains automatic confirmation.
+- Check in once as an ordinary booked parent: the parent and booked children remain pending with no rewards until the assigned leader confirms. Retry the same participant: expect already checked in, with one attendance record and one 100-point award after confirmation. The assigned approved leader's own adult check-in retains automatic confirmation.
 - Cancel/remove a booking and attempt check-in with a valid QR through an ordinary client: expect denial. Switch to Kid Mode: expect no scan/entry/check-in actions and direct attendance creates denied. Demo mode follows the same local flow without Firebase.
 
 ## Slice 25 camera scanning (unperformed)

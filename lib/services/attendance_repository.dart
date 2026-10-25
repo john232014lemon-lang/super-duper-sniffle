@@ -195,6 +195,11 @@ class FirestoreAttendanceRepository implements AttendanceRepository {
     String name,
     String code,
   ) async {
+    if (SessionStore.instance.isKidAccount || participantId != 'parent') {
+      throw const CatalogException(
+        'A parent checks in the whole booked family.',
+      );
+    }
     if (mockQrMode &&
         (SessionStore.instance.isKidAccount ||
             SessionStore.instance.role != BushelRole.volunteer ||
@@ -278,18 +283,53 @@ class FirestoreAttendanceRepository implements AttendanceRepository {
           );
           selfConfirmed = approval.data()?['status'] == 'approved';
         }
-        tx.set(ref, {
+        // Read the current booking/family in this transaction, not cached UI data.
+        final childIds = (registration.data()?['childIds'] as List? ?? [])
+            .cast<String>()
+            .toSet()
+            .toList();
+        final family = childIds.isEmpty
+            ? null
+            : await tx.get(_firestore.collection('families').doc(uid));
+        final children =
+            (family?.data()?['children'] as Map<String, dynamic>?) ?? {};
+        final childEntries = <String, DocumentSnapshot<Map<String, dynamic>>>{};
+        for (final id in childIds) {
+          if (children[id] is! String) {
+            throw const CatalogException(
+              'Refresh your family bookings before checking in.',
+            );
+          }
+          childEntries[id] = await tx.get(_entry(uid, id, shiftId));
+        }
+        Map<String, dynamic> fields(String pid, String participantName) => {
           'ownerUid': uid,
-          'participantId': participantId,
+          'participantId': pid,
           'shiftId': shiftId,
           'leaderUid': data['creatorUid'],
-          'name': name,
+          'name': participantName,
           'tokenProof': CheckInToken.proof(code),
           if (mockQrMode) 'mockQr': true,
           'status': selfConfirmed ? 'confirmed' : 'pending',
           if (selfConfirmed) 'confirmedAt': FieldValue.serverTimestamp(),
           'checkedInAt': FieldValue.serverTimestamp(),
-        });
+        };
+        tx.set(ref, {...fields('parent', name), 'checkedInChildIds': childIds});
+        for (final id in childIds) {
+          final existingChild = childEntries[id]!;
+          if (!existingChild.exists) {
+            tx.set(_entry(uid, id, shiftId), {
+              ...fields(id, children[id] as String),
+              'familyCheckIn': true,
+            });
+          } else if (selfConfirmed &&
+              existingChild.data()?['status'] == 'pending') {
+            tx.update(existingChild.reference, {
+              'status': 'confirmed',
+              'confirmedAt': FieldValue.serverTimestamp(),
+            });
+          }
+        }
         return selfConfirmed;
       });
     } on FirebaseException catch (error) {
@@ -303,19 +343,41 @@ class FirestoreAttendanceRepository implements AttendanceRepository {
   }
 
   @override
-  Future<void> confirmEntry(AttendanceEntry entry) =>
-      _firestore.runTransaction((tx) async {
-        final ref = _entry(entry.ownerUid, entry.participantId, entry.shiftId);
-        final current = await tx.get(ref);
-        if (!current.exists) {
-          throw const CatalogException('This check-in no longer exists.');
-        }
-        if (current.data()!['status'] == 'confirmed') return;
-        tx.update(ref, {
-          'status': 'confirmed',
-          'confirmedAt': FieldValue.serverTimestamp(),
-        });
+  Future<void> confirmEntry(
+    AttendanceEntry entry,
+  ) => _firestore.runTransaction((tx) async {
+    final ref = _entry(entry.ownerUid, entry.participantId, entry.shiftId);
+    final current = await tx.get(ref);
+    if (!current.exists) {
+      throw const CatalogException('This check-in no longer exists.');
+    }
+    final targets = <DocumentReference<Map<String, dynamic>>>[];
+    if (current.data()!['status'] == 'pending') targets.add(ref);
+    if (entry.participantId == 'parent') {
+      final registration = await tx.get(
+        _firestore
+            .collection('registrations')
+            .doc(entry.ownerUid)
+            .collection('shifts')
+            .doc(entry.shiftId),
+      );
+      final booked = (registration.data()?['childIds'] as List? ?? [])
+          .cast<String>()
+          .toSet();
+      final checkedIn = (current.data()?['checkedInChildIds'] as List? ?? [])
+          .cast<String>();
+      for (final id in checkedIn.toSet().intersection(booked)) {
+        final child = await tx.get(_entry(entry.ownerUid, id, entry.shiftId));
+        if (child.data()?['status'] == 'pending') targets.add(child.reference);
+      }
+    }
+    for (final target in targets) {
+      tx.update(target, {
+        'status': 'confirmed',
+        'confirmedAt': FieldValue.serverTimestamp(),
       });
+    }
+  });
 
   @override
   Future<void> chooseBadge(

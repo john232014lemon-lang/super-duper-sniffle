@@ -25,7 +25,7 @@ Pass the shared password for the existing Firebase accounts `a@a.co` (John C / M
 
 An assigned, approved coordinator (such as john for Montgomery County Food Bank) opens **Groups → QR & attendance → Generate mock QR**, then shares the displayed code or QR image. A different signed-in adult Volunteer books that shift and opens **Scan → Scan QR with camera**. In `BUSHEL_MOCK` only, that button opens a fake camera viewfinder with the session’s generated mock QR already in frame; **Scan this QR** feeds the normal check-in confirm path (no real camera). Without the mock flag, the real camera scanner is used. Manual code entry still works either way. The check-in is saved as pending in Firebase. The coordinator confirms it in **QR & attendance**, awarding the existing **100 points per shift**. Reloading, signing out/back in, or using separate devices retains this Firebase history. Normal badge thresholds remain unchanged (Harvesting Hero starts at 500 points). The fake-camera QR is kept only in the current app session after generate/rotate (not in Firestore); regenerate if the session was fully reloaded before scanning.
 
-Only the QR credential is simulated: mock codes use a distinct `BUSHELMOCK` prefix, expire after 15 minutes, rotate independently of real tokens, and can work outside the scheduled shift window during an enabled presentation session. Kid Mode, child participants, coordinators using the Coordinator role, and the shift's assigned coordinator cannot redeem them. Bookings, membership, family-removal revocations, duplicate attendance protection, leader confirmation and rewards remain real. Mock attendance is marked `mockQr: true`; it uses the same per-person/per-shift attendance record, so it cannot award a second set of points for that shift later.
+Only the QR credential is simulated: mock codes use a distinct `BUSHELMOCK` prefix, expire after 15 minutes, rotate independently of real tokens, and can work outside the scheduled shift window during an enabled presentation session. Kids never redeem codes independently. Parent Volunteer check-in automatically includes that parent's children who are booked for the shift; all remain pending until the coordinator confirms the parent. Coordinators using the Coordinator role and the shift's assigned coordinator cannot redeem mock codes. Bookings, membership, family-removal revocations, duplicate attendance protection, leader confirmation and rewards remain real. Mock attendance is marked `mockQr: true`; it uses the same per-person/per-shift attendance record, so it cannot award a second set of points for that shift later.
 
 **Backend setup required before mock QR works:**
 
@@ -39,6 +39,18 @@ On Shifts, use the month arrows, select a day, or tap **Today**. Dots mark dates
 To build the local demo: `flutter build web --dart-define=BUSHEL_DEMO=true`. To use normal Firebase startup, run `flutter run -d chrome` without the flag. Firebase errors never switch into demo mode automatically.
 
 ## Firebase setup (slices 12 and 13)
+
+### Flutter terminal crash: debugDumpApp
+
+If Flutter exits with `ResidentHandlers.debugDumpApp` and a null-check error, the installed SDK's terminal widget-tree dump tried to use a missing VM-service connection. In Flutter 3.44.8, typing `w` or `W` in the running terminal invokes that command. This stack trace identifies a tooling failure, not an application QR exception.
+
+Wait for the PowerShell prompt (or stop a still-running command with Ctrl+C), then restart:
+
+```sh
+flutter run -d chrome --dart-define=BUSHEL_MOCK=true
+```
+
+Keep app interaction in the browser. While Flutter owns the terminal, it interprets keystrokes as commands: do not paste another shell command there until it exits. Use `r` for hot reload or `R` for hot restart when the app is connected; avoid `w`/`W`. If another crash happens without terminal input, retain the earlier startup output as well as the new crash report so a connection failure can be investigated separately.
 
 The Firebase CLI and FlutterFire CLI 1.4.1 are installed. Android (`com.bushel.bushel`) and Web have been registered. `.firebaserc` selects Bushel by default, and the generated options, Android service file, and Google Services Gradle plugin are in place. To regenerate the configuration:
 
@@ -154,7 +166,7 @@ Check-in handles empty or changing signup lists without retaining obsolete dropd
 
 The developer reported manually publishing the entire earlier rules file and creating its indexes October 9. Slice 24 changes the local rules again and requires manual publication before using secure check-in. Index READY status and signed-in token/camera behavior remain unverified.
 
-The assigned approved bank leader opens **Manage check-ins** on the bank page or **Shifts you lead** under Groups. Generate or rotate a real QR within 30 minutes before through 4 hours after the shift start. Each QR expires after at most 15 minutes. Raw codes exist only in leader app memory; reopening the screen requires rotation, invalidating codes displayed in other sessions. Members scan on Android/Web or enter the displayed code manually. Parents choose themselves or a booked child; Kid Mode cannot scan or check in independently. Ordinary member submissions remain pending until the assigned approved leader confirms; the existing leader adult self-confirmation exception remains. Removed/cancelled participants cannot be confirmed. Duplicate participant check-in is rejected; confirmation retries cannot award twice.
+The assigned approved bank leader opens **Manage check-ins** on the bank page or **Shifts you lead** under Groups. Generate or rotate a real QR within 30 minutes before through 4 hours after the shift start. Each QR expires after at most 15 minutes. Raw codes exist only in leader app memory; reopening the screen requires rotation, invalidating codes displayed in other sessions. Members scan on Android/Web or enter the displayed code manually. Parents scan once for themselves and all their children booked for that shift; Kid Mode cannot scan or check in independently. Ordinary member submissions remain pending until the assigned approved leader confirms; the existing leader adult self-confirmation exception remains. Removed/cancelled participants cannot be confirmed. Duplicate participant check-in is rejected; confirmation retries cannot award twice.
 
 | Path | Purpose |
 | --- | --- |
@@ -162,6 +174,12 @@ The assigned approved bank leader opens **Manage check-ins** on the bank page or
 | `attendance/{shiftId}/families/{ownerUid}/attendanceEntries/{participantId}` | `parent` or child ID; `tokenProof` (hash, never raw QR), pending then confirmed with server timestamps; owner and assigned leader can read |
 | `rewardPreferences/{uid}/people/{childId}` | Featured badge backed by a confirmed record for that child |
 | `families/{uid}.challengeTargets` | Goal per challenge ID, 1–100 distinct completed family shifts |
+
+Parent check-in creates the parent's record and missing booked-child records atomically. Parent records snapshot `checkedInChildIds`; new child records carry `familyCheckIn: true` and the same proof/check-in timestamp. Existing attendance is retained, never overwritten. The coordinator's parent **Confirm** action confirms pending booked children in the same transaction; cancelled children are skipped and removed families still cannot earn rewards. No extra seats are booked by scanning. Book children in Family Center first, before parent check-in.
+
+Kid Mode has **Home, Shifts, Badges**, and (for families) **Family** navigation, with no Check in tab or scan button. Home lists each booked shift as **Not checked in** until family attendance is confirmed, then **Checked in**, with the child's points and badge-choice count. Pending records earn neither points nor badge choices; loading/errors retain retry states. Each child gets 100 points and one independent badge choice per confirmed shift. The separate local demo follows the same family confirmation behavior and keeps each child's badges separate.
+
+**Family check-in backend update is pending:** manually publish the complete current `firestore.rules` before using this flow in Firebase. No new indexes. Assigned approved leaders may get the specific shift's registration to verify current child bookings, but cannot list another account's registrations or read their private profile. Earlier October 24 rules publication predates this change. This work does not migrate historical parent-only attendance into child attendance.
 
 Confirmed attendance is the persistent reward ledger: **100 points per participant per shift**, with adult badge thresholds derived from those points. There are no client-writable balances or Cloud Functions to deploy. Every confirmed child shift offers one badge choice (revoked if that family is removed from the shift) in **My badge garden**. Featuring an already earned badge consumes no new choice. Profile links to rewards/badge selection. Loading and failed attendance reads have retry states and never substitute mock rewards.
 

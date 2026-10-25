@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import '../data/catalog_store.dart';
 import '../data/mock_qr_presentation_store.dart';
 import '../data/session_store.dart';
@@ -68,7 +68,29 @@ class _AttendanceManagementScreenState
     if (entry == null) return 'Not scanned yet';
     if (entry.status == 'confirmed') return 'Confirmed';
     if (entry.status == 'revoked') return 'Removed · rewards revoked';
+    if (entry.familyCheckIn) return 'Scanned with parent · pending confirmation';
     return 'Scanned · pending confirmation';
+  }
+
+  String _pendingSubtitle(AttendanceEntry entry) {
+    if (entry.participantId == 'parent') {
+      return 'Confirm this parent and their booked children together.';
+    }
+    if (entry.familyCheckIn) return 'Confirmed with parent attendance';
+    return 'Parent-managed child';
+  }
+
+  Widget? _confirmControl(CatalogStore store, AttendanceEntry? entry) {
+    if (entry == null || entry.status != 'pending') return null;
+    if (entry.familyCheckIn) {
+      return const Text('Awaiting parent confirmation');
+    }
+    return FilledButton(
+      onPressed: _saving
+          ? null
+          : () => _save(() => store.repository.confirmEntry(entry)),
+      child: const Text('Confirm'),
+    );
   }
 
   @override
@@ -217,25 +239,10 @@ class _AttendanceManagementScreenState
                                       byParticipant[(entry.key, 'parent')],
                                     ),
                                   ),
-                                  trailing:
-                                      byParticipant[(entry.key, 'parent')]
-                                              ?.status ==
-                                          'pending'
-                                      ? FilledButton(
-                                          onPressed: _saving
-                                              ? null
-                                              : () => _save(
-                                                  () => store.repository
-                                                      .confirmEntry(
-                                                        byParticipant[(
-                                                          entry.key,
-                                                          'parent',
-                                                        )]!,
-                                                      ),
-                                                ),
-                                          child: const Text('Confirm'),
-                                        )
-                                      : null,
+                                  trailing: _confirmControl(
+                                    store,
+                                    byParticipant[(entry.key, 'parent')],
+                                  ),
                                 ),
                               for (final child in group.childList)
                                 ListTile(
@@ -243,28 +250,13 @@ class _AttendanceManagementScreenState
                                   subtitle: Text(
                                     'Child · ${_statusLabel(byParticipant[(child.parentUid, child.childId)])}',
                                   ),
-                                  trailing:
-                                      byParticipant[(
-                                                    child.parentUid,
-                                                    child.childId,
-                                                  )]
-                                                  ?.status ==
-                                              'pending'
-                                          ? FilledButton(
-                                              onPressed: _saving
-                                                  ? null
-                                                  : () => _save(
-                                                      () => store.repository
-                                                          .confirmEntry(
-                                                            byParticipant[(
-                                                              child.parentUid,
-                                                              child.childId,
-                                                            )]!,
-                                                          ),
-                                                    ),
-                                              child: const Text('Confirm'),
-                                            )
-                                          : null,
+                                  trailing: _confirmControl(
+                                    store,
+                                    byParticipant[(
+                                      child.parentUid,
+                                      child.childId,
+                                    )],
+                                  ),
                                 ),
                             ] else if (ready) ...[
                               if (entries.any(
@@ -281,7 +273,7 @@ class _AttendanceManagementScreenState
                                 ),
                               ),
                               const Text(
-                                'Generate a QR to see every group member’s scan status. Confirm only people who attended.',
+                                'Generate a QR to see every group member’s scan status. Confirm a parent to confirm their booked children together.',
                               ),
                               if (pending.isEmpty)
                                 const Padding(
@@ -292,20 +284,8 @@ class _AttendanceManagementScreenState
                                 Card(
                                   child: ListTile(
                                     title: Text(entry.name),
-                                    subtitle: Text(
-                                      entry.participantId == 'parent'
-                                          ? 'Adult participant'
-                                          : 'Parent-managed child',
-                                    ),
-                                    trailing: FilledButton(
-                                      onPressed: _saving
-                                          ? null
-                                          : () => _save(
-                                              () => store.repository
-                                                  .confirmEntry(entry),
-                                            ),
-                                      child: const Text('Confirm'),
-                                    ),
+                                    subtitle: Text(_pendingSubtitle(entry)),
+                                    trailing: _confirmControl(store, entry),
                                   ),
                                 ),
                               Text(
@@ -339,15 +319,8 @@ class _AttendanceManagementScreenState
                                 Card(
                                   child: ListTile(
                                     title: Text(entry.name),
-                                    trailing: FilledButton(
-                                      onPressed: _saving
-                                          ? null
-                                          : () => _save(
-                                              () => store.repository
-                                                  .confirmEntry(entry),
-                                            ),
-                                      child: const Text('Confirm'),
-                                    ),
+                                    subtitle: Text(_pendingSubtitle(entry)),
+                                    trailing: _confirmControl(store, entry),
                                   ),
                                 ),
                             ],

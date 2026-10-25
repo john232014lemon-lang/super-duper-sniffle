@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../data/session_store.dart';
 import '../models/kid_badge.dart';
+import '../data/shift_store.dart';
 import '../widgets/bushel_navigation_bar.dart';
 import '../data/catalog_store.dart';
 import '../services/catalog_repository.dart';
@@ -58,7 +59,7 @@ class _KidBadgesScreenState extends State<KidBadgesScreen> {
             .completed(_session.accountId)
             .where((entry) => entry.badgeId == null)
             .length ??
-        0;
+        ShiftStore.instance.demoBadgeChoices;
     return Scaffold(
       appBar: AppBar(title: const Text('My badge garden')),
       body: Column(
@@ -95,13 +96,15 @@ class _KidBadgesScreenState extends State<KidBadgesScreen> {
                     onTap:
                         !_saving &&
                             (unlocked ||
-                                (catalog != null &&
-                                    claimable > 0 &&
-                                    _session.isKidAccount))
+                                (claimable > 0 && _session.isKidAccount))
                         ? () => catalog != null
                               ? _choose(catalog, badge.id)
                               : setState(
-                                  () => _session.featureKidBadge(badge.id),
+                                  () => unlocked
+                                      ? _session.featureKidBadge(badge.id)
+                                      : ShiftStore.instance.claimDemoBadge(
+                                          badge.id,
+                                        ),
                                 )
                         : null,
                     borderRadius: BorderRadius.circular(12),

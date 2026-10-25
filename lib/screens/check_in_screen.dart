@@ -31,15 +31,16 @@ class _CheckInScreenState extends State<CheckInScreen> {
     return {
       if (!_store.hasAttendance(entry.shift, 'parent'))
         'parent': session.userName,
-      for (final child in session.children)
-        if (!_store.usingMockQr &&
-            _store
-                .shiftsForChild(child.id)
-                .any((booking) => _key(booking) == _key(entry)) &&
-            !_store.hasAttendance(entry.shift, child.id))
-          child.id: child.name,
     };
   }
+
+  List<FamilyChild> _bookedChildren(ShiftListing entry) => [
+    for (final child in SessionStore.instance.children)
+      if (_store
+          .shiftsForChild(child.id)
+          .any((booking) => _key(booking) == _key(entry)))
+        child,
+  ];
 
   @override
   void initState() {
@@ -111,7 +112,7 @@ class _CheckInScreenState extends State<CheckInScreen> {
       builder: (context) => AlertDialog(
         title: const Text('Confirm check-in?'),
         content: Text(
-          '$name\n${listing.shift.title}\n${listing.foodBank.shortName}\nStation: ${listing.shift.station}',
+          '$name${_bookedChildren(listing).map((child) => '\n${child.name}').join()}\n${listing.shift.title}\n${listing.foodBank.shortName}\nStation: ${listing.shift.station}',
         ),
         actions: [
           TextButton(
@@ -153,8 +154,8 @@ class _CheckInScreenState extends State<CheckInScreen> {
         SnackBar(
           content: Text(
             _store.lastCheckInConfirmed
-                ? 'Your attendance is confirmed. As the assigned coordinator, you do not need to confirm yourself.'
-                : 'Check-in sent for $name. Awaiting coordinator confirmation; no points earned yet.',
+                ? 'Your family attendance is confirmed. As the assigned coordinator, you do not need to confirm yourself.'
+                : 'Family check-in sent for $name and their booked children. Awaiting coordinator confirmation; no points earned yet.',
           ),
         ),
       );
@@ -295,31 +296,12 @@ class _CheckInScreenState extends State<CheckInScreen> {
                         }),
                 ),
                 const SizedBox(height: 16),
-                DropdownButtonFormField<String>(
-                  key: ValueKey((
-                    account,
-                    _key(selected),
-                    _participant,
-                    people.keys.join(','),
-                  )),
-                  initialValue: _participant,
-                  decoration: const InputDecoration(
-                    labelText: 'Who is checking in?',
-                  ),
-                  items: [
-                    for (final person in people.entries)
-                      DropdownMenuItem(
-                        value: person.key,
-                        child: Text(
-                          person.key == 'parent'
-                              ? '${person.value} (you)'
-                              : person.value,
-                        ),
-                      ),
-                  ],
-                  onChanged: _saving
-                      ? null
-                      : (value) => setState(() => _participant = value!),
+                Text('Checking in: ${SessionStore.instance.parentName} (you)'),
+                const SizedBox(height: 8),
+                Text(
+                  _bookedChildren(selected).isEmpty
+                      ? 'Children with a booking for this shift will be included automatically.'
+                      : 'Also checking in: ${_bookedChildren(selected).map((child) => child.name).join(', ')}. Coordinator confirmation confirms your family together.',
                 ),
                 if (selected.shift.instructions.isNotEmpty)
                   Padding(
