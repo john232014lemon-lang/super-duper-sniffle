@@ -182,6 +182,23 @@ class _MockQrCatalog extends _Catalog {
   }
 }
 
+class _FamilyCatalog extends _Catalog {
+  _FamilyCatalog(Stream<List<AttendanceEntry>> entries)
+    : super(attendanceStream: entries);
+  @override
+  Stream<FamilyData> watchFamily(String uid) => Stream.value(
+    const FamilyData(
+      children: {'kid': 'Sam', 'other-kid': 'Alex'},
+      activeChildId: 'kid',
+    ),
+  );
+  @override
+  Stream<Map<String, Set<String>>> watchChildSignups(String uid) =>
+      Stream.value({
+        'child-shift': {'kid', 'other-kid'},
+      });
+}
+
 void main() {
   testWidgets('camera QR manual fallback uses pending attendance path', (
     tester,
@@ -420,49 +437,47 @@ void main() {
     skip: !mockQrMode,
   );
 
-  testWidgets(
-    'mock camera shows session QR and scan returns the code',
-    (tester) async {
-      expect(mockQrMode, isTrue);
-      await tester.binding.setSurfaceSize(const Size(800, 1200));
-      addTearDown(() => tester.binding.setSurfaceSize(null));
-      final now = DateTime(2026, 10, 24, 12);
-      final token = CheckInToken.generateMock('demo-shift', now: now);
-      MockQrPresentationStore.instance.remember('demo-shift', token);
-      addTearDown(MockQrPresentationStore.instance.clear);
-      String? scanned;
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Builder(
-            builder: (context) => Scaffold(
-              body: TextButton(
-                onPressed: () async {
-                  scanned = await Navigator.of(context).push<String>(
-                    MaterialPageRoute(
-                      builder: (_) =>
-                          const MockCameraScanScreen(shiftId: 'demo-shift'),
-                    ),
-                  );
-                },
-                child: const Text('Open mock camera'),
-              ),
+  testWidgets('mock camera shows session QR and scan returns the code', (
+    tester,
+  ) async {
+    expect(mockQrMode, isTrue);
+    await tester.binding.setSurfaceSize(const Size(800, 1200));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final now = DateTime(2026, 10, 24, 12);
+    final token = CheckInToken.generateMock('demo-shift', now: now);
+    MockQrPresentationStore.instance.remember('demo-shift', token);
+    addTearDown(MockQrPresentationStore.instance.clear);
+    String? scanned;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Builder(
+          builder: (context) => Scaffold(
+            body: TextButton(
+              onPressed: () async {
+                scanned = await Navigator.of(context).push<String>(
+                  MaterialPageRoute(
+                    builder: (_) =>
+                        const MockCameraScanScreen(shiftId: 'demo-shift'),
+                  ),
+                );
+              },
+              child: const Text('Open mock camera'),
             ),
           ),
         ),
-      );
-      await tester.tap(find.text('Open mock camera'));
-      await tester.pumpAndSettle();
-      expect(find.byType(MobileScanner), findsNothing);
-      expect(find.byType(QrImageView), findsOneWidget);
-      expect(find.text('Scan this QR'), findsOneWidget);
-      await tester.tap(find.text('Scan this QR'));
-      await tester.pumpAndSettle();
-      expect(scanned, token.code);
-      expect(tester.takeException(), isNull);
-      await tester.pumpWidget(const SizedBox());
-    },
-    skip: !mockQrMode,
-  );
+      ),
+    );
+    await tester.tap(find.text('Open mock camera'));
+    await tester.pumpAndSettle();
+    expect(find.byType(MobileScanner), findsNothing);
+    expect(find.byType(QrImageView), findsOneWidget);
+    expect(find.text('Scan this QR'), findsOneWidget);
+    await tester.tap(find.text('Scan this QR'));
+    await tester.pumpAndSettle();
+    expect(scanned, token.code);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox());
+  }, skip: !mockQrMode);
 
   AttendanceEntry entry(String person, String status, {String? badge}) =>
       AttendanceEntry(
@@ -535,6 +550,105 @@ void main() {
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox());
   });
+
+  test(
+    'family check-in confirms both booked kids once and keeps badge choices separate',
+    () async {
+      final session = SessionStore.instance;
+      final store = ShiftStore.instance;
+      final listing = store.available.first;
+      session.setRole(BushelRole.coordinator);
+      final code = store.generateQrCode(listing.shift)!;
+      session.setRole(BushelRole.volunteer);
+      session.addChild('Sam');
+      session.addChild('Alex');
+      session.addChild('Not booked');
+      final kids = session.children.take(2).toList();
+      for (final child in kids) {
+        await store.setChildBooking(listing, child.id, true);
+      }
+      expect(await store.submitCheckIn(listing.shift, code), isTrue);
+      expect(store.pendingAttendance(listing.shift), hasLength(3));
+      for (final child in kids) {
+        session.switchToChild(child.id);
+        expect(store.isCheckedIn(listing.shift), isFalse);
+        expect(store.points, 0);
+        expect(store.demoBadgeChoices, 0);
+        session.switchToParent();
+      }
+      session.setRole(BushelRole.coordinator);
+      expect(store.confirmAttendance(listing.shift, kids.first.id), isFalse);
+      expect(store.confirmAttendance(listing.shift, 'parent'), isTrue);
+      expect(store.confirmAttendance(listing.shift, 'parent'), isFalse);
+      for (final child in kids) {
+        session.switchToChild(child.id);
+        expect(store.isCheckedIn(listing.shift), isTrue);
+        expect(store.points, 100);
+        expect(store.demoBadgeChoices, 1);
+        expect(session.unlockedKidBadges, isEmpty);
+        store.claimDemoBadge('bee');
+        expect(store.demoBadgeChoices, 0);
+        session.switchToParent();
+      }
+      session.switchToChild(session.children.last.id);
+      expect(store.points, 0);
+      expect(store.isCheckedIn(listing.shift), isFalse);
+    },
+  );
+
+  testWidgets(
+    'kid home waits for parent confirmation and has no check-in tab',
+    (tester) async {
+      tester.view.physicalSize = const Size(1000, 1600);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final entries = StreamController<List<AttendanceEntry>>();
+      final repository = _FamilyCatalog(entries.stream);
+      addTearDown(entries.close);
+      addTearDown(repository.access.close);
+      List<AttendanceEntry> family(String status) => [
+        for (final person in ['parent', 'kid', 'other-kid'])
+          AttendanceEntry(
+            ownerUid: 'adult',
+            participantId: person,
+            shiftId: 'child-shift',
+            leaderUid: 'leader',
+            name: person,
+            status: status,
+            familyCheckIn: person != 'parent',
+          ),
+      ];
+      await tester.pumpWidget(
+        CatalogSession(
+          uid: 'adult',
+          repository: repository,
+          child: const BushelApp(home: HomeScreen(name: 'Adult')),
+        ),
+      );
+      entries.add(family('pending'));
+      await tester.pumpAndSettle();
+      expect(find.text('Check in'), findsNothing);
+      expect(find.text('Scan QR with camera'), findsNothing);
+      expect(find.text('Not checked in'), findsOneWidget);
+      expect(find.text('0 points'), findsOneWidget);
+      expect(find.text('Choose 1 new badge!'), findsNothing);
+      entries.add(family('confirmed'));
+      await tester.pumpAndSettle();
+      expect(find.text('Checked in'), findsOneWidget);
+      expect(find.text('100 points'), findsOneWidget);
+      expect(find.text('Choose 1 new badge!'), findsOneWidget);
+      SessionStore.instance.switchToChild('other-kid');
+      await tester.pumpAndSettle();
+      expect(find.text('Checked in'), findsOneWidget);
+      expect(find.text('100 points'), findsOneWidget);
+      await tester.tap(find.text('Badges'));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('Choose 1 new badge'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox());
+    },
+  );
 
   test('rewards exclude pending attendance and duplicate completions', () {
     final confirmed = entry('kid', 'confirmed', badge: 'bee');

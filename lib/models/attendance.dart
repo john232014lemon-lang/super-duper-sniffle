@@ -7,6 +7,7 @@ class AttendanceEntry {
     required this.name,
     required this.status,
     this.badgeId,
+    this.familyCheckIn = false,
   });
   final String ownerUid;
   final String participantId;
@@ -15,6 +16,7 @@ class AttendanceEntry {
   final String name;
   final String status;
   final String? badgeId;
+  final bool familyCheckIn;
   bool get confirmed => status == 'confirmed';
   AttendanceEntry revoke() => AttendanceEntry(
     ownerUid: ownerUid,
@@ -23,6 +25,7 @@ class AttendanceEntry {
     leaderUid: leaderUid,
     name: name,
     status: 'revoked',
+    familyCheckIn: familyCheckIn,
   );
   factory AttendanceEntry.decode(Map<String, dynamic> data) => AttendanceEntry(
     ownerUid: data['ownerUid'] as String,
@@ -32,6 +35,7 @@ class AttendanceEntry {
     name: data['name'] as String,
     status: data['status'] as String,
     badgeId: data['badgeId'] as String?,
+    familyCheckIn: data['familyCheckIn'] == true,
   );
 }
 

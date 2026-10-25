@@ -205,19 +205,22 @@ class _AttendanceManagementScreenState
                                 title: Text(entry.name),
                                 subtitle: Text(
                                   entry.participantId == 'parent'
-                                      ? 'Adult participant'
+                                      ? 'Confirm this parent and their booked children together.'
+                                      : entry.familyCheckIn
+                                      ? 'Confirmed with parent attendance'
                                       : 'Parent-managed child',
                                 ),
-                                trailing: FilledButton(
-                                  onPressed: _saving
-                                      ? null
-                                      : () => _save(
-                                          () => store.repository.confirmEntry(
-                                            entry,
-                                          ),
-                                        ),
-                                  child: const Text('Confirm'),
-                                ),
+                                trailing: entry.familyCheckIn
+                                    ? const Text('Awaiting parent confirmation')
+                                    : FilledButton(
+                                        onPressed: _saving
+                                            ? null
+                                            : () => _save(
+                                                () => store.repository
+                                                    .confirmEntry(entry),
+                                              ),
+                                        child: const Text('Confirm'),
+                                      ),
                               ),
                             ),
                           Text(

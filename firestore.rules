@@ -211,6 +211,21 @@ service cloud.firestore {
     }
     match /attendance/{sid}/families/{uid}/attendanceEntries/{pid} {
       function owner() { return signedIn() && request.auth.uid == uid; }
+      function familyChild() {
+        let parent = getAfter(attendancePath(uid, 'parent', sid)).data;
+        let next = request.resource.data;
+        return pid != 'parent' && next.get('familyCheckIn', false) == true
+          && !('checkedInChildIds' in next)
+          && pid in parent.checkedInChildIds
+          && parent.checkedInAt == request.time
+          && next.tokenProof == parent.tokenProof
+          && next.get('mockQr', false) == parent.get('mockQr', false)
+          && next.status == parent.status;
+      }
+      function familyParent() {
+        return pid == 'parent' && !('familyCheckIn' in request.resource.data)
+          && request.resource.data.get('checkedInChildIds', []) == get(regPath(uid, sid)).data.get('childIds', []);
+      }
       function childBadge() {
         return owner() && pid != 'parent' && resource.data.status == 'confirmed'
           && !existsAfter(revokedPath(uid, sid))
@@ -221,21 +236,25 @@ service cloud.firestore {
       allow get: if owner() || (signedIn() && get(shiftPath(sid)).data.creatorUid == request.auth.uid);
       allow create: if owner() && parentMode() && member(sid) && attendingMember(uid, pid, sid)
         && !existsAfter(revokedPath(uid, sid))
-        && request.resource.data.keys().hasOnly(['ownerUid', 'participantId', 'shiftId', 'leaderUid', 'name', 'tokenProof', 'status', 'checkedInAt', 'confirmedAt', 'mockQr'])
+        && request.resource.data.keys().hasOnly(['ownerUid', 'participantId', 'shiftId', 'leaderUid', 'name', 'tokenProof', 'status', 'checkedInAt', 'confirmedAt', 'mockQr', 'checkedInChildIds', 'familyCheckIn'])
         && request.resource.data.ownerUid == uid && request.resource.data.participantId == pid
         && request.resource.data.shiftId == sid
         && request.resource.data.leaderUid == get(shiftPath(sid)).data.creatorUid
         && text(request.resource.data.name, 80)
         && request.resource.data.tokenProof is string
         && request.resource.data.tokenProof.matches('^[0-9a-f]{64}$')
-        && ((request.resource.data.get('mockQr', false) == true && mockQrProof(sid, pid))
-          || (!('mockQr' in request.resource.data) && realQrProof(sid)))
+        && ((familyParent() && ((request.resource.data.get('mockQr', false) == true && mockQrProof(sid, pid))
+          || (!('mockQr' in request.resource.data) && realQrProof(sid))))
+          || familyChild())
         && request.resource.data.checkedInAt == request.time
         && ((request.resource.data.status == 'pending' && !('confirmedAt' in request.resource.data))
-          || (pid == 'parent' && shiftLeader(sid) && request.resource.data.status == 'confirmed' && request.resource.data.confirmedAt == request.time));
+          || (request.resource.data.status == 'confirmed' && request.resource.data.confirmedAt == request.time
+            && ((pid == 'parent' && shiftLeader(sid)) || familyChild())));
       allow update: if childBadge() || (shiftLeader(sid) && attendingMember(uid, pid, sid)
         && !existsAfter(revokedPath(uid, sid))
         && resource.data.status == 'pending'
+        && (!resource.data.get('familyCheckIn', false)
+          || getAfter(attendancePath(uid, 'parent', sid)).data.status == 'confirmed')
         && request.resource.data.status == 'confirmed'
         && request.resource.data.confirmedAt == request.time
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'confirmedAt']));
@@ -254,7 +273,10 @@ service cloud.firestore {
     match /registrations/{uid}/shifts/{shiftId} {
       function owner() { return signedIn() && request.auth.uid == uid; }
       function shift() { return /databases/$(database)/documents/shifts/$(shiftId); }
-      allow read: if owner();
+      // The assigned approved leader checks current child bookings before
+      // atomically confirming the family's attendance. Other profiles stay private.
+      allow get: if owner() || shiftLeader(shiftId);
+      allow list: if owner();
       allow create: if owner() && parentMode()
         && request.resource.data.keys().hasOnly(['createdAt'])
         && request.resource.data.createdAt == request.time

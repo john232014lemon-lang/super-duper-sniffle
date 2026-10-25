@@ -12,6 +12,8 @@ import 'check_in_screen.dart';
 import 'coordinator_screen.dart';
 import 'profile_screen.dart';
 import '../widgets/bushel_navigation_bar.dart';
+import '../widgets/attendance_status.dart';
+import 'kid_badges_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key, required this.name});
@@ -29,11 +31,13 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     _session.addListener(_refresh);
+    ShiftStore.instance.addListener(_refresh);
   }
 
   @override
   void dispose() {
     _session.removeListener(_refresh);
+    ShiftStore.instance.removeListener(_refresh);
     super.dispose();
   }
 
@@ -52,11 +56,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final catalog = CatalogScope.maybeOf(context);
     final banks = catalog?.banks ?? mockFoodBanks;
     if (_session.role == BushelRole.kid) {
-      return _KidHomeScreen(
-        name: _session.userName,
-        onProfile: _openProfile,
-        onCheckIn: _openCheckIn,
-      );
+      return _KidHomeScreen(name: _session.userName, onProfile: _openProfile);
     }
     return Scaffold(
       key: const ValueKey('home'),
@@ -316,15 +316,10 @@ class _CoordinatorNotice extends StatelessWidget {
 }
 
 class _KidHomeScreen extends StatelessWidget {
-  const _KidHomeScreen({
-    required this.name,
-    required this.onProfile,
-    required this.onCheckIn,
-  });
+  const _KidHomeScreen({required this.name, required this.onProfile});
 
   final String name;
   final VoidCallback onProfile;
-  final VoidCallback onCheckIn;
 
   KidBadge? get _featured {
     final id = SessionStore.instance.featuredKidBadge;
@@ -338,7 +333,6 @@ class _KidHomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final featured = _featured;
-    final catalog = CatalogScope.maybeOf(context);
     final nextShift = ShiftStore.instance.myShifts.firstOrNull;
     return Scaffold(
       key: const ValueKey('kid-home'),
@@ -388,10 +382,8 @@ class _KidHomeScreen extends StatelessWidget {
                       ),
                       const SizedBox(height: 12),
                       Text(
-                        catalog == null
-                            ? 'Sorting & Packing Line'
-                            : nextShift?.shift.title ??
-                                  'Plan your next shift together',
+                        nextShift?.shift.title ??
+                            'Plan your next shift together',
                         style: const TextStyle(
                           fontSize: 24,
                           fontWeight: FontWeight.w900,
@@ -399,9 +391,7 @@ class _KidHomeScreen extends StatelessWidget {
                       ),
                       const SizedBox(height: 6),
                       Text(
-                        catalog == null
-                            ? 'Saturday · 9:00 AM · Warehouse A'
-                            : nextShift == null
+                        nextShift == null
                             ? 'Ask your parent to reserve a place in Family Center.'
                             : '${nextShift.shift.date} · ${nextShift.shift.time} · ${nextShift.shift.station}',
                       ),
@@ -409,19 +399,7 @@ class _KidHomeScreen extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 18),
-                SizedBox(
-                  height: 74,
-                  child: FilledButton.icon(
-                    onPressed: onCheckIn,
-                    icon: const Icon(Icons.qr_code_scanner, size: 30),
-                    label: Text(
-                      catalog == null
-                          ? 'CHECK IN & PICK A BADGE'
-                          : 'CHECK IN & EARN A BADGE',
-                      style: const TextStyle(fontSize: 17),
-                    ),
-                  ),
-                ),
+                const _KidAttendanceCard(),
                 const SizedBox(height: 24),
                 Card(
                   child: Padding(
@@ -442,7 +420,8 @@ class _KidHomeScreen extends StatelessWidget {
                                 style: TextStyle(fontWeight: FontWeight.w900),
                               ),
                               Text(
-                                featured?.name ?? 'Unlock one after check-in!',
+                                featured?.name ??
+                                    'Unlock one after parent confirmation!',
                               ),
                             ],
                           ),
@@ -462,7 +441,7 @@ class _KidHomeScreen extends StatelessWidget {
                         SizedBox(width: 14),
                         Expanded(
                           child: Text(
-                            'Help out, check in, and grow your badge garden!',
+                            'Your parent checks you in. Once confirmed, grow your badge garden!',
                             style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.w800,
@@ -479,6 +458,86 @@ class _KidHomeScreen extends StatelessWidget {
         ),
       ),
       bottomNavigationBar: const BushelNavigationBar(selectedIndex: 0),
+    );
+  }
+}
+
+class _KidAttendanceCard extends StatelessWidget {
+  const _KidAttendanceCard();
+
+  @override
+  Widget build(BuildContext context) {
+    final catalog = CatalogScope.maybeOf(context);
+    final store = ShiftStore.instance;
+    if (catalog != null && (catalog.shiftsLoading || catalog.shiftsFailed)) {
+      return CatalogStatus(store: catalog, shifts: true);
+    }
+    if (catalog != null && (catalog.rewardsLoading || catalog.rewardsFailed)) {
+      return AttendanceStatus(store: catalog, rewards: true);
+    }
+    final bookings = store.myShifts;
+    final choices =
+        catalog?.rewards
+            .completed(SessionStore.instance.accountId)
+            .where((entry) => entry.badgeId == null)
+            .length ??
+        store.demoBadgeChoices;
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Shift check-in',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+            if (bookings.isEmpty) ...[
+              const Text('Not checked in'),
+              const Text('Ask your parent to book a shift together.'),
+            ],
+            for (final booking in bookings)
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                title: Text(booking.shift.title),
+                subtitle: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      store.isCheckedIn(booking.shift)
+                          ? 'Checked in'
+                          : 'Not checked in',
+                    ),
+                    if (store.isAwaitingConfirmation(booking.shift))
+                      const Text('Awaiting parent attendance confirmation'),
+                  ],
+                ),
+                leading: Icon(
+                  store.isCheckedIn(booking.shift)
+                      ? Icons.check_circle
+                      : Icons.hourglass_empty,
+                ),
+              ),
+            Text(
+              '${store.points} points',
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+            Text(
+              choices > 0
+                  ? 'Choose $choices new badge${choices == 1 ? '' : 's'}!'
+                  : 'Points and a badge choice unlock when your parent is confirmed.',
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => const KidBadgesScreen(),
+                ),
+              ),
+              child: const Text('My badge garden'),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

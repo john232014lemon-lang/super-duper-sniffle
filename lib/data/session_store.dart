@@ -35,8 +35,8 @@ class SessionStore extends ChangeNotifier {
     _challenges
       ..clear()
       ..addAll(initial._challenges);
-    _unlockedKidBadges.clear();
-    _featuredKidBadge = null;
+    _demoKidBadges.clear();
+    _demoFeaturedKidBadges.clear();
     _liveFamily = false;
     _liveBadges.clear();
     _liveFeatured.clear();
@@ -72,8 +72,19 @@ class SessionStore extends ChangeNotifier {
       emoji: '🤝',
     ),
   ];
-  final Set<String> _unlockedKidBadges = {};
-  String? _featuredKidBadge;
+  final Map<String, Set<String>> _demoKidBadges = {};
+  final Map<String, String> _demoFeaturedKidBadges = {};
+  Set<String> get _unlockedKidBadges =>
+      _demoKidBadges.putIfAbsent(accountId, () => {});
+  String? get _featuredKidBadge => _demoFeaturedKidBadges[accountId];
+  set _featuredKidBadge(String? value) {
+    if (value == null) {
+      _demoFeaturedKidBadges.remove(accountId);
+    } else {
+      _demoFeaturedKidBadges[accountId] = value;
+    }
+  }
+
   bool _liveFamily = false;
   final Map<String, Set<String>> _liveBadges = {};
   final Map<String, String> _liveFeatured = {};
@@ -204,8 +215,8 @@ class SessionStore extends ChangeNotifier {
 
   void clearDemoBadges() {
     if (_liveFamily) return;
-    _unlockedKidBadges.clear();
-    _featuredKidBadge = null;
+    _demoKidBadges.clear();
+    _demoFeaturedKidBadges.clear();
     notifyListeners();
   }
 

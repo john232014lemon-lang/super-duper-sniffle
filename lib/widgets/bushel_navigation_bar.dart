@@ -43,6 +43,7 @@ class BushelNavigationBar extends StatelessWidget {
       return;
     }
     if (index == 2) {
+      if (SessionStore.instance.isKidAccount) return;
       Navigator.of(context).pushReplacement(
         MaterialPageRoute<void>(builder: (_) => const CheckInScreen()),
       );
@@ -76,20 +77,15 @@ class BushelNavigationBar extends StatelessWidget {
   Widget build(BuildContext context) {
     if (SessionStore.instance.role == BushelRole.kid) {
       final kidIndex = switch (selectedIndex) {
-        2 => 1,
-        3 => 2,
-        4 => 3,
-        5 => 4,
+        3 => 1,
+        4 => 2,
+        5 => 3,
         _ => 0,
       };
       final destinations = <NavigationDestination>[
         const NavigationDestination(
           icon: Icon(Icons.home_rounded),
           label: 'Home',
-        ),
-        const NavigationDestination(
-          icon: Icon(Icons.qr_code_scanner),
-          label: 'Check in',
         ),
         const NavigationDestination(
           icon: Icon(Icons.calendar_month_outlined),
@@ -106,8 +102,8 @@ class BushelNavigationBar extends StatelessWidget {
           ),
       ];
       final canonical = SessionStore.instance.familyAccount
-          ? [0, 2, 3, 4, 5]
-          : [0, 2, 3, 4];
+          ? [0, 3, 4, 5]
+          : [0, 3, 4];
       return NavigationBar(
         selectedIndex: kidIndex,
         onDestinationSelected: (index) => _select(context, canonical[index]),
