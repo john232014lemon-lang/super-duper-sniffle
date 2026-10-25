@@ -369,47 +369,91 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
                   ),
                 ),
                 const SizedBox(height: 18),
-                Row(
-                  children: [
-                    const Expanded(
-                      child: Text(
-                        'Awaiting confirmation',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
+                if (qrCode != null) ...[
+                  const Text(
+                    'Group check-in status',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w900,
                     ),
-                    Chip(label: Text('${pending.length}')),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                if (pending.isEmpty)
-                  const Text('No one is waiting for attendance confirmation.')
-                else
-                  for (final record in pending)
-                    Card(
-                      child: ListTile(
-                        leading: const Icon(Icons.person_pin_circle_outlined),
-                        title: Text(record.name),
-                        subtitle: const Text(
-                          'Checked in · awaiting confirmation',
-                        ),
-                        trailing: FilledButton(
-                          key: ValueKey('confirm-${record.accountId}'),
-                          onPressed: () => shiftStore.confirmAttendance(
-                            shift,
-                            record.accountId,
+                  ),
+                  const SizedBox(height: 8),
+                  for (final member in _store.members)
+                    Builder(
+                      builder: (context) {
+                        final pendingRecord = pending
+                            .where((record) => record.accountId == member.id)
+                            .firstOrNull;
+                        final status = pendingRecord != null
+                            ? 'Scanned · pending confirmation'
+                            : shiftStore.hasAttendance(shift, member.id)
+                            ? 'Confirmed'
+                            : 'Not scanned yet';
+                        return Card(
+                          child: ListTile(
+                            title: Text(member.name),
+                            subtitle: Text('${member.role} · $status'),
+                            trailing: pendingRecord == null
+                                ? null
+                                : FilledButton(
+                                    key: ValueKey(
+                                      'confirm-${pendingRecord.accountId}',
+                                    ),
+                                    onPressed: () =>
+                                        shiftStore.confirmAttendance(
+                                          shift,
+                                          pendingRecord.accountId,
+                                        ),
+                                    child: const Text('Confirm'),
+                                  ),
                           ),
-                          child: const Text('Confirm'),
+                        );
+                      },
+                    ),
+                  const SizedBox(height: 22),
+                ] else ...[
+                  Row(
+                    children: [
+                      const Expanded(
+                        child: Text(
+                          'Awaiting confirmation',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w900,
+                          ),
                         ),
                       ),
-                    ),
-                const SizedBox(height: 22),
+                      Chip(label: Text('${pending.length}')),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Generate a QR to see every member’s scan status.',
+                  ),
+                  if (pending.isNotEmpty)
+                    for (final record in pending)
+                      Card(
+                        child: ListTile(
+                          title: Text(record.name),
+                          trailing: FilledButton(
+                            key: ValueKey('confirm-${record.accountId}'),
+                            onPressed: () => shiftStore.confirmAttendance(
+                              shift,
+                              record.accountId,
+                            ),
+                            child: const Text('Confirm'),
+                          ),
+                        ),
+                      ),
+                  const SizedBox(height: 22),
+                ],
               ],
               const Text(
                 'Everyone signed up for this shift',
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
+              ),
+              const Text(
+                'Adults and booked children appear here. Members can vote to remove volunteers or kids before check-in (two-thirds adult quorum; no self-votes; Kid Mode cannot vote).',
               ),
               const SizedBox(height: 6),
               Text('${_store.members.length} members'),
@@ -501,4 +545,8 @@ class _MemberCard extends StatelessWidget {
       ),
     ),
   );
+}
+
+extension _FirstOrNull<T> on Iterable<T> {
+  T? get firstOrNull => isEmpty ? null : first;
 }

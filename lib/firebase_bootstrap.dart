@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'data/coordinator_store.dart';
 import 'data/session_store.dart';
 import 'data/shift_store.dart';
+import 'demo_config.dart';
 import 'firebase_options.dart';
 import 'main.dart';
 import 'screens/auth_screen.dart';
@@ -96,6 +97,9 @@ class _AuthGateState extends State<AuthGate> {
   String? _uid;
   bool _waiting = true;
   bool _failed = false;
+  bool _mockSigningIn = false;
+  bool _mockSignInAttempted = false;
+  String? _mockSignInError;
 
   @override
   void initState() {
@@ -118,12 +122,45 @@ class _AuthGateState extends State<AuthGate> {
           _uid = uid;
           _waiting = false;
           _failed = false;
+          if (uid != null) {
+            _mockSigningIn = false;
+            _mockSignInError = null;
+            MockAccountSwitch.inProgress = false;
+          }
         });
+        if (uid == null) unawaited(_maybeMockAutoSignIn());
       },
       onError: (Object error) {
         if (mounted) setState(() => _failed = true);
       },
     );
+  }
+
+  Future<void> _maybeMockAutoSignIn() async {
+    if (!mockQrMode ||
+        !mockAccountsConfigured ||
+        _mockSignInAttempted ||
+        _mockSigningIn ||
+        _uid != null) {
+      return;
+    }
+    setState(() {
+      _mockSigningIn = true;
+      _mockSignInAttempted = true;
+      _mockSignInError = null;
+    });
+    try {
+      await widget.auth.ensureAccount(
+        mockAccountEmailA,
+        mockAccountPasswordA,
+      );
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _mockSigningIn = false;
+        _mockSignInError = authErrorMessage(error);
+      });
+    }
   }
 
   @override
@@ -144,13 +181,17 @@ class _AuthGateState extends State<AuthGate> {
             setState(() {
               _waiting = true;
               _failed = false;
+              _mockSignInAttempted = false;
+              _mockSignInError = null;
             });
             _listen();
           },
         ),
       );
     }
-    if (_waiting) return const BushelApp(home: _LoadingScreen());
+    if (_waiting || _mockSigningIn || MockAccountSwitch.inProgress) {
+      return const BushelApp(home: _LoadingScreen());
+    }
     final uid = _uid;
     final profileApp = uid == null
         ? null
@@ -164,7 +205,17 @@ class _AuthGateState extends State<AuthGate> {
       child: KeyedSubtree(
         key: ValueKey(_uid),
         child: _uid == null
-            ? BushelApp(home: AuthScreen(auth: widget.auth))
+            ? BushelApp(
+                home: AuthScreen(
+                  auth: widget.auth,
+                  initialError: mockQrMode
+                      ? (_mockSignInError ??
+                            (mockAccountsConfigured
+                                ? null
+                                : 'Mock auto-sign-in needs --dart-define=BUSHEL_MOCK_PASSWORD=…'))
+                      : null,
+                ),
+              )
             : widget.signedInHome != null
             ? BushelApp(home: widget.signedInHome!)
             : widget.catalog == null

@@ -1,5 +1,38 @@
 # Bushel Development Log
 
+## 2026-10-25 — Fix child vote-out registration read
+
+Bugbot high finding: `finalizeRemoval` for a voted-out child called `tx.get` on `registrations/{parentUid}/shifts/{shiftId}`. Rules allow only the registration owner to read that path, while finalization runs as a non-parent voter after quorum, so the transaction always permission-denied and rolled back. Fix: derive remaining `childIds` from group `childMembers` (already loaded) and `tx.update` the registration without a prior get, same privacy pattern as adult removal using group seats. No rules change.
+
+Verified: `flutter analyze --no-pub` on `catalog_repository.dart`; smoke “demo members can vote kids…” if present. No commit/push/deploy. Live signed-in child vote-out after published rules unperformed.
+
+Manual checks:
+- ≥3 adults on a shift with a booked child: two non-parent adults Vote out the child → child leaves Members, parent registration `childIds` drops that id, seats/signupCount decrement; no permission-denied.
+- Parent of the child still sees You (cannot vote); Kid Mode cannot vote.
+- Adult Vote out still removes the whole family as before.
+
+## 2026-10-25 — Mock auto-sign-in, group kids, pre-check-in votes, attendance roster
+
+Presentation/membership cleanup. Under `BUSHEL_MOCK` only: AuthGate auto-signs in as `a@a.co` when `BUSHEL_MOCK_PASSWORD` (or `_A`/`_B`) is provided; Profile replaces Sign out with **Switch account** between `a@a.co` (existing John C `tU7Za7rhdlcETyHVIxyLkyHAyft1`) and `b@b.co` (`SE9btPBdtfUQxy6TqhX3yJ3RfnI2`) without the full auth screen. Accounts are ensured via sign-in/register; passwords are dart-define only (`.env.example` documents the pattern). Without the mock flag, logout/auth UX is unchanged.
+
+All modes: `setChildSignup` writes `groups/{shiftId}.childMembers`; Live group lists adults and kids immediately (not only after scan). Members can vote out volunteers and kids before check-in; quorum remains two-thirds of adults; no self-vote; parents cannot vote out their own kids; Kid Mode cannot vote. Kid removal cancels that child’s place only (no family ban/revocation). After a leader generates a QR, QR & attendance shows every group member as not scanned / scanned·pending / confirmed (leaders may read the group doc). Local demo CoordinatorStore also allows voting kids out and shows the same status rows after QR. Updated local `firestore.rules` (childMembers, child votes, leader group get); Rules API compiled with zero issues. **Developer must publish rules** before live child roster/votes work under client security.
+
+Verified: `flutter analyze --no-pub` clean; smoke checks “group child members…”, “demo members can vote kids…”, and “My shifts exposes groups…” passed; Rules API `:test` returned `{}`. No commit/push/deploy. Signed-in mock switch / live childMembers write / vote / roster QA unperformed (needs published rules + password define).
+
+Manual checks:
+- `BUSHEL_MOCK` + password define: launches as a@a.co; Profile Switch account → b@b.co without auth screen; without mock flag, Sign out still appears.
+- Book a child on Evening Volunteer Shift: Members shows the child immediately; other adults can Vote out the child only when ≥3 adults (own parent sees You).
+- Leader generates mock QR: roster lists each adult/child with Not scanned yet → pending after scan → Confirmed after confirm.
+- Without published rules: expect permission errors on childMembers writes / leader group read until publish.
+
+## 2026-10-24 — Retarget MCFB shift leadership to John C
+
+John C (`tU7Za7rhdlcETyHVIxyLkyHAyft1`) was already approved for `montgomery-county-food-bank` with preferredRole coordinator. Both imported MCFB shifts still had `creatorUid` pointing at demo account `john`. Updated both shifts’ `creatorUid` to John C. Read-back confirmed. Profile `john` bank approval left unchanged. No app/rules changes.
+
+## 2026-10-24 — Clear MCFB signups again (demo slots)
+
+Evening Volunteer Shift had signupCount 3; Produce Rescue Center (PM) was already 0. Deleted remaining MCFB registrations for those two shift IDs, reset both groups to empty, set signupCount 0, and confirmed capacities 3 and 1. Read-back: Evening open 3, Produce Rescue open 1. No attendance entries found for MCFB on this pass. No app changes.
+
 ## 2026-10-24 — Demo data cleanup: points, mock-bank shifts, MCFB slate
 
 User requested a clean presentation dataset. Using the Firebase CLI admin token: deleted mock-bank (test) shifts `ImxyCfMPV5pux7t394Ps` and `ZkSpsN4flrXJLdqE1ngn` plus their groups/registrations; also removed extra non-imported MCFB shift `OuYjhB58U98e9KBBlNLJ` so only the two imported Montgomery County shifts remain. Cleared all registrations, attendance entries, mockQrTokens, and emptied groups for `mcfb-32fb545a-…` and `mcfb-26c13c3d-…`, resetting `signupCount` to 0. Deleted the only confirmed attendance entry (points are derived from attendance), so all accounts show zero reward points; rewardPreferences had no people docs. Banks, profiles, and coordinator approvals were not modified. `settings/mockQr` left enabled.

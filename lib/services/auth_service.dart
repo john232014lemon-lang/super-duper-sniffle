@@ -3,18 +3,44 @@ import 'package:flutter/widgets.dart';
 
 abstract class AuthService {
   Stream<String?> get userIds;
+  String? get currentEmail;
   Future<void> signIn(String email, String password);
   Future<void> register(String email, String password);
   Future<void> signOut();
+
+  /// Signs in, or creates the account when it does not exist yet.
+  Future<void> ensureAccount(String email, String password) async {
+    try {
+      await signIn(email, password);
+    } on FirebaseAuthException catch (error) {
+      if (error.code != 'user-not-found' &&
+          error.code != 'invalid-credential' &&
+          error.code != 'wrong-password') {
+        rethrow;
+      }
+      try {
+        await register(email, password);
+      } on FirebaseAuthException catch (createError) {
+        if (createError.code == 'email-already-in-use') {
+          await signIn(email, password);
+          return;
+        }
+        rethrow;
+      }
+    }
+  }
 }
 
-class FirebaseAuthService implements AuthService {
+class FirebaseAuthService extends AuthService {
   FirebaseAuthService(this._auth);
   final FirebaseAuth _auth;
 
   @override
   Stream<String?> get userIds =>
       _auth.authStateChanges().map((user) => user?.uid).distinct();
+
+  @override
+  String? get currentEmail => _auth.currentUser?.email;
 
   @override
   Future<void> signIn(String email, String password) async {

@@ -3,8 +3,9 @@ import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
 
 class AuthScreen extends StatefulWidget {
-  const AuthScreen({super.key, required this.auth});
+  const AuthScreen({super.key, required this.auth, this.initialError});
   final AuthService auth;
+  final String? initialError;
 
   @override
   State<AuthScreen> createState() => _AuthScreenState();
@@ -17,6 +18,12 @@ class _AuthScreenState extends State<AuthScreen> {
   bool _register = false;
   bool _busy = false;
   String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _error = widget.initialError;
+  }
 
   @override
   void dispose() {

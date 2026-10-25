@@ -63,12 +63,24 @@ class CoordinatorStore extends ChangeNotifier {
       containsAccount(SessionStore.instance.accountId);
   bool hasVotedFor(String id) =>
       _votersByTarget[id]?.contains(SessionStore.instance.accountId) ?? false;
-  bool canVoteFor(String id) =>
-      currentAccountIsMember &&
-      !SessionStore.instance.isKidAccount &&
-      _members.any((member) => member.id == id && member.role != 'Kid') &&
-      id != SessionStore.instance.accountId &&
-      !hasVotedFor(id);
+  bool canVoteFor(String id) {
+    if (!currentAccountIsMember ||
+        SessionStore.instance.isKidAccount ||
+        hasVotedFor(id)) {
+      return false;
+    }
+    final target = _members.where((member) => member.id == id).firstOrNull;
+    if (target == null) return false;
+    // Adults cannot vote themselves out; parents manage own kids via Leave.
+    if (target.id == SessionStore.instance.accountId) return false;
+    if (target.role == 'Kid') {
+      final ownKids = SessionStore.instance.children
+          .map((child) => child.id)
+          .toSet();
+      return !ownKids.contains(target.id);
+    }
+    return true;
+  }
 
   void configureParent(String name, BushelRole role) {
     final index = _members.indexWhere((member) => member.id == 'parent');
@@ -108,22 +120,28 @@ class CoordinatorStore extends ChangeNotifier {
     if (!canVoteFor(id)) return false;
     final index = _members.indexWhere((member) => member.id == id);
     if (index < 0) return false;
+    final target = _members[index];
     (_votersByTarget[id] ??= {}).add(voterId);
-    final updated = _members[index].copyWith(
-      voteCount: _members[index].voteCount + 1,
-    );
+    final updated = target.copyWith(voteCount: target.voteCount + 1);
     if (updated.voteCount >= votesNeeded) {
       _members.removeAt(index);
-      if (id == 'parent') {
-        final children = SessionStore.instance.children
-            .map((child) => child.id)
-            .toSet();
-        _members.removeWhere((member) => children.contains(member.id));
+      if (target.role == 'Kid') {
+        ShiftStore.instance.revokeDemoFamily(
+          mockFoodBanks.first.shifts.first,
+          id,
+        );
+      } else {
+        if (id == 'parent') {
+          final children = SessionStore.instance.children
+              .map((child) => child.id)
+              .toSet();
+          _members.removeWhere((member) => children.contains(member.id));
+        }
+        ShiftStore.instance.revokeDemoFamily(
+          mockFoodBanks.first.shifts.first,
+          id,
+        );
       }
-      ShiftStore.instance.revokeDemoFamily(
-        mockFoodBanks.first.shifts.first,
-        id,
-      );
       notifyListeners();
       return true;
     }
@@ -131,4 +149,8 @@ class CoordinatorStore extends ChangeNotifier {
     notifyListeners();
     return false;
   }
+}
+
+extension _FirstOrNull<T> on Iterable<T> {
+  T? get firstOrNull => isEmpty ? null : first;
 }

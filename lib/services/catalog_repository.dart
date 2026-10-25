@@ -292,11 +292,21 @@ class FirestoreCatalogRepository extends FirestoreAttendanceRepository
     if (join && count >= shift.data()!['capacity']) {
       throw const CatalogException('This shift is full.');
     }
+    final childName = SessionStore.instance.children
+        .where((child) => child.id == childId)
+        .map((child) => child.name)
+        .firstOrNull;
+    if (join && (childName == null || childName.trim().isEmpty)) {
+      throw const CatalogException('Child account not found.');
+    }
     join ? ids.add(childId) : ids.remove(childId);
     tx.update(ref, {'childIds': ids.toList()});
     tx.update(shiftRef, {'signupCount': count + (join ? 1 : -1)});
     tx.update(_db.collection('groups').doc(shiftId), {
       FieldPath(['seats', uid]): 1 + ids.length,
+      FieldPath(['childMembers', uid, childId]): join
+          ? childName!.trim()
+          : FieldValue.delete(),
     });
   });
 
@@ -305,12 +315,21 @@ class FirestoreCatalogRepository extends FirestoreAttendanceRepository
       .collection('groups')
       .doc(shiftId)
       .snapshots()
-      .map(
-        (doc) => ShiftGroup(
+      .map((doc) {
+        final rawChildren = Map<String, dynamic>.from(
+          doc.data()?['childMembers'] ?? {},
+        );
+        return ShiftGroup(
           members: Map<String, String>.from(doc.data()?['members'] ?? {}),
+          childMembers: {
+            for (final entry in rawChildren.entries)
+              entry.key: Map<String, String>.from(
+                entry.value is Map ? entry.value as Map : const {},
+              ),
+          },
           version: doc.data()?['version'] as int? ?? 0,
-        ),
-      );
+        );
+      });
 
   @override
   Stream<Map<String, RemovalVote>> watchVotes(String shiftId) => _db
@@ -332,6 +351,7 @@ class FirestoreCatalogRepository extends FirestoreAttendanceRepository
   Future<void> voteToRemove(String uid, String shiftId, String target) async {
     final groupRef = _db.collection('groups').doc(shiftId);
     final voteRef = groupRef.collection('votes').doc(target);
+    final childTarget = ShiftGroup.parseChildVoteTarget(target);
     await _db.runTransaction((tx) async {
       final group = (await tx.get(groupRef)).data()!;
       final vote = (await tx.get(voteRef)).data();
@@ -340,7 +360,16 @@ class FirestoreCatalogRepository extends FirestoreAttendanceRepository
           : <String>[];
       if (voters.contains(uid)) return;
       voters.add(uid);
-      tx.set(voteRef, {'version': group['version'], 'voters': voters});
+      if (childTarget == null) {
+        tx.set(voteRef, {'version': group['version'], 'voters': voters});
+      } else {
+        tx.set(voteRef, {
+          'version': group['version'],
+          'voters': voters,
+          'parentUid': childTarget.$1,
+          'childId': childTarget.$2,
+        });
+      }
     });
     await finalizeRemoval(uid, shiftId, target);
   }
@@ -353,29 +382,76 @@ class FirestoreCatalogRepository extends FirestoreAttendanceRepository
   ) => _db.runTransaction((tx) async {
     final groupRef = _db.collection('groups').doc(shiftId);
     final shiftRef = _db.collection('shifts').doc(shiftId);
-    final registrationRef = _db
-        .collection('registrations')
-        .doc(target)
-        .collection('shifts')
-        .doc(shiftId);
     final group = (await tx.get(groupRef)).data()!;
     final vote = (await tx.get(
       groupRef.collection('votes').doc(target),
     )).data();
     final members = Map<String, dynamic>.from(group['members']);
-    if (!members.containsKey(target) ||
-        vote?['version'] != group['version'] ||
+    if (vote?['version'] != group['version'] ||
         (vote!['voters'] as List).length * 3 < members.length * 2) {
       return;
     }
+    final childTarget = ShiftGroup.parseChildVoteTarget(target);
     final shift = (await tx.get(shiftRef)).data()!;
+    final seats = Map<String, dynamic>.from(group['seats'] ?? {});
+    final childMembers = Map<String, dynamic>.from(
+      group['childMembers'] ?? {},
+    );
+
+    if (childTarget != null) {
+      final parentUid = childTarget.$1;
+      final childId = childTarget.$2;
+      if (vote['parentUid'] != parentUid || vote['childId'] != childId) {
+        return;
+      }
+      final parentKids = Map<String, dynamic>.from(
+        childMembers[parentUid] ?? {},
+      );
+      if (!members.containsKey(parentUid) || !parentKids.containsKey(childId)) {
+        return;
+      }
+      // Group childMembers mirrors registration childIds; avoid reading the
+      // parent's private registration (only the owner may read it).
+      final ids = Set<String>.from(parentKids.keys)..remove(childId);
+      parentKids.remove(childId);
+      if (parentKids.isEmpty) {
+        childMembers.remove(parentUid);
+      } else {
+        childMembers[parentUid] = parentKids;
+      }
+      seats[parentUid] = 1 + ids.length;
+      tx.update(
+        _db
+            .collection('registrations')
+            .doc(parentUid)
+            .collection('shifts')
+            .doc(shiftId),
+        {'childIds': ids.toList()},
+      );
+      tx.update(groupRef, {
+        'seats': seats,
+        'childMembers': childMembers,
+      });
+      tx.update(shiftRef, {
+        'signupCount': (shift['signupCount'] as int) - 1,
+      });
+      return;
+    }
+
+    final registrationRef = _db
+        .collection('registrations')
+        .doc(target)
+        .collection('shifts')
+        .doc(shiftId);
+    if (!members.containsKey(target)) return;
     // Group seat counts avoid reading another family's private registration.
-    final seats = Map<String, dynamic>.from(group['seats']);
     final removedSeats = seats.remove(target) as int;
     members.remove(target);
+    childMembers.remove(target);
     tx.update(groupRef, {
       'members': members,
       'seats': seats,
+      'childMembers': childMembers,
       'version': (group['version'] as int) + 1,
       'banned': FieldValue.arrayUnion([target]),
     });
@@ -437,6 +513,7 @@ class FirestoreCatalogRepository extends FirestoreAttendanceRepository
     batch.set(_db.collection('groups').doc(ref.id), {
       'members': <String, String>{},
       'seats': <String, int>{},
+      'childMembers': <String, Map<String, String>>{},
       'version': 0,
       'banned': <String>[],
     });
@@ -475,6 +552,7 @@ class FirestoreCatalogRepository extends FirestoreAttendanceRepository
               ? SessionStore.instance.parentName
               : FieldValue.delete(),
           FieldPath(['seats', uid]): join ? 1 : FieldValue.delete(),
+          if (!join) FieldPath(['childMembers', uid]): FieldValue.delete(),
           'version': FieldValue.increment(1),
         });
         if (join) {
@@ -483,4 +561,8 @@ class FirestoreCatalogRepository extends FirestoreAttendanceRepository
           tx.delete(registrationRef);
         }
       });
+}
+
+extension _FirstOrNull<T> on Iterable<T> {
+  T? get firstOrNull => isEmpty ? null : first;
 }

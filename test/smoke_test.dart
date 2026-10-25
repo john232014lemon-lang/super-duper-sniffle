@@ -46,6 +46,8 @@ class _Auth implements AuthService {
   @override
   Stream<String?> get userIds => changes.stream;
   @override
+  String? get currentEmail => null;
+  @override
   dynamic noSuchMethod(Invocation invocation) =>
       throw StateError('Unexpected auth call: ${invocation.memberName}');
 }
@@ -534,6 +536,57 @@ void main() {
     );
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox());
+  });
+
+  test('group child members are listable and vote targets parse', () {
+    const group = ShiftGroup(
+      members: {'adult-a': 'Alex', 'adult-b': 'Blair', 'adult-c': 'Casey'},
+      childMembers: {
+        'adult-a': {'child-1': 'Sam'},
+      },
+      version: 2,
+    );
+    expect(group.votesNeeded, 2);
+    expect(group.childList.single.name, 'Sam');
+    expect(
+      group.childList.single.target,
+      ShiftGroup.childVoteTarget('adult-a', 'child-1'),
+    );
+    expect(
+      ShiftGroup.parseChildVoteTarget('adult-a::child-1'),
+      ('adult-a', 'child-1'),
+    );
+    expect(ShiftGroup.parseChildVoteTarget('adult-a'), isNull);
+  });
+
+  test('demo members can vote kids out before check-in', () {
+    SessionStore.instance.reset();
+    CoordinatorStore.instance.reset();
+    SessionStore.instance.configureParent(
+      name: 'Maya',
+      role: BushelRole.volunteer,
+      family: true,
+    );
+    SessionStore.instance.addChild('Jordan');
+    CoordinatorStore.instance.addFamilyChild(
+      SessionStore.instance.children.single,
+    );
+    expect(CoordinatorStore.instance.canVoteFor('parent'), isFalse);
+    expect(CoordinatorStore.instance.canVoteFor('riley'), isTrue);
+    expect(
+      CoordinatorStore.instance.canVoteFor(
+        SessionStore.instance.children.single.id,
+      ),
+      isFalse,
+    );
+    final kidId = SessionStore.instance.children.single.id;
+    SessionStore.instance.reset();
+    SessionStore.instance.configureParent(
+      name: 'Other adult',
+      role: BushelRole.volunteer,
+      family: false,
+    );
+    expect(CoordinatorStore.instance.canVoteFor(kidId), isTrue);
   });
 
   test('rewards exclude pending attendance and duplicate completions', () {

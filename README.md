@@ -16,8 +16,10 @@ The explicit `BUSHEL_DEMO` flag opens mock onboarding without initializing Fireb
 For the Congressional App Challenge presentation, run:
 
 ```sh
-flutter run -d chrome --dart-define=BUSHEL_MOCK=true
+flutter run -d chrome --dart-define=BUSHEL_MOCK=true --dart-define=BUSHEL_MOCK_PASSWORD=your-password
 ```
+
+Pass the shared password for the existing Firebase accounts `a@a.co` (John C / MCFB leader) and `b@b.co` via `BUSHEL_MOCK_PASSWORD` (or per-account `BUSHEL_MOCK_PASSWORD_A` / `BUSHEL_MOCK_PASSWORD_B`). Do not commit real passwords; see `.env.example`. With the password define set, mock mode auto-signs in as `a@a.co` and Profile **Switch account** toggles to `b@b.co` (and back) without the normal auth screen. Without `BUSHEL_MOCK`, Sign out and the usual login UX are unchanged.
 
 `BUSHEL_MOCK` uses normal Firebase initialization, sign-in, profiles, banks, shifts, bookings, attendance, and rewards. The banner reads **Mock QR · Firebase data is live**. It also takes precedence over `BUSHEL_DEMO` if both flags are supplied. The separate `BUSHEL_DEMO` flag alone still opens the fully local sandbox.
 
@@ -116,8 +118,8 @@ Review `name`, `contact`, `reason`, and `submittedAt`, then set the string field
 
 | Path | Stored data and access |
 | --- | --- |
-| `groups/{shiftId}` | Adult display names, seat counts, membership version, removed UIDs; readable only by current group members |
-| `groups/{shiftId}/votes/{targetUid}` | Voter UIDs and membership version; current adults vote once per target/version, never for themselves |
+| `groups/{shiftId}` | Adult display names, `childMembers` (parentUid → childId → name), seat counts, membership version, removed UIDs; readable by current group members and the assigned shift leader |
+| `groups/{shiftId}/votes/{target}` | Adult targets use the adult uid; child targets use `parentUid::childId` plus `parentUid`/`childId` fields. Voter UIDs and membership version; current adults vote once per target/version, never for themselves or their own kids |
 | `families/{parentUid}` | Child names, family challenge titles, selected child ID; private to the authenticated parent |
 | `registrations/{parentUid}/shifts/{shiftId}.childIds` | Child places managed by that parent; private and atomically counted toward capacity |
 

@@ -33,14 +33,70 @@ service cloud.firestore {
       return member(sid) && target != request.auth.uid && target in g.members
         && vote.version == g.version && vote.voters.size() * 3 >= g.members.size() * 2;
     }
+    function childVote(sid, target) {
+      return get(/databases/$(database)/documents/groups/$(sid)/votes/$(target)).data;
+    }
+    function childQuorum(sid, target) {
+      let g = get(groupPath(sid)).data;
+      let vote = childVote(sid, target);
+      return member(sid)
+        && vote.keys().hasOnly(['version', 'voters', 'parentUid', 'childId'])
+        && vote.parentUid is string
+        && vote.childId is string
+        && vote.parentUid in g.members
+        && vote.parentUid != request.auth.uid
+        && vote.childId in g.get('childMembers', {}).get(vote.parentUid, {})
+        && target == vote.parentUid + '::' + vote.childId
+        && vote.version == g.version
+        && vote.voters.size() * 3 >= g.members.size() * 2;
+    }
     function removedTarget(sid) {
       return get(groupPath(sid)).data.members.keys().removeAll(getAfter(groupPath(sid)).data.members.keys())[0];
     }
     function removal(sid, target) {
       return quorum(sid, target) && !existsAfter(regPath(target, sid))
         && !(target in getAfter(groupPath(sid)).data.members)
+        && !(target in getAfter(groupPath(sid)).data.get('childMembers', {}))
         && target in getAfter(groupPath(sid)).data.banned
         && getAfter(revokedPath(target, sid)).data.revokedAt == request.time;
+    }
+    function childRemoval(sid, parentUid, childId) {
+      let target = parentUid + '::' + childId;
+      let beforeIds = resource.data.get('childIds', []);
+      let afterIds = request.resource.data.get('childIds', []);
+      return childQuorum(sid, target)
+        && childVote(sid, target).parentUid == parentUid
+        && childVote(sid, target).childId == childId
+        && childId in beforeIds
+        && !(childId in afterIds)
+        && afterIds.size() == beforeIds.size() - 1
+        && beforeIds.hasAll(afterIds)
+        && !(childId in getAfter(groupPath(sid)).data.get('childMembers', {}).get(parentUid, {}))
+        && getAfter(groupPath(sid)).data.seats[parentUid] == 1 + afterIds.size()
+        && getAfter(shiftPath(sid)).data.signupCount == get(shiftPath(sid)).data.signupCount - 1;
+    }
+    function childSeatRemovalQuorum(sid, parentUid) {
+      let before = get(groupPath(sid)).data.get('childMembers', {}).get(parentUid, {});
+      let after = getAfter(groupPath(sid)).data.get('childMembers', {}).get(parentUid, {});
+      let childKeys = before.keys();
+      return (childKeys.size() >= 1 && !(childKeys[0] in after) && childQuorum(sid, parentUid + '::' + childKeys[0]))
+        || (childKeys.size() >= 2 && !(childKeys[1] in after) && childQuorum(sid, parentUid + '::' + childKeys[1]))
+        || (childKeys.size() >= 3 && !(childKeys[2] in after) && childQuorum(sid, parentUid + '::' + childKeys[2]))
+        || (childKeys.size() >= 4 && !(childKeys[3] in after) && childQuorum(sid, parentUid + '::' + childKeys[3]))
+        || (childKeys.size() >= 5 && !(childKeys[4] in after) && childQuorum(sid, parentUid + '::' + childKeys[4]));
+    }
+    function registrationRemovedChild(sid, parentUid) {
+      let beforeIds = resource.data.get('childIds', []);
+      let afterIds = request.resource.data.childIds;
+      return beforeIds.size() == afterIds.size() + 1
+        && beforeIds.hasAll(afterIds)
+        && (
+          (beforeIds.size() >= 1 && !(beforeIds[0] in afterIds) && childRemoval(sid, parentUid, beforeIds[0]))
+          || (beforeIds.size() >= 2 && !(beforeIds[1] in afterIds) && childRemoval(sid, parentUid, beforeIds[1]))
+          || (beforeIds.size() >= 3 && !(beforeIds[2] in afterIds) && childRemoval(sid, parentUid, beforeIds[2]))
+          || (beforeIds.size() >= 4 && !(beforeIds[3] in afterIds) && childRemoval(sid, parentUid, beforeIds[3]))
+          || (beforeIds.size() >= 5 && !(beforeIds[4] in afterIds) && childRemoval(sid, parentUid, beforeIds[4]))
+        );
     }
     function text(value, limit) { return value is string && value.size() > 0 && value.size() <= limit && value.matches('(?s).*\\S.*'); }
     // Administrator-owned, expiring allowlist. A client build flag grants no access.
@@ -161,7 +217,7 @@ service cloud.firestore {
         && request.resource.data.signupCount == 0
         && request.resource.data.createdAt == request.time
         && !exists(groupPath(shiftId))
-        && getAfter(groupPath(shiftId)).data == {'members': {}, 'seats': {}, 'version': 0, 'banned': []};
+        && getAfter(groupPath(shiftId)).data == {'members': {}, 'seats': {}, 'childMembers': {}, 'version': 0, 'banned': []};
 
       function ownCountChange() {
         let delta = afterSeats(request.auth.uid, shiftId) - beforeSeats(request.auth.uid, shiftId);
@@ -172,12 +228,39 @@ service cloud.firestore {
         return removal(shiftId, target)
           && request.resource.data.signupCount == resource.data.signupCount - beforeSeats(target, shiftId);
       }
+      function childRemovalCountChange() {
+        let beforeSeats = get(groupPath(shiftId)).data.seats;
+        let afterSeats = getAfter(groupPath(shiftId)).data.seats;
+        let seatKeys = beforeSeats.keys();
+        return request.resource.data.signupCount == resource.data.signupCount - 1
+          && getAfter(groupPath(shiftId)).data.members == get(groupPath(shiftId)).data.members
+          && getAfter(groupPath(shiftId)).data.version == get(groupPath(shiftId)).data.version
+          && beforeSeats.diff(afterSeats).affectedKeys().size() == 1
+          && (
+            (seatKeys.size() >= 1 && beforeSeats[seatKeys[0]] == afterSeats[seatKeys[0]] + 1
+              && childSeatRemovalQuorum(shiftId, seatKeys[0]))
+            || (seatKeys.size() >= 2 && beforeSeats[seatKeys[1]] == afterSeats[seatKeys[1]] + 1
+              && childSeatRemovalQuorum(shiftId, seatKeys[1]))
+            || (seatKeys.size() >= 3 && beforeSeats[seatKeys[2]] == afterSeats[seatKeys[2]] + 1
+              && childSeatRemovalQuorum(shiftId, seatKeys[2]))
+            || (seatKeys.size() >= 4 && beforeSeats[seatKeys[3]] == afterSeats[seatKeys[3]] + 1
+              && childSeatRemovalQuorum(shiftId, seatKeys[3]))
+            || (seatKeys.size() >= 5 && beforeSeats[seatKeys[4]] == afterSeats[seatKeys[4]] + 1
+              && childSeatRemovalQuorum(shiftId, seatKeys[4]))
+            || (seatKeys.size() >= 6 && beforeSeats[seatKeys[5]] == afterSeats[seatKeys[5]] + 1
+              && childSeatRemovalQuorum(shiftId, seatKeys[5]))
+            || (seatKeys.size() >= 7 && beforeSeats[seatKeys[6]] == afterSeats[seatKeys[6]] + 1
+              && childSeatRemovalQuorum(shiftId, seatKeys[6]))
+            || (seatKeys.size() >= 8 && beforeSeats[seatKeys[7]] == afterSeats[seatKeys[7]] + 1
+              && childSeatRemovalQuorum(shiftId, seatKeys[7]))
+          );
+      }
       allow update: if signedIn()
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['signupCount'])
         && request.resource.data.signupCount is int
         && request.resource.data.signupCount >= 0
         && request.resource.data.signupCount <= resource.data.capacity
-        && (ownCountChange() || removalCountChange());
+        && (ownCountChange() || removalCountChange() || childRemovalCountChange());
       allow update: if shiftLeader(shiftId)
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['qrTokenHash', 'qrExpiresAt', 'qrCode'])
         && !('qrCode' in request.resource.data)
@@ -274,17 +357,33 @@ service cloud.firestore {
           || (request.resource.data.childIds.size() == resource.data.get('childIds', []).size() - 1
               && resource.data.get('childIds', []).hasAll(request.resource.data.childIds)))
         && getAfter(shift()).data.signupCount == get(shift()).data.signupCount + request.resource.data.childIds.size() - resource.data.get('childIds', []).size()
-        && getAfter(groupPath(shiftId)).data.seats[uid] == 1 + request.resource.data.childIds.size();
+        && getAfter(groupPath(shiftId)).data.seats[uid] == 1 + request.resource.data.childIds.size()
+        && getAfter(groupPath(shiftId)).data.get('childMembers', {}).get(uid, {}).keys()
+             .hasOnly(request.resource.data.childIds)
+        && request.resource.data.childIds.hasOnly(
+             getAfter(groupPath(shiftId)).data.get('childMembers', {}).get(uid, {}).keys());
+      allow update: if parentMode()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['childIds'])
+        && request.resource.data.childIds is list
+        && request.resource.data.childIds.size() == request.resource.data.childIds.toSet().size()
+        && registrationRemovedChild(shiftId, uid);
       allow delete: if parentMode() && (owner() || removal(shiftId, uid))
         && !(uid in getAfter(groupPath(shiftId)).data.members)
+        && !(uid in getAfter(groupPath(shiftId)).data.get('childMembers', {}))
         && getAfter(shift()).data.signupCount == get(shift()).data.signupCount - 1 - resource.data.get('childIds', []).size()
         && getAfter(shift()).data.signupCount >= 0;
     }
     match /groups/{shiftId} {
-      allow get: if member(shiftId);
+      allow get: if member(shiftId) || shiftLeader(shiftId);
       allow create: if signedIn() && !exists(shiftPath(shiftId))
         && getAfter(shiftPath(shiftId)).data.creatorUid == request.auth.uid
-        && request.resource.data == {'members': {}, 'seats': {}, 'version': 0, 'banned': []};
+        && request.resource.data == {'members': {}, 'seats': {}, 'childMembers': {}, 'version': 0, 'banned': []};
+      function childRosterOk(uid, next) {
+        let kids = next.get('childMembers', {}).get(uid, {});
+        let ids = getAfter(regPath(uid, shiftId)).data.get('childIds', []);
+        return kids.keys().hasOnly(ids) && ids.hasOnly(kids.keys())
+          && next.get('childMembers', {}).diff(resource.data.get('childMembers', {})).affectedKeys().hasOnly([uid]);
+      }
       function ownMembership() {
         let uid = request.auth.uid;
         let before = beforeSeats(uid, shiftId);
@@ -294,10 +393,13 @@ service cloud.firestore {
           && next.members.diff(resource.data.members).affectedKeys().hasOnly([uid])
           && next.seats.diff(resource.data.seats).affectedKeys().hasOnly([uid])
           && ((before == 0 && after == 1 && !(uid in resource.data.banned)
-              && text(next.members[uid], 80) && next.seats[uid] == 1 && next.version == resource.data.version + 1)
-            || (before > 0 && after == 0 && !(uid in next.members) && !(uid in next.seats) && next.version == resource.data.version + 1)
+              && text(next.members[uid], 80) && next.seats[uid] == 1 && next.version == resource.data.version + 1
+              && !(uid in next.get('childMembers', {})))
+            || (before > 0 && after == 0 && !(uid in next.members) && !(uid in next.seats)
+              && !(uid in next.get('childMembers', {})) && next.version == resource.data.version + 1)
             || (before > 0 && after > 0 && before != after && next.members == resource.data.members
-              && next.seats[uid] == after && next.version == resource.data.version));
+              && next.seats[uid] == after && next.version == resource.data.version
+              && childRosterOk(uid, next)));
       }
       function removeMember() {
         let target = removedTarget(shiftId);
@@ -305,15 +407,47 @@ service cloud.firestore {
         return removal(shiftId, target)
           && next.members.diff(resource.data.members).affectedKeys().hasOnly([target])
           && next.seats.diff(resource.data.seats).affectedKeys().hasOnly([target])
-          && !(target in next.seats) && next.version == resource.data.version + 1
+          && next.get('childMembers', {}).diff(resource.data.get('childMembers', {})).affectedKeys().hasOnly([target])
+          && !(target in next.seats) && !(target in next.get('childMembers', {}))
+          && next.version == resource.data.version + 1
           && next.banned == resource.data.banned.concat([target]);
       }
+      function removeChildForParent(parentUid) {
+        let next = request.resource.data;
+        let before = resource.data.get('childMembers', {}).get(parentUid, {});
+        let after = next.get('childMembers', {}).get(parentUid, {});
+        let childKeys = before.keys();
+        return next.members == resource.data.members
+          && next.banned == resource.data.banned
+          && next.version == resource.data.version
+          && next.seats.diff(resource.data.seats).affectedKeys().hasOnly([parentUid])
+          && next.seats[parentUid] == resource.data.seats[parentUid] - 1
+          && resource.data.get('childMembers', {}).diff(next.get('childMembers', {})).affectedKeys().hasOnly([parentUid])
+          && (
+            (childKeys.size() >= 1 && !(childKeys[0] in after) && childQuorum(shiftId, parentUid + '::' + childKeys[0]))
+            || (childKeys.size() >= 2 && !(childKeys[1] in after) && childQuorum(shiftId, parentUid + '::' + childKeys[1]))
+            || (childKeys.size() >= 3 && !(childKeys[2] in after) && childQuorum(shiftId, parentUid + '::' + childKeys[2]))
+            || (childKeys.size() >= 4 && !(childKeys[3] in after) && childQuorum(shiftId, parentUid + '::' + childKeys[3]))
+            || (childKeys.size() >= 5 && !(childKeys[4] in after) && childQuorum(shiftId, parentUid + '::' + childKeys[4]))
+          );
+      }
+      function removeChildMember() {
+        let seatKeys = resource.data.seats.keys();
+        return (seatKeys.size() >= 1 && removeChildForParent(seatKeys[0]))
+          || (seatKeys.size() >= 2 && removeChildForParent(seatKeys[1]))
+          || (seatKeys.size() >= 3 && removeChildForParent(seatKeys[2]))
+          || (seatKeys.size() >= 4 && removeChildForParent(seatKeys[3]))
+          || (seatKeys.size() >= 5 && removeChildForParent(seatKeys[4]))
+          || (seatKeys.size() >= 6 && removeChildForParent(seatKeys[5]))
+          || (seatKeys.size() >= 7 && removeChildForParent(seatKeys[6]))
+          || (seatKeys.size() >= 8 && removeChildForParent(seatKeys[7]));
+      }
       allow update: if signedIn()
-        && request.resource.data.keys().hasOnly(['members', 'seats', 'version', 'banned'])
-        && (ownMembership() || removeMember());
+        && request.resource.data.keys().hasOnly(['members', 'seats', 'version', 'banned', 'childMembers'])
+        && (ownMembership() || removeMember() || removeChildMember());
       match /votes/{target} {
         allow read: if member(shiftId);
-        function validVote() {
+        function validAdultVote() {
           let g = get(groupPath(shiftId)).data;
           let previous = resource == null || resource.data.version != g.version ? [] : resource.data.voters;
           return parentMode() && member(shiftId) && target in g.members && target != request.auth.uid
@@ -322,7 +456,23 @@ service cloud.firestore {
             && !(request.auth.uid in previous)
             && request.resource.data.voters == previous.concat([request.auth.uid]);
         }
-        allow create, update: if validVote();
+        function validChildVote() {
+          let g = get(groupPath(shiftId)).data;
+          let previous = resource == null || resource.data.version != g.version ? [] : resource.data.voters;
+          let parentUid = request.resource.data.parentUid;
+          let childId = request.resource.data.childId;
+          return parentMode() && member(shiftId)
+            && parentUid is string && childId is string
+            && parentUid in g.members
+            && parentUid != request.auth.uid
+            && childId in g.get('childMembers', {}).get(parentUid, {})
+            && target == parentUid + '::' + childId
+            && request.resource.data.keys().hasOnly(['version', 'voters', 'parentUid', 'childId'])
+            && request.resource.data.version == g.version
+            && !(request.auth.uid in previous)
+            && request.resource.data.voters == previous.concat([request.auth.uid]);
+        }
+        allow create, update: if validAdultVote() || validChildVote();
       }
     }
     // Only the explicitly shared phone is exposed, never private profile fields.

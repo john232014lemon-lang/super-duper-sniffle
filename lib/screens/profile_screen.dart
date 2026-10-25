@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../data/session_store.dart';
 import '../data/catalog_store.dart';
+import '../demo_config.dart';
 import '../widgets/attendance_status.dart';
 import 'rewards_screen.dart';
 import 'kid_badges_screen.dart';
@@ -38,6 +39,27 @@ class _ProfileScreenState extends State<ProfileScreen> {
     try {
       await auth.signOut();
     } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(authErrorMessage(error))));
+      }
+    } finally {
+      if (mounted) setState(() => _signingOut = false);
+    }
+  }
+
+  Future<void> _switchMockAccount(AuthService auth) async {
+    if (_signingOut || !mockAccountsConfigured) return;
+    final nextEmail = mockOtherAccountEmail(auth.currentEmail);
+    final password = mockPasswordForEmail(nextEmail);
+    setState(() => _signingOut = true);
+    MockAccountSwitch.inProgress = true;
+    try {
+      await auth.signOut();
+      await auth.ensureAccount(nextEmail, password);
+    } catch (error) {
+      MockAccountSwitch.inProgress = false;
       if (mounted) {
         ScaffoldMessenger.of(
           context,
@@ -245,11 +267,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
               if (auth != null) ...[
                 const SizedBox(height: 16),
-                OutlinedButton.icon(
-                  onPressed: _signingOut ? null : () => _signOut(auth),
-                  icon: const Icon(Icons.logout),
-                  label: Text(_signingOut ? 'Signing out…' : 'Sign out'),
-                ),
+                if (mockQrMode)
+                  OutlinedButton.icon(
+                    onPressed: _signingOut || !mockAccountsConfigured
+                        ? null
+                        : () => _switchMockAccount(auth),
+                    icon: const Icon(Icons.swap_horiz),
+                    label: Text(
+                      _signingOut
+                          ? 'Switching…'
+                          : 'Switch account (${mockOtherAccountEmail(auth.currentEmail)})',
+                    ),
+                  )
+                else
+                  OutlinedButton.icon(
+                    onPressed: _signingOut ? null : () => _signOut(auth),
+                    icon: const Icon(Icons.logout),
+                    label: Text(_signingOut ? 'Signing out…' : 'Sign out'),
+                  ),
               ],
             ],
           ),

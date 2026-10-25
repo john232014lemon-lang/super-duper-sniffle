@@ -39,17 +39,20 @@ class _LiveGroupScreenState extends State<LiveGroupScreen> {
 
   Future<void> _vote(
     String target,
-    String name,
-    int needed,
-    bool finalize,
-  ) async {
+    String name, {
+    required int needed,
+    required bool finalize,
+    required bool child,
+  }) async {
     if (_busy) return;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: Text(finalize ? 'Complete removal?' : 'Vote to remove $name?'),
         content: Text(
-          'Removal needs $needed votes, at least two-thirds of current adult members. It revokes family points and badges from this shift, even after check-in. It cancels this member’s signup and any child places they manage. Votes reset when adult membership changes.',
+          child
+              ? 'Removal needs $needed votes, at least two-thirds of current adult members. It cancels this child’s place on the shift. Adults cannot vote for their own family’s children (use Leave instead). Votes reset when adult membership changes.'
+              : 'Removal needs $needed votes, at least two-thirds of current adult members. It revokes family points and badges from this shift, even after check-in. It cancels this member’s signup and any child places they manage. Votes reset when adult membership changes.',
         ),
         actions: [
           TextButton(
@@ -92,6 +95,55 @@ class _LiveGroupScreenState extends State<LiveGroupScreen> {
       ),
     ],
   );
+
+  Widget _memberTile({
+    required CatalogStore store,
+    required ShiftGroup group,
+    required Map<String, RemovalVote> votes,
+    required String target,
+    required String name,
+    required String subtitle,
+    required bool selfFamily,
+  }) {
+    final vote = votes[target];
+    final voters = vote?.version == group.version ? vote!.voters : <String>[];
+    final voted = voters.contains(store.uid);
+    final ready = voters.length >= group.votesNeeded;
+    final canStart =
+        !_busy &&
+        !selfFamily &&
+        group.members.length >= 3 &&
+        (!voted || ready);
+    return Card(
+      child: ListTile(
+        title: Text(name),
+        subtitle: Text(
+          '$subtitle · ${voters.length}/${group.votesNeeded} removal votes',
+        ),
+        trailing: TextButton(
+          onPressed: !canStart
+              ? null
+              : () => _vote(
+                  target,
+                  name,
+                  needed: group.votesNeeded,
+                  finalize: ready,
+                  child: subtitle.contains('Child'),
+                ),
+          child: Text(
+            selfFamily
+                ? 'You'
+                : ready
+                ? 'Complete removal'
+                : voted
+                ? 'Voted'
+                : 'Vote out',
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final store = CatalogScope.maybeOf(context);
@@ -124,6 +176,8 @@ class _LiveGroupScreenState extends State<LiveGroupScreen> {
                     if (!votesSnapshot.hasData) {
                       return const Center(child: CircularProgressIndicator());
                     }
+                    final votes = votesSnapshot.data!;
+                    final childCount = group.childList.length;
                     return Center(
                       child: ConstrainedBox(
                         constraints: const BoxConstraints(maxWidth: 720),
@@ -131,16 +185,18 @@ class _LiveGroupScreenState extends State<LiveGroupScreen> {
                           padding: const EdgeInsets.all(20),
                           children: [
                             Text(
-                              '${group.members.length} adult members · ${group.votesNeeded} votes needed for removal',
+                              '${group.members.length} adult members'
+                              '${childCount == 0 ? '' : ' · $childCount child places'}'
+                              ' · ${group.votesNeeded} votes needed for removal',
                             ),
                             const Text(
-                              'Child places are managed privately by their parents. Adult membership changes reset removal votes.',
+                              'Everyone booked for this shift appears here right away, including parent-booked children. Adult membership changes reset removal votes. Kid Mode cannot vote.',
                             ),
                             if (group.members.length < 3)
                               const Padding(
                                 padding: EdgeInsets.symmetric(vertical: 12),
                                 child: Text(
-                                  'Removal voting needs at least 3 adults. Two-thirds of all members must vote, and nobody can vote for themselves. You can cancel your own signup from My shifts.',
+                                  'Removal voting needs at least 3 adults. Two-thirds of all adult members must vote, and nobody can vote for themselves or their own family’s children. You can cancel your own signup from My shifts.',
                                 ),
                               ),
                             if (_error != null)
@@ -152,48 +208,24 @@ class _LiveGroupScreenState extends State<LiveGroupScreen> {
                               ),
                             if (_busy) const LinearProgressIndicator(),
                             for (final entry in group.members.entries)
-                              Builder(
-                                builder: (context) {
-                                  final vote = votesSnapshot.data![entry.key];
-                                  final voters = vote?.version == group.version
-                                      ? vote!.voters
-                                      : <String>[];
-                                  final self = entry.key == store.uid;
-                                  final voted = voters.contains(store.uid);
-                                  final ready =
-                                      voters.length >= group.votesNeeded;
-                                  return Card(
-                                    child: ListTile(
-                                      title: Text(entry.value),
-                                      subtitle: Text(
-                                        '${voters.length}/${group.votesNeeded} removal votes',
-                                      ),
-                                      trailing: TextButton(
-                                        onPressed:
-                                            _busy ||
-                                                self ||
-                                                group.members.length < 3 ||
-                                                (voted && !ready)
-                                            ? null
-                                            : () => _vote(
-                                                entry.key,
-                                                entry.value,
-                                                group.votesNeeded,
-                                                ready,
-                                              ),
-                                        child: Text(
-                                          self
-                                              ? 'You'
-                                              : ready
-                                              ? 'Complete removal'
-                                              : voted
-                                              ? 'Voted'
-                                              : 'Vote out',
-                                        ),
-                                      ),
-                                    ),
-                                  );
-                                },
+                              _memberTile(
+                                store: store,
+                                group: group,
+                                votes: votes,
+                                target: entry.key,
+                                name: entry.value,
+                                subtitle: 'Adult volunteer',
+                                selfFamily: entry.key == store.uid,
+                              ),
+                            for (final child in group.childList)
+                              _memberTile(
+                                store: store,
+                                group: group,
+                                votes: votes,
+                                target: child.target,
+                                name: child.name,
+                                subtitle: 'Child · with ${group.members[child.parentUid] ?? 'parent'}',
+                                selfFamily: child.parentUid == store.uid,
                               ),
                           ],
                         ),
