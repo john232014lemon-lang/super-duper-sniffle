@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// A month calendar with markers for dates containing shifts in the active tab.
 class ShiftCalendar extends StatelessWidget {

@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 import 'firebase_bootstrap.dart';
 import 'screens/firestore_smoke_screen.dart';

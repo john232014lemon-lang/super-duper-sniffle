@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import '../data/mock_qr_presentation_store.dart';
 import '../data/session_store.dart';
 import '../widgets/station_qr_code.dart';

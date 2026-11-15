@@ -1,5 +1,34 @@
 # Bushel Development Log
 
+## 2026-11-14 - Flutter 3.50 and standalone Material UI
+
+User request: upgrade Flutter to its newest version and replace deprecated Material UI APIs. Upgraded the existing C:\flutter stable installation from 3.44.8 to 3.50.0 (framework ab2912035e), with Dart 3.14.0 / DevTools 2.61.0. Updated project SDK minimums, added material_ui ^1.11.0, and refreshed the lockfile for its dependencies and new SDK pins. Official `dart fix --apply --code=migrate_design_widgets` migrated 37 app/test imports to package:material_ui/material_ui.dart. A subsequent fix scan found no other fixes. Existing Material 3 settings and DropdownButtonFormField.initialValue already use current APIs.
+
+BushelApp now supplies the official MaterialUiCompatibilityBridge inside MaterialApp.builder so legacy flutter_map, qr_flutter, and mobile_scanner widgets retain SDK theme/localization access. Those packages still import SDK Material; their latest published releases do not depend on material_ui. The bridge itself carries a planned-removal deprecation: one documented, line-scoped ignore is retained for this official transition utility, pending upstream migration. No broad diagnostic suppression or third-party cache edits. README documents setup and the [official migration guide](https://docs.flutter.dev/release/breaking-changes/material-ui-and-cupertino-ui). Preserved pre-existing README/plan/log edits.
+
+Verified: stable upgrade completed; flutter analyze --no-pub passed after the explicit compatibility-bridge exception. flutter test --no-pub test/smoke_test.dart --reporter compact reported 23 passed, 2 existing mock-mode tests skipped by their existing configuration, no failures. No new tests. Upgrade's automatic doctor check reports Android SDK not found; Chrome and Windows tooling were detected. Initial sandboxed version inspection could not write user tool state; SDK upgrade/verification succeeded with scoped elevated tool access. No release build, emulator, browser/camera, signed-in Firebase QA, commit, push, or deployment performed.
+
+Manual checks (unperformed):
+
+- Run `flutter run -d chrome --dart-define=BUSHEL_DEMO=true`, finish onboarding, navigate tabs, open a date picker/dropdown, and reset demo: controls should render and respond, with reset returning to onboarding and clearing private state.
+- Open the food bank map and attribution, then show a shift QR: map controls, attribution text, and QR should render without missing theme/localization errors.
+- On a supported signed-in parent client, deny camera permission and use manual QR entry: fallback should remain usable and valid booked-family check-in should stay pending until leader confirmation. Switch to Kid Mode: independent check-in must remain unavailable. Use ordinary signed-in accounts; no admin writes.
+
+## 2026-10-25 — Diagnose b@b.co signup permission denial
+
+Read the current signup transaction and local rules, refreshed the existing Firebase CLI login after its token returned 401, then performed read-only Auth/Firestore/Rules API inspection. The demo account b@b.co is enabled and maps to the existing parent UID SE9btPBdtfUQxy6TqhX3yJ3RfnI2. Its family activeChildId is empty (adult/parent mode). Both MCFB groups have empty members/seats/childMembers/banned and version 0 after the presentation reset.
+
+Confirmed root cause: the actual active Firestore release updateTime is 2026-10-24T16:39:56.808399Z, and its source differs from current firestore.rules. Its group update rule uses keys().hasOnly(['members', 'seats', 'version', 'banned']); both saved groups now also contain childMembers. Signup updates members/seats/version while retaining childMembers, so the resulting document violates the old deployed allowlist. This denies adult signup irrespective of refresh; the inspected account's disabled/Kid Mode state is not the cause. Current local rules already permit childMembers with the existing membership/seat/capacity checks.
+
+Required fix: developer manually publishes the complete current firestore.rules to bushel-volunteer-20260925 / (default), then retries signup in the normal authenticated app. Include the full current family attendance/child roster/voting rules, not a permissive workaround or partial allowlist patch. No new indexes. Per plan.md, agents must not attempt rules publication. No rules/data/auth changes or administrative signup were performed; existing roster/capacity/permission checks were preserved.
+
+Verified: active-source comparison, live account parent-mode/group-state inspection, and non-deploying Rules API compilation of the complete local source returned no issues. git diff --check passed. No Dart changes, so no Flutter analysis/smoke suite/build was run. No signed-in client signup attempt or permission verification; administrator reads and source compilation do not establish client authorization. Removed the temporary downloaded rules comparison file. No deployment, commit or push.
+
+Manual checks (unperformed; after publishing rules):
+
+- As b@b.co in parent mode, join the 3-place Evening Volunteer Shift: one parent registration and group membership should appear, with availability decreasing by one; retry should not duplicate seats. Cancel and expect the seat to return.
+- Book the parent's two children into the remaining places: childMembers should list both names and the shift should be full. An additional participant must be rejected; Kid Mode must still be unable to book independently.
+
 ## 2026-10-25 — Clear MCFB signups and check-ins
 
 Admin pass on both Montgomery County shifts (`mcfb-32fb545a-…`, `mcfb-26c13c3d-…`): reset groups to empty members/seats/childMembers/banned and version 0; set signupCount 0. Collection-group/list scans found zero registrations, attendanceEntries, votes, mockQrTokens, or revokedFamilies (already empty). Capacities remain 1 and 3. No app/rules changes. No commit or push. Hot-restart the mock client if the UI still shows old bookings.

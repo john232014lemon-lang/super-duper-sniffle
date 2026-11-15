@@ -35,7 +35,7 @@ import 'package:bushel/services/catalog_repository.dart';
 import 'package:bushel/services/community_models.dart';
 import 'package:bushel/services/profile_service.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 

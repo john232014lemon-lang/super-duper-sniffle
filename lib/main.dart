@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 import 'screens/onboarding_screen.dart';
 import 'firebase_bootstrap.dart';
@@ -36,7 +36,12 @@ class BushelApp extends StatelessWidget {
       title: 'Bushel',
       debugShowCheckedModeBanner: false,
       builder: (context, child) {
-        final content = builder?.call(context, child) ?? child!;
+        // flutter_map/mobile_scanner/qr_flutter still use SDK Material. This
+        // official migration bridge shares theme/localizations until they migrate.
+        // https://docs.flutter.dev/release/breaking-changes/material-ui-and-cupertino-ui
+        // ignore: deprecated_member_use
+        final bridgedChild = MaterialUiCompatibilityBridge(child: child!);
+        final content = builder?.call(context, bridgedChild) ?? bridgedChild;
         if (!mockQrMode) return content;
         return Column(
           children: [

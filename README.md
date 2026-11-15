@@ -6,6 +6,10 @@ Android and Web are configured for Firebase project `bushel-volunteer-20260925`.
 
 ## Run locally
 
+Use Flutter **3.50.0 stable** (Dart **3.14.0**) or newer; run `flutter upgrade` on the stable channel and `flutter pub get` after updating. The app uses the standalone `material_ui` package. `BushelApp` includes Flutter's temporary compatibility bridge because the current map, QR, and scanner dependencies still use SDK Material internally; remove the bridge once those dependencies migrate. See the [official migration guide](https://docs.flutter.dev/release/breaking-changes/material-ui-and-cupertino-ui).
+
+If shift signup returns permission-denied even after refresh, ensure the complete current `firestore.rules` is published in the Firebase Console for `bushel-volunteer-20260925` / `(default)`. On October 25 the active October 24 release still allowed only `members`, `seats`, `version`, and `banned` on group updates, while existing groups already included the newer `childMembers` field. That mismatch denies even adult-only signup. Publish the complete current file (including family attendance and child roster/voting rules), then retry as an ordinary signed-in parent. Do not delete child roster data or loosen permissions to bypass this mismatch. No index changes are needed for this fix.
+
 ```sh
 flutter pub get
 flutter run -d chrome --dart-define=BUSHEL_DEMO=true
