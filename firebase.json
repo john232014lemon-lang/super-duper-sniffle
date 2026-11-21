@@ -8,11 +8,20 @@
           "fileOutput": "android/app/google-services.json"
         }
       },
+      "ios": {
+        "default": {
+          "projectId": "bushel-volunteer-20260925",
+          "appId": "1:375797641238:ios:a6c2225ffd10167cdb0537",
+          "uploadDebugSymbols": false,
+          "fileOutput": "ios/Runner/GoogleService-Info.plist"
+        }
+      },
       "dart": {
         "lib/firebase_options.dart": {
           "projectId": "bushel-volunteer-20260925",
           "configurations": {
             "android": "1:375797641238:android:10c26f6d62420805db0537",
+            "ios": "1:375797641238:ios:a6c2225ffd10167cdb0537",
             "web": "1:375797641238:web:2a550d411392a147db0537"
           }
         }

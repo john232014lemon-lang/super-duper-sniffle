@@ -56,14 +56,14 @@ flutter run -d chrome --dart-define=BUSHEL_MOCK=true
 
 Keep app interaction in the browser. While Flutter owns the terminal, it interprets keystrokes as commands: do not paste another shell command there until it exits. Use `r` for hot reload or `R` for hot restart when the app is connected; avoid `w`/`W`. If another crash happens without terminal input, retain the earlier startup output as well as the new crash report so a connection failure can be investigated separately.
 
-The Firebase CLI and FlutterFire CLI 1.4.1 are installed. Android (`com.bushel.bushel`) and Web have been registered. `.firebaserc` selects Bushel by default, and the generated options, Android service file, and Google Services Gradle plugin are in place. To regenerate the configuration:
+The Firebase CLI and FlutterFire CLI 1.4.1 are installed. Android (`com.bushel.bushel`), iOS (`com.bushel.bushel`), and Web have been registered. `.firebaserc` selects Bushel by default, and the generated options, Android `google-services.json`, iOS `GoogleService-Info.plist`, and Google Services Gradle plugin are in place. Flutter 3.50+ uses Swift Package Manager for iOS plugins by default; this project has no CocoaPods `Podfile`. To regenerate the configuration:
 
 ```sh
 firebase login
-dart pub global run flutterfire_cli:flutterfire configure --project=bushel-volunteer-20260925 --platforms=android,web --android-package-name=com.bushel.bushel
+dart pub global run flutterfire_cli:flutterfire configure --project=bushel-volunteer-20260925 --platforms=android,ios,web --android-package-name=com.bushel.bushel --ios-bundle-id=com.bushel.bushel --yes
 ```
 
-`lib/firebase_options.dart` now contains real generated configuration for Android and Web. Other platforms intentionally report unsupported configuration. The Firebase client identifiers are not admin credentials; never commit service-account files or login tokens.
+If FlutterFire skips writing the iOS plist on Windows, download it with `firebase apps:sdkconfig IOS <ios-app-id> --out ios/Runner/GoogleService-Info.plist` and keep that file in the Runner target resources. `lib/firebase_options.dart` includes Android, iOS, and Web. Other platforms intentionally report unsupported configuration. The Firebase client identifiers are not admin credentials; never commit service-account files or login tokens.
 
 **Authentication status:** Slices 12–13 are complete based on developer manual verification on Web (Edge/Chrome) and Android emulator (Pixel 7): sign-in works, sessions persist across app restart, logout returns to sign-in, and invalid passwords show an error without opening the app.
 

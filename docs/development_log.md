@@ -1,5 +1,18 @@
 # Bushel Development Log
 
+## 2026-11-21 — iOS IPA precursors (Firebase + Info.plist)
+
+Registered the iOS app on existing Firebase project `bushel-volunteer-20260925` with bundle ID `com.bushel.bushel` (app id `1:375797641238:ios:a6c2225ffd10167cdb0537`) via FlutterFire, keeping Android and Web configs. FlutterFire on Windows wrote `lib/firebase_options.dart` but did not create `GoogleService-Info.plist`; downloaded it with `firebase apps:sdkconfig` into `ios/Runner/` and added it to the Runner target resources in `project.pbxproj`. Updated `firebase.json` with the iOS `fileOutput` path. Confirmed Flutter 3.50 iOS scaffolding uses Swift Package Manager (`FlutterGeneratedPluginSwiftPackage`); there is no CocoaPods `Podfile`, and one should not be reintroduced unless a plugin lacks SPM support. Added `NSCameraUsageDescription` and `NSLocationWhenInUseUsageDescription` to `ios/Runner/Info.plist`. Removed an accidental default `test/widget_test.dart` created by `flutter create --platforms=ios`. Did not add the GitHub Actions unsigned IPA workflow yet.
+
+Verified: FlutterFire configure exit 0; plist download exit 0; `flutter analyze --no-pub` reported no issues. No smoke tests (config-only). No iOS build, Sideloadly install, rules publish, commit, or push.
+
+Manual checks (unperformed):
+
+- After the unsigned IPA workflow exists, build on `macos-latest` and confirm `Runner-unsigned.ipa` uploads.
+- Sideload the IPA with a free Apple ID; expect Firebase sign-in to initialize using the new iOS options/plist.
+- On device, open Scan → camera permission prompt should show the Bushel camera usage string; deny should still allow manual code entry.
+- Confirm Android/Web Firebase startup is unchanged after regenerating `firebase_options.dart`.
+
 ## 2026-11-14 - Flutter 3.50 and standalone Material UI
 
 User request: upgrade Flutter to its newest version and replace deprecated Material UI APIs. Upgraded the existing C:\flutter stable installation from 3.44.8 to 3.50.0 (framework ab2912035e), with Dart 3.14.0 / DevTools 2.61.0. Updated project SDK minimums, added material_ui ^1.11.0, and refreshed the lockfile for its dependencies and new SDK pins. Official `dart fix --apply --code=migrate_design_widgets` migrated 37 app/test imports to package:material_ui/material_ui.dart. A subsequent fix scan found no other fixes. Existing Material 3 settings and DropdownButtonFormField.initialValue already use current APIs.

@@ -1,32 +1,34 @@
-I need your help setting up a free CI/CD pipeline to build our Flutter iOS app using GitHub Actions on a macOS runner, and then sideloading it onto our iPhones from Windows PCs using a free Apple ID (no $99 Apple Developer Program membership).
+# iOS sideload plan (Windows → free Apple ID)
 
-### Context & Constraints
-- **Repository:** Public GitHub repository (so `macos-latest` GitHub-hosted runner minutes are free).
-- **Development OS:** Windows PCs (we do not have local Macs).
-- **Signing:** Free Apple ID only. The GitHub Actions runner must build an unsigned `.ipa` (`--no-codesign`) and package `Runner.app` into a `Payload` directory zipped as `app.ipa`.
-- **Sideloading Tool:** We will use **Sideloadly** (free Windows desktop app) to sign the `.ipa` with our free Apple ID and install it over USB onto our iPhones.
+Goal: build an unsigned Flutter iOS IPA with GitHub Actions (`macos-latest`), then install on student iPhones from Windows with **Sideloadly** and a free Apple ID (no $99 Developer Program).
 
-### Your Tasks
-1. **Inspect the Repository:**
-   - Check our `pubspec.yaml` (Flutter/Dart SDK versions and dependencies, especially any iOS-specific packages like Firebase or plugins requiring CocoaPods).
-   - Check the `ios/` directory (`ios/Podfile`, `ios/Runner/Info.plist`, and deployment target versions) to ensure there are no configuration blockers for an automated headless macOS build.
-2. **Create the GitHub Actions Workflow:**
-   - Create `.github/workflows/ios-unsigned-build.yml`.
-   - Configure it to trigger on `workflow_dispatch` (manual trigger) and/or pushes to `main`.
-   - Use `runs-on: macos-latest`.
-   - Include steps to:
-     - Checkout the code (`actions/checkout@v4`).
-     - Set up Flutter (`subosito/flutter-action@v2`) matching our project's SDK version.
-     - Run `flutter pub get`.
-     - Run `pod install` inside `ios/` if needed.
-     - Build the unsigned iOS release app: `flutter build ios --release --no-codesign`.
-     - Package `build/ios/iphoneos/Runner.app` into a `Payload/` folder and zip it into `Runner-unsigned.ipa`.
-     - Upload `Runner-unsigned.ipa` using `actions/upload-artifact@v4`.
-3. **Provide a Windows + Sideloadly Walkthrough:**
-   - After generating the workflow file, give us clear, step-by-step instructions on how to:
-     1. Trigger the workflow on GitHub and download `Runner-unsigned.ipa`.
-     2. Install Sideloadly (plus Apple's non-Microsoft-Store versions of iTunes and iCloud required by Sideloadly on Windows).
-     3. Connect an iPhone via USB, load `Runner-unsigned.ipa` into Sideloadly, enter our free Apple ID, and install the app.
-     4. Trust the developer profile in iOS **Settings > General > VPN & Device Management** and enable **Developer Mode** (iOS 16+), plus explain the 7-day re-signing refresh process.
+## Precursors (done 2026-11-21)
 
-Start by inspecting `pubspec.yaml` and the `ios/` directory in this repository, tell me if any fixes are needed first, and then generate the `.github/workflows/ios-unsigned-build.yml` file.
+- Firebase iOS app registered: bundle `com.bushel.bushel`, app id `1:375797641238:ios:a6c2225ffd10167cdb0537` on project `bushel-volunteer-20260925`.
+- `lib/firebase_options.dart` includes iOS; `ios/Runner/GoogleService-Info.plist` is in the Runner resources.
+- Flutter **3.50+ uses Swift Package Manager** for iOS plugins. This repo has **no CocoaPods `Podfile`**. CI should **not** run `pod install` unless a future plugin forces CocoaPods fallback.
+- `Info.plist` includes camera (QR scan) and location-when-in-use usage descriptions.
+
+## Still todo
+
+1. Add `.github/workflows/ios-unsigned-build.yml`:
+   - Triggers: `workflow_dispatch` and/or push to `main`
+   - `runs-on: macos-latest`
+   - Checkout → Flutter setup matching project SDK (`>=3.50.0`) → `flutter pub get`
+   - **Skip `pod install`** while SPM-only
+   - `flutter build ios --release --no-codesign`
+   - Package `build/ios/iphoneos/Runner.app` into `Payload/` → zip as `Runner-unsigned.ipa`
+   - Upload artifact with `actions/upload-artifact@v4`
+2. Make the GitHub repo **public** (or accept paid macOS Actions minutes if private).
+3. Windows + Sideloadly class path:
+   - Download artifact IPA
+   - Install Sideloadly + Apple **non–Microsoft Store iTunes** (Apple no longer ships a current non-Store iCloud; try iTunes-only first)
+   - USB install with each student’s free Apple ID
+   - Trust profile under **Settings → General → VPN & Device Management**; enable **Developer Mode** on iOS 16+
+   - Re-sign about every **7 days** with free Apple IDs
+
+## Constraints
+
+- Development OS: Windows (no local Mac).
+- Signing: free Apple ID via Sideloadly; CI builds unsigned (`--no-codesign`).
+- Repository should stay public for free `macos-latest` minutes.
