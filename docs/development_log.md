@@ -1,5 +1,9 @@
 # Bushel Development Log
 
+## 2026-11-21 — iOS unsigned IPA GitHub Actions workflow
+
+Added `.github/workflows/ios-unsigned-build.yml` for `workflow_dispatch` and pushes to `main`: Flutter 3.50.0 on `macos-latest`, `flutter build ios --release --no-codesign`, package `Runner.app` into `Runner-unsigned.ipa`, upload artifact. Skips CocoaPods/`pod install` (SPM). Updated `docs/iphone.md` and `plan.md`. No local iOS build possible on Windows; Actions run and Sideloadly install unperformed.
+
 ## 2026-11-21 — iOS IPA precursors (Firebase + Info.plist)
 
 Registered the iOS app on existing Firebase project `bushel-volunteer-20260925` with bundle ID `com.bushel.bushel` (app id `1:375797641238:ios:a6c2225ffd10167cdb0537`) via FlutterFire, keeping Android and Web configs. FlutterFire on Windows wrote `lib/firebase_options.dart` but did not create `GoogleService-Info.plist`; downloaded it with `firebase apps:sdkconfig` into `ios/Runner/` and added it to the Runner target resources in `project.pbxproj`. Updated `firebase.json` with the iOS `fileOutput` path. Confirmed Flutter 3.50 iOS scaffolding uses Swift Package Manager (`FlutterGeneratedPluginSwiftPackage`); there is no CocoaPods `Podfile`, and one should not be reintroduced unless a plugin lacks SPM support. Added `NSCameraUsageDescription` and `NSLocationWhenInUseUsageDescription` to `ios/Runner/Info.plist`. Removed an accidental default `test/widget_test.dart` created by `flutter create --platforms=ios`. Did not add the GitHub Actions unsigned IPA workflow yet.

@@ -9,18 +9,14 @@ Goal: build an unsigned Flutter iOS IPA with GitHub Actions (`macos-latest`), th
 - Flutter **3.50+ uses Swift Package Manager** for iOS plugins. This repo has **no CocoaPods `Podfile`**. CI should **not** run `pod install` unless a future plugin forces CocoaPods fallback.
 - `Info.plist` includes camera (QR scan) and location-when-in-use usage descriptions.
 
+## Workflow (added 2026-11-21)
+
+`.github/workflows/ios-unsigned-build.yml` builds an unsigned IPA on `macos-latest` (Flutter 3.50.0, no CocoaPods). Trigger via Actions → **iOS unsigned IPA** → Run workflow, or push to `main`. Download the `Runner-unsigned` artifact (`Runner-unsigned.ipa`).
+
 ## Still todo
 
-1. Add `.github/workflows/ios-unsigned-build.yml`:
-   - Triggers: `workflow_dispatch` and/or push to `main`
-   - `runs-on: macos-latest`
-   - Checkout → Flutter setup matching project SDK (`>=3.50.0`) → `flutter pub get`
-   - **Skip `pod install`** while SPM-only
-   - `flutter build ios --release --no-codesign`
-   - Package `build/ios/iphoneos/Runner.app` into `Payload/` → zip as `Runner-unsigned.ipa`
-   - Upload artifact with `actions/upload-artifact@v4`
-2. Make the GitHub repo **public** (or accept paid macOS Actions minutes if private).
-3. Windows + Sideloadly class path:
+1. Make the GitHub repo **public** (or accept paid macOS Actions minutes if private).
+2. Windows + Sideloadly class path:
    - Download artifact IPA
    - Install Sideloadly + Apple **non–Microsoft Store iTunes** (Apple no longer ships a current non-Store iCloud; try iTunes-only first)
    - USB install with each student’s free Apple ID
