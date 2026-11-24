@@ -4,6 +4,8 @@ Bushel is the existing Flutter app starting at `lib/main.dart`. Use Firebase pro
 
 ## Current state
 
+- November 23 Slice 25 print follow-up implemented locally. Approved assigned coordinators can print separate signup and check-in PDFs. New codes last 24 hours and attendance retains its existing window. Firebase Hosting and Firestore rules publication and signed-in phone QA are pending.
+
 - November 23 iOS QR scanning: enabled the existing check-in camera on iPhone using the camera permission description already in Runner. Denied camera access still offers manual entry. Physical iPhone verification requires a new IPA containing the fix.
 
 - November 21 GitHub sync: fast-forwarded to `3628d20`, which supplies the **iOS unsigned IPA** workflow for manual runs and pushes to main. The local iOS 15.0 deployment-target edit is pending publication.
@@ -41,7 +43,7 @@ Keep parent-managed child bookings, Kid Mode permission restrictions, two-thirds
 
 ### Slice 25 — Printable shift QR sheets
 
-- Continue the existing Slice 25 QR work with **Print signup sheet** and **Print station check-in sheet** in the assigned coordinator’s shift tools. Each action produces a one-page US Letter PDF with the Bushel logo above a high-contrast QR, a clear purpose title, food bank, shift date and local time, location or station, scan instructions, and expiration. Use the existing Bushel app icon unless a dedicated print logo is supplied.
+- Continue the existing Slice 25 QR work with **Print signup sheet** and **Print station check-in sheet** in the assigned coordinator’s shift tools. Each action produces a one-page US Letter PDF with the Bushel logo above a high-contrast QR, a clear purpose title, food bank, shift date and local time, location or station, scan instructions, and expiration. The checked-in app icon is the Flutter placeholder, so the sheets use the Bushel onboarding mark and wordmark.
 - Signup QRs open the specified shift on Bushel Web over HTTPS using Firebase Hosting on the existing project. After sign-in, return volunteers to the shift and use the existing booking flow. Expired links explain the expiry and offer a link to browse shifts.
 - Newly issued signup and check-in QRs last 24 hours. Allow check-in QR generation up to 24 hours before shift start, and accept attendance only from 30 minutes before through four hours after shift start, while the QR is valid and the volunteer is eligible. Rotation invalidates the previous check-in code. Printing reuses the current code when available and never silently rotates it.
 - Apply the 24-hour credential lifetime to mock QRs while retaining the mock session’s expiry and allowlist. Existing codes keep their stored expiration. Roll out the client and Firestore validation changes together.
@@ -76,7 +78,7 @@ Keep parent-managed child bookings, Kid Mode permission restrictions, two-thirds
 
 ### Congressional App Challenge mock QR demo (October 23)
 
-Corrected after user clarification: `flutter run -d chrome --dart-define=BUSHEL_MOCK=true` uses Firebase startup and all live data; only QR credentials are simulated. The flag takes precedence over BUSHEL_DEMO. Assigned approved coordinators publish separate mock tokens; booked adult volunteers submit pending Firebase attendance; coordinator confirmation earns the usual 100 points once per shift. Kids cannot redeem independently; a parent Volunteer scan includes booked children. The assigned coordinator cannot redeem a mock code. Mock tokens expire in 15 minutes, ignore shift times during the enabled presentation session, and never overwrite real shift QR fields. Under BUSHEL_MOCK only, Scan QR with camera opens a fake viewfinder showing the session’s generated mock QR and a Scan this QR button (no real camera); without the flag the real camera path is unchanged. Fully local BUSHEL_DEMO remains separate.
+Corrected after user clarification: `flutter run -d chrome --dart-define=BUSHEL_MOCK=true` uses Firebase startup and all live data; only QR credentials are simulated. The flag takes precedence over BUSHEL_DEMO. Assigned approved coordinators publish separate mock tokens; booked adult volunteers submit pending Firebase attendance; coordinator confirmation earns the usual 100 points once per shift. Kids cannot redeem independently; a parent Volunteer scan includes booked children. The assigned coordinator cannot redeem a mock code. New mock tokens expire in 24 hours, ignore shift times during the enabled presentation session, and never overwrite real shift QR fields. Under BUSHEL_MOCK only, Scan QR with camera opens a fake viewfinder showing the session’s generated mock QR and a Scan this QR button (no real camera); without the flag the real camera path is unchanged. Fully local BUSHEL_DEMO remains separate.
 
 Backend allowlist is live: `settings/mockQr` enabled with presentation expiry and both MCFB shift IDs; complete mock-QR `firestore.rules` released October 24. Missing/disabled/expired settings still deny the mock path. No new indexes. Set `enabled: false` when the presentation ends. Signed-in client/camera QA remains unperformed.
 

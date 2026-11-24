@@ -15,6 +15,7 @@ import 'profile_app.dart';
 import 'services/profile_service.dart';
 import 'services/auth_service.dart';
 import 'services/catalog_repository.dart';
+import 'services/shift_signup_link.dart';
 import 'catalog_session.dart';
 
 typedef AuthInitializer = Future<AuthService> Function();
@@ -41,10 +42,12 @@ class FirebaseBootstrap extends StatefulWidget {
 
 class _FirebaseBootstrapState extends State<FirebaseBootstrap> {
   late Future<AuthService> _initialization;
+  late final String? _signupLink;
 
   @override
   void initState() {
     super.initState();
+    _signupLink = ShiftSignupLink.incomingId;
     _initialization = widget.initialize();
   }
 
@@ -55,8 +58,7 @@ class _FirebaseBootstrapState extends State<FirebaseBootstrap> {
       if (snapshot.hasError) {
         return BushelApp(
           home: _StartupError(
-            message:
-                'Bushel could not connect to Firebase. Check the app configuration and your connection, then retry.',
+            message: 'Bushel could not connect to Firebase. Check the app configuration and your connection, then retry.',
             onRetry: () => setState(() {
               _initialization = widget.initialize();
             }),
@@ -69,6 +71,7 @@ class _FirebaseBootstrapState extends State<FirebaseBootstrap> {
         catalog: FirestoreCatalogRepository(),
         signedInHome: widget.signedInHome,
         profiles: widget.profiles,
+        signupLink: _signupLink,
       );
     },
   );
@@ -82,11 +85,13 @@ class AuthGate extends StatefulWidget {
     this.signedInHome,
     this.profiles,
     this.catalog,
+    this.signupLink,
   });
   final AuthService auth;
   final Widget? signedInHome;
   final ProfileRepository? profiles;
   final CatalogRepository? catalog;
+  final String? signupLink;
 
   @override
   State<AuthGate> createState() => _AuthGateState();
@@ -150,10 +155,7 @@ class _AuthGateState extends State<AuthGate> {
       _mockSignInError = null;
     });
     try {
-      await widget.auth.ensureAccount(
-        mockAccountEmailA,
-        mockAccountPasswordA,
-      );
+      await widget.auth.ensureAccount(mockAccountEmailA, mockAccountPasswordA);
     } catch (error) {
       if (!mounted) return;
       setState(() {
@@ -197,6 +199,7 @@ class _AuthGateState extends State<AuthGate> {
         ? null
         : ProfileApp(
             uid: uid,
+            signupLink: widget.signupLink,
             repository: widget.profiles ?? FirestoreProfileRepository(),
             isCurrent: () => mounted && _uid == uid && !_waiting && !_failed,
           );

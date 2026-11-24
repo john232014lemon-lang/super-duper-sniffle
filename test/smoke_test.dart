@@ -283,7 +283,31 @@ void main() {
         now: now ?? start,
       );
       expect(validate(token.code), isNull);
-      expect(validate(token.code, now: token.expiresAt), 'This is an old qr code');
+      expect(token.expiresAt, start.add(const Duration(hours: 24)));
+      final opens = start.subtract(const Duration(hours: 24));
+      final earlyToken = CheckInToken.generate('shift', start, now: opens);
+      expect(earlyToken.expiresAt, start);
+      expect(
+        () => CheckInToken.generate(
+          'shift',
+          start,
+          now: opens.subtract(const Duration(seconds: 1)),
+        ),
+        throwsFormatException,
+      );
+      expect(validate(token.code, now: opens), contains('window is closed'));
+      expect(
+        validate(token.code, now: start.add(const Duration(hours: 4))),
+        contains('window is closed'),
+      );
+      expect(
+        CheckInToken.generateMock('shift', now: start).expiresAt,
+        token.expiresAt,
+      );
+      expect(
+        validate(token.code, now: token.expiresAt),
+        'This is an old qr code',
+      );
       expect(validate(token.code, sid: 'other'), contains('another shift'));
       expect(
         validate(token.code, hash: CheckInToken.verifier(next.code)),
@@ -567,10 +591,10 @@ void main() {
       group.childList.single.target,
       ShiftGroup.childVoteTarget('adult-a', 'child-1'),
     );
-    expect(
-      ShiftGroup.parseChildVoteTarget('adult-a::child-1'),
-      ('adult-a', 'child-1'),
-    );
+    expect(ShiftGroup.parseChildVoteTarget('adult-a::child-1'), (
+      'adult-a',
+      'child-1',
+    ));
     expect(ShiftGroup.parseChildVoteTarget('adult-a'), isNull);
   });
 
@@ -604,50 +628,47 @@ void main() {
     expect(CoordinatorStore.instance.canVoteFor(kidId), isTrue);
   });
 
-  test(
-    'family check-in confirms both booked kids once and keeps badge choices separate',
-    () async {
-      final session = SessionStore.instance;
-      final store = ShiftStore.instance;
-      final listing = store.available.first;
-      session.setRole(BushelRole.coordinator);
-      final code = store.generateQrCode(listing.shift)!;
-      session.setRole(BushelRole.volunteer);
-      session.addChild('Sam');
-      session.addChild('Alex');
-      session.addChild('Not booked');
-      final kids = session.children.take(2).toList();
-      for (final child in kids) {
-        await store.setChildBooking(listing, child.id, true);
-      }
-      expect(await store.submitCheckIn(listing.shift, code), isTrue);
-      expect(store.pendingAttendance(listing.shift), hasLength(3));
-      for (final child in kids) {
-        session.switchToChild(child.id);
-        expect(store.isCheckedIn(listing.shift), isFalse);
-        expect(store.points, 0);
-        expect(store.demoBadgeChoices, 0);
-        session.switchToParent();
-      }
-      session.setRole(BushelRole.coordinator);
-      expect(store.confirmAttendance(listing.shift, kids.first.id), isFalse);
-      expect(store.confirmAttendance(listing.shift, 'parent'), isTrue);
-      expect(store.confirmAttendance(listing.shift, 'parent'), isFalse);
-      for (final child in kids) {
-        session.switchToChild(child.id);
-        expect(store.isCheckedIn(listing.shift), isTrue);
-        expect(store.points, 100);
-        expect(store.demoBadgeChoices, 1);
-        expect(session.unlockedKidBadges, isEmpty);
-        store.claimDemoBadge('bee');
-        expect(store.demoBadgeChoices, 0);
-        session.switchToParent();
-      }
-      session.switchToChild(session.children.last.id);
-      expect(store.points, 0);
+  test('family check-in confirms both booked kids once and keeps badge choices separate', () async {
+    final session = SessionStore.instance;
+    final store = ShiftStore.instance;
+    final listing = store.available.first;
+    session.setRole(BushelRole.coordinator);
+    final code = store.generateQrCode(listing.shift)!;
+    session.setRole(BushelRole.volunteer);
+    session.addChild('Sam');
+    session.addChild('Alex');
+    session.addChild('Not booked');
+    final kids = session.children.take(2).toList();
+    for (final child in kids) {
+      await store.setChildBooking(listing, child.id, true);
+    }
+    expect(await store.submitCheckIn(listing.shift, code), isTrue);
+    expect(store.pendingAttendance(listing.shift), hasLength(3));
+    for (final child in kids) {
+      session.switchToChild(child.id);
       expect(store.isCheckedIn(listing.shift), isFalse);
-    },
-  );
+      expect(store.points, 0);
+      expect(store.demoBadgeChoices, 0);
+      session.switchToParent();
+    }
+    session.setRole(BushelRole.coordinator);
+    expect(store.confirmAttendance(listing.shift, kids.first.id), isFalse);
+    expect(store.confirmAttendance(listing.shift, 'parent'), isTrue);
+    expect(store.confirmAttendance(listing.shift, 'parent'), isFalse);
+    for (final child in kids) {
+      session.switchToChild(child.id);
+      expect(store.isCheckedIn(listing.shift), isTrue);
+      expect(store.points, 100);
+      expect(store.demoBadgeChoices, 1);
+      expect(session.unlockedKidBadges, isEmpty);
+      store.claimDemoBadge('bee');
+      expect(store.demoBadgeChoices, 0);
+      session.switchToParent();
+    }
+    session.switchToChild(session.children.last.id);
+    expect(store.points, 0);
+    expect(store.isCheckedIn(listing.shift), isFalse);
+  });
 
   testWidgets(
     'kid home waits for parent confirmation and has no check-in tab',

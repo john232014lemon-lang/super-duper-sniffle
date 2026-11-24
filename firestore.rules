@@ -143,7 +143,7 @@ service cloud.firestore {
         && (resource == null || request.resource.data.qrTokenHash != resource.data.qrTokenHash)
         && request.resource.data.expiresAt is timestamp
         && request.resource.data.expiresAt > request.time
-        && request.resource.data.expiresAt <= request.time + duration.value(15, 'm');
+        && request.resource.data.expiresAt <= request.time + duration.value(1442, 'm');
     }
     match /coordinatorApplications/{uid}/banks/{bankId} {
       allow read: if signedIn() && request.auth.uid == uid;
@@ -277,10 +277,19 @@ service cloud.firestore {
         && request.resource.data.qrTokenHash.matches('^[0-9a-f]{64}$')
         && request.resource.data.qrTokenHash != resource.data.get('qrTokenHash', '')
         && request.resource.data.qrExpiresAt is timestamp
-        && request.time >= resource.data.startsAt - duration.value(30, 'm')
+        && request.time >= resource.data.startsAt - duration.value(24, 'h')
+        && request.time < resource.data.startsAt + duration.value(4, 'h')
         && request.resource.data.qrExpiresAt > request.time
-        && request.resource.data.qrExpiresAt <= request.time + duration.value(15, 'm')
-        && request.resource.data.qrExpiresAt <= resource.data.startsAt + duration.value(4, 'h');
+        && request.resource.data.qrExpiresAt <= request.time + duration.value(1442, 'm');
+    }
+    match /shiftSignupLinks/{linkId} {
+      allow get: if signedIn()
+        && request.time < resource.data.issuedAt + duration.value(24, 'h');
+      allow create: if linkId.matches('^[A-Za-z0-9]{20}$')
+        && request.resource.data.keys().hasOnly(['shiftId', 'issuedAt'])
+        && request.resource.data.shiftId is string
+        && request.resource.data.issuedAt == request.time
+        && shiftLeader(request.resource.data.shiftId);
     }
     // Collection-group queries must constrain ownerUid or leaderUid to auth.uid.
     // These grants are read-only; writes are allowed only at the canonical path.

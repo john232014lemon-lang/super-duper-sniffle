@@ -5,9 +5,11 @@ import '../services/profile_service.dart';
 import '../data/coordinator_store.dart';
 import 'family_center_screen.dart';
 import 'home_screen.dart';
+import 'shifts_screen.dart';
 
 class OnboardingScreen extends StatefulWidget {
-  const OnboardingScreen({super.key});
+  const OnboardingScreen({super.key, this.signupLink});
+  final String? signupLink;
 
   @override
   State<OnboardingScreen> createState() => _OnboardingScreenState();
@@ -56,8 +58,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     } catch (_) {
       if (mounted) {
         setState(
-          () => _saveError =
-              'Could not save your profile. Check your connection and try again.',
+          () => _saveError = 'Could not save your profile. Check your connection and try again.',
         );
       }
     } finally {
@@ -88,6 +89,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 onBack: () => setState(() => _step = 0),
                 onContinue: _completeOnboarding,
               ),
+            ),
+            _ when widget.signupLink != null => ShiftsScreen(
+              signupLink: widget.signupLink,
             ),
             _ =>
               _familyMode
@@ -210,8 +214,7 @@ class _WelcomeStep extends StatelessWidget {
                       style: TextStyle(fontWeight: FontWeight.w800),
                     ),
                     TextSpan(
-                      text:
-                          ', assigns the work on-site, and turns giving into a ',
+                      text: ', assigns the work on-site, and turns giving into a ',
                     ),
                     TextSpan(
                       text: 'game families and kids love',

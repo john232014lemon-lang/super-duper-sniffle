@@ -1,10 +1,13 @@
 import 'package:material_ui/material_ui.dart';
+
 import '../data/catalog_store.dart';
 import '../data/mock_qr_presentation_store.dart';
 import '../data/session_store.dart';
 import '../models/attendance.dart';
 import '../services/catalog_repository.dart';
 import '../services/community_models.dart';
+import '../services/shift_qr_sheet.dart';
+import '../services/shift_signup_link.dart';
 import '../models/check_in_token.dart';
 import '../widgets/station_token_display.dart';
 import '../demo_config.dart';
@@ -31,11 +34,9 @@ class _AttendanceManagementScreenState
   String? _error;
   CheckInToken? _token;
   String? _tokenOwner;
+  ShiftSignupLink? _signupLink;
   void _subscribe() {
-    _entries = _store!.repository.watchAttendance(
-      _store!.uid,
-      asLeader: true,
-    );
+    _entries = _store!.repository.watchAttendance(_store!.uid, asLeader: true);
     _group = _store!.repository.watchGroup(widget.shiftId);
   }
 
@@ -45,6 +46,7 @@ class _AttendanceManagementScreenState
     final store = CatalogScope.maybeOf(context);
     if (!identical(_store, store)) {
       _store = store;
+      _signupLink = null;
       if (store != null) _subscribe();
     }
   }
@@ -64,11 +66,21 @@ class _AttendanceManagementScreenState
     }
   }
 
+  String _expirationLabel(DateTime expiry) {
+    final local = expiry.toLocal();
+    final labels = MaterialLocalizations.of(context);
+    final date = labels.formatFullDate(local);
+    final time = labels.formatTimeOfDay(TimeOfDay.fromDateTime(local));
+    return '$date at $time ${local.timeZoneName}';
+  }
+
   String _statusLabel(AttendanceEntry? entry) {
     if (entry == null) return 'Not scanned yet';
     if (entry.status == 'confirmed') return 'Confirmed';
     if (entry.status == 'revoked') return 'Removed · rewards revoked';
-    if (entry.familyCheckIn) return 'Scanned with parent · pending confirmation';
+    if (entry.familyCheckIn) {
+      return 'Scanned with parent · pending confirmation';
+    }
     return 'Scanned · pending confirmation';
   }
 
@@ -98,6 +110,9 @@ class _AttendanceManagementScreenState
     final store = CatalogScope.maybeOf(context);
     final shift = store?.shifts
         .where((record) => record.shift.id == widget.shiftId)
+        .firstOrNull;
+    final bank = store?.banks
+        .where((bank) => bank.id == shift?.bankId)
         .firstOrNull;
     final allowed =
         store != null &&
@@ -174,8 +189,8 @@ class _AttendanceManagementScreenState
                             ),
                             const Text(
                               mockQrMode
-                                  ? 'Mock codes work during the enabled presentation session, regardless of shift time. Only adult volunteers can redeem. Confirm attendance below to award points in Firebase. Codes expire in 15 minutes; rotating invalidates the old code.'
-                                  : 'Codes last at most 15 minutes. Rotating invalidates the previous code. Reopening this screen requires a new code.',
+                                  ? 'Mock codes last 24 hours within the enabled presentation session. Only adult volunteers can redeem them. Rotation invalidates the previous code.'
+                                  : 'Codes last 24 hours. Attendance still follows the shift check-in window. Rotation invalidates the previous code.',
                             ),
                             const SizedBox(height: 16),
                             FilledButton(
@@ -209,6 +224,73 @@ class _AttendanceManagementScreenState
                               ),
                             ),
                             if (qrReady) StationTokenDisplay(token: _token!),
+                            if (!mockQrMode && bank != null) ...[
+                              OutlinedButton.icon(
+                                onPressed: _saving
+                                    ? null
+                                    : () => _save(() async {
+                                        var link = _signupLink;
+                                        if (link == null ||
+                                            !DateTime.now().isBefore(
+                                              link.expiresAt,
+                                            )) {
+                                          link = await ShiftSignupLink.issue(
+                                            widget.shiftId,
+                                          );
+                                        }
+                                        if (!mounted ||
+                                            !identical(_store, store) ||
+                                            SessionStore
+                                                .instance
+                                                .isKidAccount) {
+                                          return;
+                                        }
+                                        _signupLink = link;
+                                        await printShiftQrSheet(
+                                          shift: shift.shift,
+                                          bank: bank,
+                                          code: link.url.toString(),
+                                          expiration: _expirationLabel(
+                                            link.expiresAt,
+                                          ),
+                                          signup: true,
+                                        );
+                                      }),
+                                icon: const Icon(Icons.print),
+                                label: const Text('Print signup sheet'),
+                              ),
+                              OutlinedButton.icon(
+                                onPressed: _saving || !qrReady
+                                    ? null
+                                    : () => _save(() async {
+                                        final token = _token!;
+                                        if (!DateTime.now().isBefore(
+                                          token.expiresAt,
+                                        )) {
+                                          throw const CatalogException(
+                                            'This QR has expired. Rotate it before printing.',
+                                          );
+                                        }
+                                        await printShiftQrSheet(
+                                          shift: shift.shift,
+                                          bank: bank,
+                                          code: token.code,
+                                          expiration: _expirationLabel(
+                                            token.expiresAt,
+                                          ),
+                                          signup: false,
+                                        );
+                                      }),
+                                icon: const Icon(Icons.print),
+                                label: const Text(
+                                  'Print station check-in sheet',
+                                ),
+                              ),
+                              if (!qrReady)
+                                const Text(
+                                  'Generate or rotate the check-in QR to print it.',
+                                ),
+                            ],
                             const SizedBox(height: 24),
                             if (snapshot.hasError) ...[
                               const Text(
@@ -305,9 +387,7 @@ class _AttendanceManagementScreenState
                                   ),
                                 ),
                             ],
-                            if (ready &&
-                                qrReady &&
-                                groupSnapshot.hasError) ...[
+                            if (ready && qrReady && groupSnapshot.hasError) ...[
                               const Text(
                                 'Could not load group membership for the full roster. Pending confirmations still work below.',
                               ),

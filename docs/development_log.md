@@ -1,5 +1,17 @@
 # Bushel Development Log
 
+## 2026-11-23 - Slice 25 printable QR sheets
+
+Added separate US Letter signup and station check-in print actions for the assigned approved coordinator. The sheets use the Bushel onboarding mark and wordmark, shift and station details, instructions, and expiration. Signup QR links resolve through Firebase Hosting and preserve the target through sign-in and profile setup. Firestore authorizes issuance and expires signup-link reads at 24 hours. New real and mock check-in QR credentials last 24 hours, and real attendance keeps the original shift window. Printing an available check-in credential preserves it. Existing codes retain their stored expiration.
+
+Verified clean Flutter analysis, two existing secure QR smoke checks with the new time-boundary assertions, the existing leader QR and profile isolation checks, and `git diff --check`. Generated and visually inspected both one-page Letter PDF previews. Production rules, Hosting, native printing, and device scanning remain unverified. Rollout steps are in the README. No commit, push, or deployment.
+
+Manual checks (unperformed):
+
+- Print both sheets as the assigned coordinator and scan the signup sheet with the iPhone Camera app. After sign-in, Bushel Web should open the exact shift and let an eligible adult book it. An expired sheet should offer **Browse shifts**.
+- Print the current station QR twice, then scan from paper in Bushel. Both copies should work for eligible volunteers inside the attendance window. After rotation, the previous code should fail.
+- Attempt check-in before the attendance window opens and after it closes using an otherwise valid credential. Both attempts should be rejected. An ordinary non-coordinator account should be unable to issue either type of QR.
+
 ## 2026-11-23 - Plan Slices 25–28
 
 Recorded printable 24-hour shift QRs, a live coordinator dashboard, notifications, and profile editing in `plan.md`. The new QR work continues the existing Slice 25. Reviewed the documentation diff. Implementation, builds, and feature verification remain pending.

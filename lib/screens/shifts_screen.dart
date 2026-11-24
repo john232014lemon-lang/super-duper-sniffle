@@ -3,6 +3,7 @@ import 'package:material_ui/material_ui.dart';
 import '../data/shift_store.dart';
 import '../data/catalog_store.dart';
 import '../services/catalog_repository.dart';
+import '../services/shift_signup_link.dart';
 import '../data/coordinator_store.dart';
 import '../widgets/bushel_navigation_bar.dart';
 import '../widgets/shift_calendar.dart';
@@ -12,9 +13,15 @@ import '../data/session_store.dart';
 import '../widgets/family_shift_bookings.dart';
 
 class ShiftsScreen extends StatefulWidget {
-  const ShiftsScreen({super.key, this.initialDate, this.showMyShifts = false});
+  const ShiftsScreen({
+    super.key,
+    this.initialDate,
+    this.showMyShifts = false,
+    this.signupLink,
+  });
   final DateTime? initialDate;
   final bool showMyShifts;
+  final String? signupLink;
 
   @override
   State<ShiftsScreen> createState() => _ShiftsScreenState();
@@ -25,12 +32,16 @@ class _ShiftsScreenState extends State<ShiftsScreen> {
   int _tab = 0;
   bool _busy = false;
   late DateTime _selectedDate;
+  Future<String?>? _linkedShift;
 
   @override
   void initState() {
     super.initState();
     _tab = widget.showMyShifts ? 1 : 0;
     _selectedDate = DateUtils.dateOnly(widget.initialDate ?? DateTime.now());
+    if (widget.signupLink case final link?) {
+      _linkedShift = ShiftSignupLink.resolve(link);
+    }
     _store.addListener(_refresh);
     CoordinatorStore.instance.addListener(_refresh);
   }
@@ -96,6 +107,13 @@ class _ShiftsScreenState extends State<ShiftsScreen> {
     setState(() => _busy = true);
     try {
       if (join) {
+        if (widget.signupLink case final link?) {
+          if (await ShiftSignupLink.resolve(link) != listing.shift.id) {
+            if (mounted) setState(() => _linkedShift = Future.value());
+            return;
+          }
+          if (!mounted) return;
+        }
         await _store.signUp(listing.foodBank, listing.shift);
       } else {
         await _store.cancelSignup(listing.shift);
@@ -111,9 +129,8 @@ class _ShiftsScreenState extends State<ShiftsScreen> {
       }
     } catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(catalogError(error))));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(catalogError(error))));
       }
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -123,6 +140,8 @@ class _ShiftsScreenState extends State<ShiftsScreen> {
   @override
   Widget build(BuildContext context) {
     final catalog = CatalogScope.maybeOf(context);
+    final linkedShift = _linkedShift;
+    if (linkedShift != null) return _buildLinkedShift(linkedShift, catalog);
     final allShifts = _tab == 0 ? _store.available : _store.myShifts;
     final shifts = allShifts
         .where(
@@ -185,9 +204,8 @@ class _ShiftsScreenState extends State<ShiftsScreen> {
                     ? (SessionStore.instance.isKidAccount
                           ? 'All your booked shifts · your parent manages group membership'
                           : 'All your booked shifts · tap a card to open its group')
-                    : MaterialLocalizations.of(
-                        context,
-                      ).formatFullDate(_selectedDate),
+                    : MaterialLocalizations.of(context)
+                          .formatFullDate(_selectedDate),
               ),
               const SizedBox(height: 12),
               if (catalog != null &&
@@ -239,6 +257,74 @@ class _ShiftsScreenState extends State<ShiftsScreen> {
         ),
       ),
       bottomNavigationBar: const BushelNavigationBar(selectedIndex: 3),
+    );
+  }
+
+  Widget _buildLinkedShift(Future<String?> link, CatalogStore? catalog) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Shift signup')),
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 720),
+          child: ListView(
+            padding: const EdgeInsets.all(20),
+            children: [
+              FutureBuilder<String?>(
+                future: link,
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState != ConnectionState.done) {
+                    return const LinearProgressIndicator();
+                  }
+                  if (snapshot.hasError) {
+                    return Column(
+                      children: [
+                        const Text('Could not open this signup link.'),
+                        TextButton(
+                          onPressed: () => setState(() {
+                            _linkedShift = ShiftSignupLink.resolve(
+                              widget.signupLink!,
+                            );
+                          }),
+                          child: const Text('Retry link'),
+                        ),
+                      ],
+                    );
+                  }
+                  final shiftId = snapshot.data;
+                  if (shiftId == null) {
+                    return const Text(
+                      'This signup link has expired or is invalid.',
+                    );
+                  }
+                  if (catalog != null &&
+                      (catalog.shiftsLoading || catalog.shiftsFailed)) {
+                    return CatalogStatus(store: catalog, shifts: true);
+                  }
+                  final listing = _store.available
+                      .where((listing) => listing.shift.id == shiftId)
+                      .firstOrNull;
+                  if (listing == null) {
+                    return const Text('This shift is no longer available.');
+                  }
+                  return _ScheduleCard(
+                    listing: listing,
+                    signedUp: _store.isSignedUp(listing.shift),
+                    checkedIn: _store.isCheckedIn(listing.shift),
+                    showSignup: !SessionStore.instance.isKidAccount,
+                    onSignup: _busy ? null : () => _confirmSignup(listing),
+                  );
+                },
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(context).pushReplacement(
+                  MaterialPageRoute<void>(builder: (_) => const ShiftsScreen()),
+                ),
+                child: const Text('Browse shifts'),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:math';
+
 import 'package:crypto/crypto.dart';
 
 /// The raw QR exists only in memory. Firestore receives a proof and its hash,
@@ -8,9 +9,8 @@ class CheckInToken {
   const CheckInToken(this.code, this.expiresAt);
   final String code;
   final DateTime expiresAt;
-  static const lifetime = Duration(minutes: 15);
-  // Rules cap expiry at server time + lifetime; device clocks may run ahead.
-  static const clockSkewAllowance = Duration(minutes: 2);
+  static const lifetime = Duration(hours: 24);
+  static const generationLeadTime = Duration(hours: 24);
   static const earlyWindow = Duration(minutes: 30);
   static const lateWindow = Duration(hours: 4);
   static String digest(String value) =>
@@ -61,9 +61,10 @@ class CheckInToken {
   }) {
     final clock = now ?? DateTime.now();
     final end = start.add(lateWindow);
-    if (clock.isBefore(start.subtract(earlyWindow)) || !clock.isBefore(end)) {
+    if (clock.isBefore(start.subtract(generationLeadTime)) ||
+        !clock.isBefore(end)) {
       throw const FormatException(
-        'QR generation opens 30 minutes before the shift and closes 4 hours after its start.',
+        'QR generation opens 24 hours before the shift and closes 4 hours after its start.',
       );
     }
     final random = Random.secure();
@@ -71,10 +72,9 @@ class CheckInToken {
       32,
       (_) => random.nextInt(256).toRadixString(16).padLeft(2, '0'),
     ).join();
-    final expiry = clock.add(lifetime - clockSkewAllowance);
     return CheckInToken(
       'BUSHEL1:${Uri.encodeComponent(shiftId)}:$secret',
-      expiry.isBefore(end) ? expiry : end,
+      clock.add(lifetime),
     );
   }
 

@@ -6,6 +6,7 @@ import 'main.dart';
 import 'screens/family_center_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/onboarding_screen.dart';
+import 'screens/shifts_screen.dart';
 import 'services/auth_service.dart';
 import 'services/profile_service.dart';
 
@@ -15,10 +16,12 @@ class ProfileApp extends StatefulWidget {
     required this.uid,
     required this.repository,
     required this.isCurrent,
+    this.signupLink,
   });
   final String uid;
   final ProfileRepository repository;
   final bool Function() isCurrent;
+  final String? signupLink;
   @override
   State<ProfileApp> createState() => _ProfileAppState();
 }
@@ -98,9 +101,12 @@ class _ProfileAppState extends State<ProfileApp> {
           );
         }
         final profile = snapshot.data;
+        final signupLink = widget.signupLink;
         return BushelApp(
           home: profile == null
-              ? const OnboardingScreen()
+              ? OnboardingScreen(signupLink: signupLink)
+              : signupLink != null
+              ? ShiftsScreen(signupLink: signupLink)
               : profile.family
               ? const FamilyCenterScreen()
               : HomeScreen(name: profile.name),
