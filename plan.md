@@ -37,6 +37,41 @@ Demo: `flutter run -d chrome --dart-define=BUSHEL_DEMO=true`. It initializes no 
 
 Keep parent-managed child bookings, Kid Mode permission restrictions, two-thirds adult removal voting, assigned approved leader confirmation, and immutable attendance/reward history. Removal revokes the family's rewards for that shift; voluntary leaving retains confirmed rewards. Pending attendance earns nothing; confirmed attendance earns 100 points per participant, and family goals count distinct shifts. See README for schema details.
 
+## Next slices
+
+### Slice 25 — Printable shift QR sheets
+
+- Continue the existing Slice 25 QR work with **Print signup sheet** and **Print station check-in sheet** in the assigned coordinator’s shift tools. Each action produces a one-page US Letter PDF with the Bushel logo above a high-contrast QR, a clear purpose title, food bank, shift date and local time, location or station, scan instructions, and expiration. Use the existing Bushel app icon unless a dedicated print logo is supplied.
+- Signup QRs open the specified shift on Bushel Web over HTTPS using Firebase Hosting on the existing project. After sign-in, return volunteers to the shift and use the existing booking flow. Expired links explain the expiry and offer a link to browse shifts.
+- Newly issued signup and check-in QRs last 24 hours. Allow check-in QR generation up to 24 hours before shift start, and accept attendance only from 30 minutes before through four hours after shift start, while the QR is valid and the volunteer is eligible. Rotation invalidates the previous check-in code. Printing reuses the current code when available and never silently rotates it.
+- Apply the 24-hour credential lifetime to mock QRs while retaining the mock session’s expiry and allowlist. Existing codes keep their stored expiration. Roll out the client and Firestore validation changes together.
+- Verify with a focused offline QR time-boundary check. Print and scan both sheets on an iPhone. Signup should resume the exact shift after login. Check-in should work for eligible volunteers inside the attendance window and reject expired or rotated codes and attempts outside the window.
+
+### Slice 26 — Live coordinator shift dashboard
+
+- Add **Shift dashboard** under **Shifts you lead**. Show booked adults and tasks grouped by station with **To do**, **In progress**, and **Done** statuses. The assigned approved coordinator creates tasks, assigns or reassigns adults by dragging their names onto tasks, and updates progress. Include an accessible **Assign volunteer** picker for touch and keyboard use.
+- Show live task updates and a shift-wide message thread. Currently booked adults can post messages and see their own assignments. Only the assigned approved coordinator manages progress. Kid Mode and removed or cancelled members lose access. Family bookings stay under the adult account.
+- Store tasks and messages under the shift. Recheck approval and booking eligibility when assigning and use transactions to surface conflicting edits as a refresh-and-retry message. Keep task progress separate from attendance and rewards. Assignment events feed the notification system in Slice 27.
+- Verify with ordinary signed-in coordinator and volunteer accounts. Drag a booked adult onto a task and confirm the assignment and progress appear live. Exchange messages, check that an adult volunteer cannot edit progress, and confirm a removed member loses dashboard access.
+
+### Slice 27 — Notification inbox and Android push
+
+- Connect the Home bell to a live inbox with an unread badge. Open **Notification settings** from the inbox or Profile. Include controls for reminders, schedule changes and cancellations, station assignments and reassignments, and coordinator announcements. Keep thread replies in the thread unless the coordinator posts an announcement.
+- Remind eligible adults 24 hours before the current shift start. Send schedule changes to currently booked adults and assignment alerts to the affected adult. Use stable event IDs for one inbox item per event despite retries. Recheck current booking and shift time before reminder delivery. Open the relevant shift or assignment after verifying access.
+- Deliver inbox alerts across supported platforms. Add opt-in Android push through Firebase Cloud Messaging with account-scoped device registrations and sign-out cleanup. Keep lock-screen push text generic. Android permission denial still allows inbox delivery. The free Sideloadly iPhone build uses the inbox.
+- Verify with a focused offline deduplication check. Change a shift time and reassign a station. Each intended recipient should get one inbox item per event, and reminders should follow the revised time. Check Android permission and settings behavior and confirm inbox delivery on iPhone.
+
+### Slice 28 — Edit display name and profile photo
+
+- Let signed-in adults edit their display name and choose, replace, or remove a photo from their device library. Use the existing name field and its 80-character limit so changes reach current name consumers.
+- Keep photos private to the owning account in an owner-scoped Firebase Storage path. Use initials when no photo is set. Keep the previous photo if replacement fails.
+- Verify that the new name and photo persist after reopening the app, removal restores initials, and a different signed-in account cannot read or edit the photo.
+
+### Rollout for Slices 25–28
+
+- Use the existing `bushel-volunteer-20260925` project. Document Firebase Hosting, Functions, Scheduler, Storage, rules, and index setup. Verify billing and bucket availability before rollout. Deploy compatible client and backend QR changes together. Implementation commits, pushes, and deployments require separate authorization.
+- Update this plan and the development log after each implementation slice. Use ordinary signed-in clients to verify permissions.
+
 ## Testing policy
 
 ### Congressional App Challenge mock QR demo (October 23)

@@ -1,5 +1,9 @@
 # Bushel Development Log
 
+## 2026-11-23 - Plan Slices 25–28
+
+Recorded printable 24-hour shift QRs, a live coordinator dashboard, notifications, and profile editing in `plan.md`. The new QR work continues the existing Slice 25. Reviewed the documentation diff. Implementation, builds, and feature verification remain pending.
+
 ## 2026-11-23 - iPhone QR camera
 
 The QR scanner's platform check excluded iOS. Enabled iOS on the existing scanner route, which uses Runner's existing camera usage description. The manual-entry fallback remains available.
