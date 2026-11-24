@@ -58,3 +58,4 @@ app.*.map.json
 # Local standalone development tools
 /tools/firebase/firebase.exe
 /firepit-log.txt
+/functions/node_modules/

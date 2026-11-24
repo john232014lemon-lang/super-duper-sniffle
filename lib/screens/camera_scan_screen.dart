@@ -62,7 +62,10 @@ class _CameraScanScreenState extends State<CameraScanScreen> {
   @override
   Widget build(BuildContext context) {
     final kid = SessionStore.instance.isKidAccount;
-    final supported = kIsWeb || defaultTargetPlatform == TargetPlatform.android;
+    final supported =
+        kIsWeb ||
+        defaultTargetPlatform == TargetPlatform.android ||
+        defaultTargetPlatform == TargetPlatform.iOS;
     final secureWeb =
         !kIsWeb ||
         Uri.base.scheme == 'https' ||
@@ -79,7 +82,7 @@ class _CameraScanScreenState extends State<CameraScanScreen> {
                   child: !supported
                       ? const Center(
                           child: Text(
-                            'Camera scanning is available on Android and Web. Enter the code instead.',
+                            'Camera scanning is unavailable on this device. Enter the code instead.',
                           ),
                         )
                       : !secureWeb

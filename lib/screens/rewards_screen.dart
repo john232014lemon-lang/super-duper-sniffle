@@ -5,6 +5,7 @@ import '../models/reward_badge.dart';
 import '../widgets/bushel_navigation_bar.dart';
 import '../data/catalog_store.dart';
 import '../widgets/attendance_status.dart';
+import 'leaderboard_screen.dart';
 
 class RewardsScreen extends StatefulWidget {
   const RewardsScreen({super.key});
@@ -59,6 +60,10 @@ class _RewardsScreenState extends State<RewardsScreen> {
             padding: const EdgeInsets.fromLTRB(20, 8, 20, 40),
             children: [
               _PointsHero(points: points, earned: earned, nextBadge: nextBadge),
+              const Align(
+                alignment: Alignment.centerRight,
+                child: LeaderboardButton(),
+              ),
               const SizedBox(height: 28),
               const Text(
                 'Your badges',

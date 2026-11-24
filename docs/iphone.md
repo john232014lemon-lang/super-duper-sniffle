@@ -1,30 +1,17 @@
-# iOS sideload plan (Windows → free Apple ID)
+# Install Bushel on iPhone from Windows
 
-Goal: build an unsigned Flutter iOS IPA with GitHub Actions (`macos-latest`), then install on student iPhones from Windows with **Sideloadly** and a free Apple ID (no $99 Developer Program).
+## Build the unsigned IPA
 
-## Precursors (done 2026-11-21)
+After the workflow is on GitHub's default branch, open **Actions > iOS unsigned IPA > Run workflow** and select the branch to build. The workflow uses Flutter 3.50.0 and the checked-in dependency lockfile on `macos-latest`. It builds with Swift Package Manager and packages the device app as `Payload/Runner.app` inside `Runner-unsigned.ipa`.
 
-- Firebase iOS app registered: bundle `com.bushel.bushel`, app id `1:375797641238:ios:a6c2225ffd10167cdb0537` on project `bushel-volunteer-20260925`.
-- `lib/firebase_options.dart` includes iOS; `ios/Runner/GoogleService-Info.plist` is in the Runner resources.
-- Flutter **3.50+ uses Swift Package Manager** for iOS plugins. This repo has **no CocoaPods `Podfile`**. CI should **not** run `pod install` unless a future plugin forces CocoaPods fallback.
-- `Info.plist` includes camera (QR scan) and location-when-in-use usage descriptions.
+Open the successful run and download the **Runner-unsigned** artifact. Extract the downloaded ZIP to get `Runner-unsigned.ipa`. Leave the IPA itself intact. Standard GitHub-hosted runner minutes are free for public repositories. Private repositories use the owner's Actions allowance. [GitHub Actions billing](https://docs.github.com/en/actions/concepts/billing-and-usage)
 
-## Workflow (added 2026-11-21)
+The local Xcode configuration targets iOS 15.0 for the locked Firebase Apple SDK. If GitHub Actions reports an iOS 13.0 deployment-target mismatch, run the workflow from a GitHub branch containing the iOS 15.0 setting. The Android, iOS, and Web configs use Firebase project `bushel-volunteer-20260925`. The iOS bundle ID is `com.bushel.bushel`, and its Firebase plist is included in Runner resources. The iOS app declares camera and foreground location usage.
 
-`.github/workflows/ios-unsigned-build.yml` builds an unsigned IPA on `macos-latest` (Flutter 3.50.0, no CocoaPods). Trigger via Actions → **iOS unsigned IPA** → Run workflow, or push to `main`. Download the `Runner-unsigned` artifact (`Runner-unsigned.ipa`).
+## Sign and install over USB
 
-## Still todo
-
-1. Make the GitHub repo **public** (or accept paid macOS Actions minutes if private).
-2. Windows + Sideloadly class path:
-   - Download artifact IPA
-   - Install Sideloadly + Apple **non–Microsoft Store iTunes** (Apple no longer ships a current non-Store iCloud; try iTunes-only first)
-   - USB install with each student’s free Apple ID
-   - Trust profile under **Settings → General → VPN & Device Management**; enable **Developer Mode** on iOS 16+
-   - Re-sign about every **7 days** with free Apple IDs
-
-## Constraints
-
-- Development OS: Windows (no local Mac).
-- Signing: free Apple ID via Sideloadly; CI builds unsigned (`--no-codesign`).
-- Repository should stay public for free `macos-latest` minutes.
+1. Install Sideloadly for Windows and the desktop iTunes and iCloud installers linked on its download page. Use the web versions linked there. [Sideloadly downloads](https://sideloadly.io/#download)
+2. Unlock the iPhone and connect it with a data-capable USB cable. Tap **Trust** if prompted and enter the device passcode. Confirm iTunes detects the phone.
+3. Open Sideloadly, select the iPhone, drop in `Runner-unsigned.ipa`, enter your free Apple ID, and click **Start**. Complete the Apple password and two-factor prompts in Sideloadly. Use the same Apple ID and effective bundle ID on subsequent installs.
+4. On the iPhone, trust the Apple ID's developer profile in **Settings > General > VPN & Device Management** if prompted. On iOS 16 and later, turn on **Settings > Privacy & Security > Developer Mode**, restart, and confirm **Turn On**. Then open Bushel.
+5. Refresh the signature within **7 days**. Reconnect by USB and repeat the Sideloadly install over the existing app using the same Apple ID and effective bundle ID. You can also enable automatic refresh and keep the Sideloadly daemon running on a PC that can reach the phone by USB or configured Wi-Fi. Reuse the same IPA for a signature refresh. [Sideloadly FAQ](https://sideloadly.io/faq.html)

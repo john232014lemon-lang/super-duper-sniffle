@@ -283,7 +283,7 @@ void main() {
         now: now ?? start,
       );
       expect(validate(token.code), isNull);
-      expect(validate(token.code, now: token.expiresAt), contains('expired'));
+      expect(validate(token.code, now: token.expiresAt), 'This is an old qr code');
       expect(validate(token.code, sid: 'other'), contains('another shift'));
       expect(
         validate(token.code, hash: CheckInToken.verifier(next.code)),

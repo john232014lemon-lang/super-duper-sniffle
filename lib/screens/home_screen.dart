@@ -14,6 +14,7 @@ import 'profile_screen.dart';
 import '../widgets/bushel_navigation_bar.dart';
 import '../widgets/attendance_status.dart';
 import 'kid_badges_screen.dart';
+import 'leaderboard_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key, required this.name});
@@ -114,6 +115,10 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                       const SizedBox(height: 18),
                       const _ImpactStats(),
+                      const Align(
+                        alignment: Alignment.centerRight,
+                        child: LeaderboardButton(),
+                      ),
                       const SizedBox(height: 26),
                       _SectionHeader(
                         title: 'Food banks near you',
@@ -195,15 +200,13 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _openCheckIn() {
-    Navigator.of(
-      context,
-    ).push(MaterialPageRoute<void>(builder: (_) => const CheckInScreen()));
+    Navigator.of(context)
+        .push(MaterialPageRoute<void>(builder: (_) => const CheckInScreen()));
   }
 
   void _openProfile() {
-    Navigator.of(
-      context,
-    ).push(MaterialPageRoute<void>(builder: (_) => const ProfileScreen()));
+    Navigator.of(context)
+        .push(MaterialPageRoute<void>(builder: (_) => const ProfileScreen()));
   }
 }
 

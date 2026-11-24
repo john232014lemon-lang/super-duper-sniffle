@@ -134,6 +134,8 @@ class ShiftStore extends ChangeNotifier {
       ? _catalog!.rewards.points(SessionStore.instance.accountId)
       : _pointsByAccount[SessionStore.instance.accountId] ?? 0;
 
+  int get demoAdultPoints => usingLive ? 0 : _pointsByAccount['parent'] ?? 0;
+
   bool isSignedUp(FoodBankShift shift) =>
       myShifts.any((listing) => _sameShift(listing.shift, shift));
 

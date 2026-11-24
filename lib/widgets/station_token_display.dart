@@ -43,7 +43,7 @@ class _StationTokenDisplayState extends State<StationTokenDisplay> {
   @override
   Widget build(BuildContext context) {
     if (!DateTime.now().isBefore(widget.token.expiresAt)) {
-      return const Text('This QR has expired. Generate or rotate a new QR.');
+      return const Text('This is an old qr code');
     }
     return Column(
       mainAxisSize: MainAxisSize.min,

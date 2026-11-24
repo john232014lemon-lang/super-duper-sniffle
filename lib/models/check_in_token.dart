@@ -97,10 +97,12 @@ class CheckInToken {
       return 'Ask the assigned leader to generate a new QR.';
     }
     final clock = now ?? DateTime.now();
-    if (!clock.isBefore(expiry) ||
-        clock.isBefore(start.subtract(earlyWindow)) ||
+    if (!clock.isBefore(expiry)) {
+      return 'This is an old qr code';
+    }
+    if (clock.isBefore(start.subtract(earlyWindow)) ||
         !clock.isBefore(start.add(lateWindow))) {
-      return 'This code has expired or the shift check-in window is closed. Ask the leader for a new QR.';
+      return 'The shift check-in window is closed. Ask the leader for a new QR.';
     }
     if (verifier(code) != hash) {
       return 'This code is wrong or has been rotated. Scan the newest QR.';

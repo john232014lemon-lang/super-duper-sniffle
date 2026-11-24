@@ -121,6 +121,15 @@ service cloud.firestore {
         && hashing.sha256(request.resource.data.tokenProof).toHexString().lower() == token.qrTokenHash
         && request.time < token.expiresAt;
     }
+    // Trusted server projections only; never expose private attendance/profiles.
+    match /leaderboard/{uid} {
+      allow read: if signedIn();
+      allow write: if false;
+    }
+    match /leaderboardStatus/{id} {
+      allow read: if signedIn();
+      allow write: if false;
+    }
     match /settings/mockQr {
       allow get: if signedIn();
       // Trusted administrator writes only.

@@ -1,8 +1,30 @@
 # Bushel Development Log
 
+## 2026-11-23 - iPhone QR camera
+
+The QR scanner's platform check excluded iOS. Enabled iOS on the existing scanner route, which uses Runner's existing camera usage description. The manual-entry fallback remains available.
+
+Flutter analysis and the existing Kid Mode and unsupported-camera smoke test passed. An IPA build and physical iPhone camera checks remain unperformed.
+
+## 2026-11-21 - Sync GitHub iOS workflow
+
+Fast-forwarded main to `3628d20`, adopted the tracked workflow, and kept the prior local workflow in a temporary backup. Reconciled the overlapping setup guide, plan, and log. The iOS 15.0 deployment target remains a local edit. Git sync and diff checks passed. No CI build or device install was performed during the sync.
+
 ## 2026-11-21 — iOS unsigned IPA GitHub Actions workflow
 
 Added `.github/workflows/ios-unsigned-build.yml` for `workflow_dispatch` and pushes to `main`: Flutter 3.50.0 on `macos-latest`, `flutter build ios --release --no-codesign`, package `Runner.app` into `Runner-unsigned.ipa`, upload artifact. Skips CocoaPods/`pod install` (SPM). Updated `docs/iphone.md` and `plan.md`. No local iOS build possible on Windows; Actions run and Sideloadly install unperformed.
+## 2026-11-21 - Unsigned iPhone build workflow
+
+Fast-forwarded main to `0b7ade8` and combined overlapping plan and log entries with local work. The incoming Firebase configuration and iOS usage descriptions already met the setup request. Added the manually triggered `macos-latest` workflow with Flutter 3.50.0, locked Dart dependencies, Swift Package Manager, and an unsigned `Runner-unsigned.ipa` artifact. Set the Xcode deployment target to iOS 15.0 for the locked Firebase Apple SDK. Updated the Windows installation guide.
+
+Verified locally with static configuration and Git checks. The macOS CI build, IPA installation, iPhone permissions, Firebase sign-in, and signature refresh remain unperformed.
+
+Manual checks (unperformed):
+
+- Run the workflow on GitHub. Extract its artifact and inspect the IPA for `Payload/Runner.app` and the bundled `GoogleService-Info.plist`.
+- Install with a free Apple ID via USB, trust the profile, and open Bushel. Sign in with an existing test account and check that the normal app loads.
+- Open the QR scanner on a fresh install and deny camera access. The Bushel purpose text should appear and manual QR entry should remain available.
+- Reinstall the IPA over the existing app with the same Apple ID and effective bundle ID before expiry. Bushel should still open after the old signature would have expired.
 
 ## 2026-11-21 — iOS IPA precursors (Firebase + Info.plist)
 
@@ -16,6 +38,44 @@ Manual checks (unperformed):
 - Sideload the IPA with a free Apple ID; expect Firebase sign-in to initialize using the new iOS options/plist.
 - On device, open Scan → camera permission prompt should show the Bushel camera usage string; deny should still allow manual code entry.
 - Confirm Android/Web Firebase startup is unchanged after regenerating `firebase_options.dart`.
+
+## 2026-11-14 - Sync cloud main
+
+User requested merging cloud main and pulling all new files. Fetched origin, inspected the incoming change, and fast-forwarded local main from 7c8b74d to 5ce17ac (`iphone ipa build workflow`). The only incoming file is `docs/iphone.md`, containing requirements for a future unsigned iOS workflow. No overlapping paths or conflicts; existing uncommitted expired-QR and leaderboard changes/new files remain in the workspace. No stash, local commit, push, deployment, or workflow implementation was needed.
+
+Verified: HEAD/origin/main divergence is 0/0, incoming document exists and was read, working-tree status retains local work, and `git diff --check` passed. Documentation-only incoming change: Flutter analysis/tests were not rerun under the testing policy.
+
+Optional manual checks (unperformed): open `docs/iphone.md` in the editor and confirm the iPhone workflow requirements are present; open the app's Home/Rewards Leaderboard link and confirm the preceding local feature remains accessible (live activation still requires documented backend setup).
+
+## 2026-11-14 - Adult points leaderboard
+
+Added Leaderboard links to adult Home and Rewards, opening a responsive top-50 all-time list with descending points, shared competition ranks for equal scores, and current-account highlighting. The public projection contains only each adult's first name and points; children and private attendance/contact/profile data are not published. Demo mode displays only the local parent's earned points, with no fabricated competitors or Firebase initialization. Live errors have Retry, initial setup has an explicit pending message, and no live failure falls back to demo results.
+
+Added a Firebase Functions codebase in `functions/` (Node 22 target, locked firebase-admin/firebase-functions dependencies). Three retry-enabled triggers recompute adult totals when parent attendance, family revocation, or profile documents change. A transaction reads current canonical attendance/profile/revocations, deduplicates confirmed parent shifts, excludes revoked rewards, and writes the minimal projection or deletes a zero/missing-profile row. Recalculation avoids repeated-event increments and stale event payloads. Existing ownerUid collection-group indexes suffice; no new composite index. Added signed-in read-only leaderboard/status rules while preserving private source-data rules and existing validation. Guarded developer-run backfill includes historical points and stale-row cleanup, setting readiness only after success. Deployment and trusted-credential steps are documented in `functions/README.md`. Initial backfill is required; event triggers alone do not populate historical scores. Updates are eventually consistent.
+
+Verified: final `flutter analyze --no-pub` passed after fixing two brace lints. Two selected existing Flutter smoke checks passed once: demo startup/reset and rewards excluding pending/duplicate completions. One new offline Node smoke check passed for production score calculation, including pending/child/other-owner/duplicate/revoked exclusions and missing-profile cleanup. JS syntax checks passed, and importing the functions module exposed all three triggers without Firestore access. npm install completed with a lockfile and zero reported vulnerabilities; local host is Node 24, so the target Node 22 runtime remains unverified. `git diff --check` passed. No emulator, release build, browser/camera QA, Firestore rules compilation/live permission exercise, backfill, backend data write, deployment, commit, or push performed. Preserved the preceding expired-QR changes.
+
+Developer setup pending: manually publish the complete repository rules, verify existing ownerUid indexes are READY, deploy only the leaderboard functions codebase to the existing project, and run the guarded initial backfill using trusted credentials. See `functions/README.md`. Current production rules/functions have not been changed by this feature.
+
+Manual checks (all unperformed; live checks require setup):
+
+- Open Home or Rewards → Leaderboard on narrow and wide displays. Adults with 300/200/200/100 confirmed points should appear in ranks 1/2/2/4; the signed-in adult should be marked You. Only first names and adult totals should appear.
+- Submit a parent/family check-in and leave it pending: ranking must not increase. Confirm it as the assigned approved coordinator: the adult should gain exactly 100 once after the server update, matching Rewards; kids must not get public rows. Repeated confirmation must not duplicate points.
+- Complete normal adult removal voting for a family with confirmed attendance: that shift's adult 100 points should disappear after projection update. Voluntary leaving should retain already-confirmed rewards.
+- Use ordinary signed-in and signed-out clients to check permissions: signed-in users can read the public board; signed-out reads and all direct client score/status writes must fail. Before initial setup or during a read failure, expect pending/error UI and no demo scores. Administrator/backfill writes do not establish client authorization.
+
+## 2026-11-14 - Expired QR message
+
+Changed expired QR validation (shared by real/mock codes) and the leader's expired QR display to exactly `This is an old qr code`. Split the existing expiry/window condition to retain a specific closed-window explanation without changing rejection behavior. Updated the existing expiry assertion; no new tests or permission/rules changes.
+
+Verified: `flutter analyze --no-pub` passed; existing smoke `secure QR rejects expired rotated wrong-shift and public-hash codes` passed. Manual/browser/live checks unperformed. No commit, push, or deployment.
+
+Manual checks (unperformed):
+
+- Submit an expired QR as a booked parent: expect `This is an old qr code` and no attendance creation.
+- Leave the leader QR display open until expiry: expect the same exact message in place of the QR.
+- Submit a fresh valid QR within the check-in window: expect normal pending attendance; a wrong-shift QR should still be rejected with its existing explanation.
+
 
 ## 2026-11-14 - Flutter 3.50 and standalone Material UI
 
