@@ -32,20 +32,28 @@ class _AuthScreenState extends State<AuthScreen> {
     super.dispose();
   }
 
-  Future<void> _submit() async {
-    if (_busy || !_form.currentState!.validate()) return;
+  Future<void> _submit({bool google = false}) async {
+    if (_busy || (!google && !_form.currentState!.validate())) return;
     setState(() {
       _busy = true;
       _error = null;
     });
     try {
-      if (_register) {
+      if (google) {
+        await widget.auth.signInWithGoogle();
+      } else if (_register) {
         await widget.auth.register(_email.text.trim(), _password.text);
       } else {
         await widget.auth.signIn(_email.text.trim(), _password.text);
       }
     } catch (error) {
-      if (mounted) setState(() => _error = authErrorMessage(error));
+      if (mounted) {
+        setState(
+          () => _error = google
+              ? googleSignInError(error)
+              : authErrorMessage(error),
+        );
+      }
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -91,9 +99,8 @@ class _AuthScreenState extends State<AuthScreen> {
                       autocorrect: false,
                       textInputAction: TextInputAction.next,
                       validator: (value) =>
-                          RegExp(
-                            r'^[^\s@]+@[^\s@]+\.[^\s@]+$',
-                          ).hasMatch(value?.trim() ?? '')
+                          RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$')
+                              .hasMatch(value?.trim() ?? '')
                           ? null
                           : 'Enter a valid email address.',
                     ),
@@ -159,6 +166,17 @@ class _AuthScreenState extends State<AuthScreen> {
                             : 'New to Bushel? Create an account',
                       ),
                     ),
+                    if (widget.auth.supportsGoogleSignIn) ...[
+                      const Divider(height: 28),
+                      OutlinedButton(
+                        onPressed: _busy ? null : () => _submit(google: true),
+                        child: Text(
+                          _register
+                              ? 'Sign up with Google'
+                              : 'Sign in with Google',
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),

@@ -1,4 +1,5 @@
 import 'package:material_ui/material_ui.dart';
+
 import '../data/shift_store.dart';
 import '../data/session_store.dart';
 import '../data/catalog_store.dart';
@@ -253,9 +254,7 @@ class _CheckInScreenState extends State<CheckInScreen> {
               const SizedBox(height: 12),
               if (selected == null) ...[
                 Text(
-                  _store.myShifts.isEmpty
-                      ? 'Sign up for a shift first'
-                      : 'Your check-ins are up to date. Pending attendance awaits coordinator confirmation.',
+                  _store.myShifts.isEmpty ? 'Sign up for a shift first' : 'Your check-ins are up to date. Pending attendance awaits coordinator confirmation.',
                 ),
                 TextButton(
                   onPressed: () => Navigator.of(context).pushReplacement(
@@ -313,8 +312,8 @@ class _CheckInScreenState extends State<CheckInScreen> {
                 const SizedBox(height: 20),
                 Text(
                   _store.usingMockQr
-                      ? 'Scan or enter your coordinator’s mock code. Attendance is saved to Firebase; coordinator confirmation earns 100 points. Codes expire in 15 minutes.'
-                      : 'Use the current code displayed by your assigned leader. Codes expire after at most 15 minutes.',
+                      ? 'Scan the mock QR or enter the 10-character code from your coordinator.'
+                      : 'Scan the current QR or enter the 10-character code from your assigned leader.',
                 ),
                 FilledButton.icon(
                   onPressed: _saving ? null : _scan,
@@ -326,6 +325,7 @@ class _CheckInScreenState extends State<CheckInScreen> {
                   enabled: !_saving,
                   autocorrect: false,
                   enableSuggestions: false,
+                  textCapitalization: TextCapitalization.characters,
                   decoration: const InputDecoration(labelText: 'Enter code'),
                 ),
                 TextButton(

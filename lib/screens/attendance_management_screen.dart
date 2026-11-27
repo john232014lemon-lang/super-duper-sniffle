@@ -275,6 +275,7 @@ class _AttendanceManagementScreenState
                                           shift: shift.shift,
                                           bank: bank,
                                           code: token.code,
+                                          manualCode: token.manualCode,
                                           expiration: _expirationLabel(
                                             token.expiresAt,
                                           ),

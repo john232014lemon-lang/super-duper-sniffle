@@ -1,5 +1,7 @@
 import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
+
 import '../models/attendance.dart';
 import '../models/check_in_token.dart';
 import '../demo_config.dart';
@@ -163,6 +165,7 @@ class FirestoreAttendanceRepository implements AttendanceRepository {
           final token = CheckInToken.generateMock(shiftId);
           tx.set(_firestore.collection('mockQrTokens').doc(shiftId), {
             'qrTokenHash': CheckInToken.verifier(token.code),
+            'qrManualHash': token.manualVerifier,
             'expiresAt': Timestamp.fromDate(token.expiresAt),
           });
           return token;
@@ -181,6 +184,7 @@ class FirestoreAttendanceRepository implements AttendanceRepository {
         }
         tx.update(ref, {
           'qrTokenHash': CheckInToken.verifier(token.code),
+          'qrManualHash': token.manualVerifier,
           'qrExpiresAt': Timestamp.fromDate(token.expiresAt),
           'qrCode': FieldValue.delete(),
         });
@@ -259,6 +263,7 @@ class FirestoreAttendanceRepository implements AttendanceRepository {
             shiftId,
             mock.data()?['qrTokenHash'] as String?,
             (mock.data()?['expiresAt'] as Timestamp?)?.toDate(),
+            manualHash: mock.data()?['qrManualHash'] as String?,
           );
         } else {
           error = CheckInToken.validate(
@@ -267,6 +272,7 @@ class FirestoreAttendanceRepository implements AttendanceRepository {
             data['qrTokenHash'] as String?,
             (data['qrExpiresAt'] as Timestamp?)?.toDate(),
             start,
+            manualHash: data['qrManualHash'] as String?,
           );
         }
         if (error != null) throw CatalogException(error);
@@ -308,7 +314,11 @@ class FirestoreAttendanceRepository implements AttendanceRepository {
           'shiftId': shiftId,
           'leaderUid': data['creatorUid'],
           'name': participantName,
-          'tokenProof': CheckInToken.proof(code),
+          'tokenProof': CheckInToken.submissionProof(
+            code,
+            shiftId,
+            mock: mockQrMode,
+          ),
           if (mockQrMode) 'mockQr': true,
           'status': selfConfirmed ? 'confirmed' : 'pending',
           if (selfConfirmed) 'confirmedAt': FieldValue.serverTimestamp(),

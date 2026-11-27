@@ -4,11 +4,13 @@ import '../data/coordinator_store.dart';
 import '../data/session_store.dart';
 import '../data/shift_store.dart';
 import '../models/group_member.dart';
+import '../services/catalog_repository.dart';
 import '../widgets/bushel_navigation_bar.dart';
 import '../widgets/station_token_display.dart';
 import '../data/catalog_store.dart';
 import 'live_group_screen.dart';
 import 'attendance_management_screen.dart';
+import 'shift_dashboard_screen.dart';
 
 class CoordinatorScreen extends StatelessWidget {
   const CoordinatorScreen({super.key});
@@ -24,6 +26,13 @@ class CoordinatorScreen extends StatelessWidget {
                 catalog.signups.contains(record.shift.id),
           )
           .toList();
+      bool leads(StoredShift record) =>
+          record.creatorUid == catalog.uid &&
+          catalog.coordinatorBanks.contains(record.bankId);
+      final sections = {
+        'Shifts you lead': records.where(leads),
+        'Other shift groups': records.where((record) => !leads(record)),
+      };
       return Scaffold(
         appBar: AppBar(title: const Text('Your shift groups')),
         body: catalog.shiftsLoading || catalog.shiftsFailed
@@ -36,65 +45,103 @@ class CoordinatorScreen extends StatelessWidget {
                   ),
                   if (records.isEmpty)
                     const Text('Join or create a shift to see it here.'),
-                  for (final record in records)
-                    Card(
-                      child: Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              record.shift.title,
-                              style: const TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            Text('${record.shift.date} · ${record.shift.time}'),
-                            Wrap(
-                              spacing: 8,
+                  for (final section in sections.entries)
+                    if (section.value.isNotEmpty) ...[
+                      Padding(
+                        padding: const EdgeInsets.only(top: 16, bottom: 4),
+                        child: Text(
+                          section.key,
+                          style: Theme.of(context).textTheme.titleLarge,
+                        ),
+                      ),
+                      for (final record in section.value)
+                        Card(
+                          child: Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                if (catalog.signups.contains(record.shift.id) &&
-                                    !SessionStore.instance.isKidAccount)
-                                  OutlinedButton.icon(
-                                    icon: const Icon(Icons.groups_outlined),
-                                    label: const Text(
-                                      'Members & removal votes',
-                                    ),
-                                    onPressed: () => Navigator.of(context).push(
-                                      MaterialPageRoute<void>(
-                                        builder: (_) => LiveGroupScreen(
-                                          shiftId: record.shift.id!,
-                                          title: record.shift.title,
-                                        ),
-                                      ),
-                                    ),
+                                Text(
+                                  record.shift.title,
+                                  style: const TextStyle(
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.bold,
                                   ),
-                                if (record.creatorUid == catalog.uid &&
-                                    !SessionStore.instance.isKidAccount)
-                                  FilledButton.icon(
-                                    icon: const Icon(Icons.fact_check_outlined),
-                                    label: const Text('QR & attendance'),
-                                    onPressed: () => Navigator.of(context).push(
-                                      MaterialPageRoute<void>(
-                                        builder: (_) =>
-                                            AttendanceManagementScreen(
-                                              shiftId: record.shift.id!,
-                                              title: record.shift.title,
+                                ),
+                                Text(
+                                  '${record.shift.date} · ${record.shift.time}',
+                                ),
+                                Wrap(
+                                  spacing: 8,
+                                  children: [
+                                    if (!SessionStore.instance.isKidAccount &&
+                                        (leads(record) ||
+                                            catalog.signups.contains(
+                                              record.shift.id,
+                                            )))
+                                      OutlinedButton.icon(
+                                        icon: const Icon(
+                                          Icons.dashboard_outlined,
+                                        ),
+                                        label: const Text('Shift dashboard'),
+                                        onPressed: () =>
+                                            Navigator.of(context).push(
+                                              MaterialPageRoute<void>(
+                                                builder: (_) =>
+                                                    ShiftDashboardScreen(
+                                                      shiftId: record.shift.id!,
+                                                    ),
+                                              ),
                                             ),
                                       ),
-                                    ),
+                                    if (catalog.signups.contains(
+                                          record.shift.id,
+                                        ) &&
+                                        !SessionStore.instance.isKidAccount)
+                                      OutlinedButton.icon(
+                                        icon: const Icon(Icons.groups_outlined),
+                                        label: const Text(
+                                          'Members & removal votes',
+                                        ),
+                                        onPressed: () =>
+                                            Navigator.of(context).push(
+                                              MaterialPageRoute<void>(
+                                                builder: (_) => LiveGroupScreen(
+                                                  shiftId: record.shift.id!,
+                                                  title: record.shift.title,
+                                                ),
+                                              ),
+                                            ),
+                                      ),
+                                    if (record.creatorUid == catalog.uid &&
+                                        !SessionStore.instance.isKidAccount)
+                                      FilledButton.icon(
+                                        icon: const Icon(
+                                          Icons.fact_check_outlined,
+                                        ),
+                                        label: const Text('QR & attendance'),
+                                        onPressed: () =>
+                                            Navigator.of(context).push(
+                                              MaterialPageRoute<void>(
+                                                builder: (_) =>
+                                                    AttendanceManagementScreen(
+                                                      shiftId: record.shift.id!,
+                                                      title: record.shift.title,
+                                                    ),
+                                              ),
+                                            ),
+                                      ),
+                                  ],
+                                ),
+                                if (!catalog.signups.contains(record.shift.id))
+                                  const Text(
+                                    'Join this shift to take part in its member group and removal voting.',
                                   ),
                               ],
                             ),
-                            if (!catalog.signups.contains(record.shift.id))
-                              const Text(
-                                'Join this shift to take part in its member group and removal voting.',
-                              ),
-                          ],
+                          ),
                         ),
-                      ),
-                    ),
+                    ],
                 ],
               ),
         bottomNavigationBar: const BushelNavigationBar(selectedIndex: 4),
@@ -372,10 +419,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
                 if (qrCode != null) ...[
                   const Text(
                     'Group check-in status',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w900,
-                    ),
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
                   ),
                   const SizedBox(height: 8),
                   for (final member in _store.members)

@@ -1,8 +1,10 @@
 import 'package:material_ui/material_ui.dart';
+
 import '../data/catalog_store.dart';
 import '../data/session_store.dart';
 import '../services/catalog_repository.dart';
 import '../services/community_models.dart';
+import 'shift_dashboard_screen.dart';
 
 class LiveGroupScreen extends StatefulWidget {
   const LiveGroupScreen({
@@ -110,10 +112,7 @@ class _LiveGroupScreenState extends State<LiveGroupScreen> {
     final voted = voters.contains(store.uid);
     final ready = voters.length >= group.votesNeeded;
     final canStart =
-        !_busy &&
-        !selfFamily &&
-        group.members.length >= 3 &&
-        (!voted || ready);
+        !_busy && !selfFamily && group.members.length >= 3 && (!voted || ready);
     return Card(
       child: ListTile(
         title: Text(name),
@@ -148,7 +147,22 @@ class _LiveGroupScreenState extends State<LiveGroupScreen> {
   Widget build(BuildContext context) {
     final store = CatalogScope.maybeOf(context);
     return Scaffold(
-      appBar: AppBar(title: Text('${widget.title} · Members')),
+      appBar: AppBar(
+        title: Text('${widget.title} · Members'),
+        actions: [
+          if (store?.signups.contains(widget.shiftId) == true &&
+              !SessionStore.instance.isKidAccount)
+            IconButton(
+              tooltip: 'Shift dashboard',
+              icon: const Icon(Icons.dashboard_outlined),
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => ShiftDashboardScreen(shiftId: widget.shiftId),
+                ),
+              ),
+            ),
+        ],
+      ),
       body:
           store == null ||
               !store.signups.contains(widget.shiftId) ||
@@ -224,7 +238,8 @@ class _LiveGroupScreenState extends State<LiveGroupScreen> {
                                 votes: votes,
                                 target: child.target,
                                 name: child.name,
-                                subtitle: 'Child · with ${group.members[child.parentUid] ?? 'parent'}',
+                                subtitle:
+                                    'Child · with ${group.members[child.parentUid] ?? 'parent'}',
                                 selfFamily: child.parentUid == store.uid,
                               ),
                           ],

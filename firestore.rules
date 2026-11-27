@@ -25,6 +25,12 @@ service cloud.firestore {
         || pid in getAfter(regPath(uid, sid)).data.get('childIds', []));
     }
     function member(sid) { return signedIn() && request.auth.uid in get(groupPath(sid)).data.members; }
+    function bookedAdult(uid, sid) {
+      return exists(regPath(uid, sid)) && uid in get(groupPath(sid)).data.members;
+    }
+    function shiftBoardParticipant(sid) {
+      return shiftLeader(sid) || (parentMode() && bookedAdult(request.auth.uid, sid));
+    }
     function beforeSeats(uid, sid) { return exists(regPath(uid, sid)) ? 1 + get(regPath(uid, sid)).data.get('childIds', []).size() : 0; }
     function afterSeats(uid, sid) { return existsAfter(regPath(uid, sid)) ? 1 + getAfter(regPath(uid, sid)).data.get('childIds', []).size() : 0; }
     function quorum(sid, target) {
@@ -105,9 +111,17 @@ service cloud.firestore {
       return config.enabled == true && request.time < config.expiresAt
         && sid in config.shiftIds;
     }
+    function matchesQrProof(token) {
+      let hash = hashing.sha256(request.resource.data.tokenProof).toHexString().lower();
+      return hash == token.qrTokenHash || hash == token.get('qrManualHash', '');
+    }
+    function validManualHash(data) {
+      return !('qrManualHash' in data) || (data.qrManualHash is string
+        && data.qrManualHash.matches('^[0-9a-f]{64}$'));
+    }
     function realQrProof(sid) {
       let shift = get(shiftPath(sid)).data;
-      return hashing.sha256(request.resource.data.tokenProof).toHexString().lower() == shift.qrTokenHash
+      return matchesQrProof(shift)
         && request.time >= shift.startsAt - duration.value(30, 'm')
         && request.time < shift.qrExpiresAt
         && request.time < shift.startsAt + duration.value(4, 'h');
@@ -118,7 +132,7 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/profiles/$(request.auth.uid)).data.preferredRole == 'volunteer'
         && request.auth.uid != get(shiftPath(sid)).data.creatorUid
         && request.resource.data.status == 'pending'
-        && hashing.sha256(request.resource.data.tokenProof).toHexString().lower() == token.qrTokenHash
+        && matchesQrProof(token)
         && request.time < token.expiresAt;
     }
     // Trusted server projections only; never expose private attendance/profiles.
@@ -137,7 +151,10 @@ service cloud.firestore {
     match /mockQrTokens/{sid} {
       allow get: if signedIn() && (shiftLeader(sid) || (parentMode() && member(sid)));
       allow create, update: if shiftLeader(sid) && mockQrEnabled(sid)
-        && request.resource.data.keys().hasOnly(['qrTokenHash', 'expiresAt'])
+        && request.resource.data.keys().hasOnly(['qrTokenHash', 'qrManualHash', 'expiresAt'])
+        && validManualHash(request.resource.data)
+        && (resource == null || !('qrManualHash' in request.resource.data)
+          || request.resource.data.qrManualHash != resource.data.get('qrManualHash', ''))
         && request.resource.data.qrTokenHash is string
         && request.resource.data.qrTokenHash.matches('^[0-9a-f]{64}$')
         && (resource == null || request.resource.data.qrTokenHash != resource.data.qrTokenHash)
@@ -194,6 +211,41 @@ service cloud.firestore {
       // Never writable by clients, including coordinators.
     }
     match /shifts/{shiftId} {
+      match /tasks/{taskId} {
+        function validTask() {
+          let task = request.resource.data;
+          return task.keys().hasOnly(['title', 'station', 'status', 'assigneeUid', 'revision', 'updatedAt'])
+            && text(task.title, 120) && text(task.station, 80)
+            && task.status in ['todo', 'inProgress', 'done']
+            && task.assigneeUid is string && task.revision is int
+            && task.updatedAt == request.time;
+        }
+        allow read: if shiftLeader(shiftId) || (parentMode()
+          && bookedAdult(request.auth.uid, shiftId)
+          && resource.data.assigneeUid == request.auth.uid);
+        allow create: if shiftLeader(shiftId) && validTask()
+          && request.resource.data.assigneeUid == ''
+          && request.resource.data.status == 'todo'
+          && request.resource.data.revision == 1;
+        allow update: if shiftLeader(shiftId) && validTask()
+          && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['assigneeUid', 'status', 'revision', 'updatedAt'])
+          && request.resource.data.revision == resource.data.revision + 1
+          && (request.resource.data.assigneeUid == resource.data.assigneeUid
+            || request.resource.data.assigneeUid == ''
+            || bookedAdult(request.resource.data.assigneeUid, shiftId));
+      }
+      match /messages/{messageId} {
+        allow read: if shiftBoardParticipant(shiftId);
+        allow create: if shiftBoardParticipant(shiftId)
+          && request.resource.data.keys().hasOnly(['authorUid', 'authorName', 'body', 'sentAt'])
+          && request.resource.data.authorUid == request.auth.uid
+          && text(request.resource.data.authorName, 80)
+          && request.resource.data.authorName ==
+            get(/databases/$(database)/documents/profiles/$(request.auth.uid)).data.name
+          && text(request.resource.data.body, 1000)
+          && request.resource.data.sentAt == request.time;
+      }
       function validSchedule() {
         let d = request.resource.data;
         let parts = d.time.split(':');
@@ -271,7 +323,10 @@ service cloud.firestore {
         && request.resource.data.signupCount <= resource.data.capacity
         && (ownCountChange() || removalCountChange() || childRemovalCountChange());
       allow update: if shiftLeader(shiftId)
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['qrTokenHash', 'qrExpiresAt', 'qrCode'])
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['qrTokenHash', 'qrManualHash', 'qrExpiresAt', 'qrCode'])
+        && validManualHash(request.resource.data)
+        && (!('qrManualHash' in request.resource.data)
+          || request.resource.data.qrManualHash != resource.data.get('qrManualHash', ''))
         && !('qrCode' in request.resource.data)
         && request.resource.data.qrTokenHash is string
         && request.resource.data.qrTokenHash.matches('^[0-9a-f]{64}$')

@@ -4,6 +4,10 @@ Bushel is the existing Flutter app starting at `lib/main.dart`. Use Firebase pro
 
 ## Current state
 
+- November 27 Google sign-in and manual check-in codes: separate Google actions are available on iOS, Android, and Web. Refreshed the iOS and Android Firebase configs and configured the iOS OAuth callback. Check-in now shows a 10-character manual code while preserving existing QR scans. Published the complete Firestore rules, including Slice 26. Live sign-in and check-in QA remain pending. Android Google sign-in requires the installed build’s signing SHA-1 to be registered.
+
+- November 27 Slice 26 dashboard implemented. Approved assigned coordinators can create station tasks, assign booked adults by drag-and-drop or picker, and update progress. Booked adults can see their own assignments and post shift messages. Firestore rules are published. Signed-in testing remains pending. Slice 27 will deliver assignment notifications.
+
 - November 23 Slice 25 print follow-up implemented locally. Approved assigned coordinators can print separate signup and check-in PDFs. New codes last 24 hours and attendance retains its existing window. Firebase Hosting and Firestore rules publication and signed-in phone QA are pending.
 
 - November 23 iOS QR scanning: enabled the existing check-in camera on iPhone using the camera permission description already in Runner. Denied camera access still offers manual entry. Physical iPhone verification requires a new IPA containing the fix.
@@ -49,12 +53,13 @@ Keep parent-managed child bookings, Kid Mode permission restrictions, two-thirds
 - Apply the 24-hour credential lifetime to mock QRs while retaining the mock session’s expiry and allowlist. Existing codes keep their stored expiration. Roll out the client and Firestore validation changes together.
 - Verify with a focused offline QR time-boundary check. Print and scan both sheets on an iPhone. Signup should resume the exact shift after login. Check-in should work for eligible volunteers inside the attendance window and reject expired or rotated codes and attempts outside the window.
 
-### Slice 26 — Live coordinator shift dashboard
+### Slice 26 — Live coordinator shift dashboard (implemented locally)
 
 - Add **Shift dashboard** under **Shifts you lead**. Show booked adults and tasks grouped by station with **To do**, **In progress**, and **Done** statuses. The assigned approved coordinator creates tasks, assigns or reassigns adults by dragging their names onto tasks, and updates progress. Include an accessible **Assign volunteer** picker for touch and keyboard use.
 - Show live task updates and a shift-wide message thread. Currently booked adults can post messages and see their own assignments. Only the assigned approved coordinator manages progress. Kid Mode and removed or cancelled members lose access. Family bookings stay under the adult account.
 - Store tasks and messages under the shift. Recheck approval and booking eligibility when assigning and use transactions to surface conflicting edits as a refresh-and-retry message. Keep task progress separate from attendance and rewards. Assignment events feed the notification system in Slice 27.
 - Verify with ordinary signed-in coordinator and volunteer accounts. Drag a booked adult onto a task and confirm the assignment and progress appear live. Exchange messages, check that an adult volunteer cannot edit progress, and confirm a removed member loses dashboard access.
+- Slice 27 can observe writes at `shifts/{shiftId}/tasks/{taskId}` and detect changes to `assigneeUid`. Use the task ID and committed revision to identify an assignment event. Dashboard queries use single-field indexes.
 
 ### Slice 27 — Notification inbox and Android push
 

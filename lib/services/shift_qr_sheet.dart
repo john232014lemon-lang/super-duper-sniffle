@@ -52,6 +52,7 @@ Future<Uint8List> buildShiftQrSheet({
   required String code,
   required String expiration,
   required bool signup,
+  String? manualCode,
 }) async {
   final logo = await _bushelMark();
   final pdf = pw.Document();
@@ -127,6 +128,13 @@ Future<Uint8List> buildShiftQrSheet({
             style: const pw.TextStyle(fontSize: 13),
           ),
           if (!signup) ...[
+            if (manualCode != null) ...[
+              pw.SizedBox(height: 6),
+              pw.Text(
+                'Manual check-in code: $manualCode',
+                style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+              ),
+            ],
             pw.SizedBox(height: 6),
             pw.Text(
               'Check-in opens 30 minutes before and closes 4 hours after the shift starts.',
@@ -151,6 +159,7 @@ Future<void> printShiftQrSheet({
   required String code,
   required String expiration,
   required bool signup,
+  String? manualCode,
 }) async {
   final bytes = await buildShiftQrSheet(
     shift: shift,
@@ -158,6 +167,7 @@ Future<void> printShiftQrSheet({
     code: code,
     expiration: expiration,
     signup: signup,
+    manualCode: manualCode,
   );
   await Printing.layoutPdf(
     name: signup ? 'bushel-shift-signup.pdf' : 'bushel-station-check-in.pdf',

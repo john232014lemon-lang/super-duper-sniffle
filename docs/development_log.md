@@ -1,5 +1,33 @@
 # Bushel Development Log
 
+## 2026-11-27 - Google sign-in and short check-in codes
+
+Added separate Google actions to email sign-in and signup. First-time Google users enter the existing profile setup flow. Refreshed both native Firebase configurations and registered the iOS client ID and callback scheme in Runner. The downloaded Android configuration includes a web OAuth client. The Android signing certificate still needs to be registered for the build being tested.
+
+Added a case-insensitive 10-character manual code to real and mock station check-in. Real station sheets include it alongside the existing full QR. The separate manual verifier is bound to the shift and real or mock mode, rotates with the QR, and follows the same attendance rules. Older issued camera QRs continue to work until their stored expiration or rotation.
+
+Flutter analysis, four focused auth and QR smoke checks, the iOS callback/config match, and `git diff --check` passed. Firebase compiled and released the complete rules to `bushel-volunteer-20260925` including Slice 26. Live Google OAuth, sideloading, and ordinary-client permission checks were unperformed.
+
+Manual checks (unperformed):
+
+- On the rebuilt iPhone app and authorized Web domain, sign up with a new Google account and sign in again. The first visit should open profile setup and the second should return to the saved profile.
+- Cancel the Google picker, then sign in with email. The cancellation should leave the app signed out and email login should remain available.
+- Type the displayed code in lowercase. Expect the same check-in result as scanning. Rotate the QR and confirm both the old QR and its old manual code are rejected.
+
+## 2026-11-27 - Slice 26 live shift dashboard
+
+Added **Shift dashboard** under **Shifts you lead** and for booked adults through Groups and the member screen. Approved assigned coordinators see the adult roster, create station tasks, assign or reassign by dragging names or using the volunteer picker, and update progress. Booked adults see their own assignments and can post to the shared shift thread. The dashboard shows the latest 50 messages.
+
+Firestore rules restrict task edits to the assigned approved coordinator and check current adult booking and group membership for new assignees and volunteer access. Task updates use transactions and a revision check to detect conflicting edits. The committed task assignment and revision are available for Slice 27 notification processing. The dashboard does not write attendance or rewards. No composite index is needed.
+
+Flutter analysis, the existing My shifts group-navigation check, the new Kid Mode dashboard access smoke check, and `git diff --check` passed. Rules compilation and live signed-in dashboard checks were unperformed. Publish the complete rules before device testing. No commit, push, or deployment.
+
+Manual checks (unperformed):
+
+- As the assigned coordinator, create a task and assign a booked adult by dragging their name. Reassign using the picker. The old assignee should lose the task and the new assignee should see it immediately.
+- Open the same dashboard on two devices as the assigned coordinator. Try conflicting updates to the same task. The stale update should prompt a retry after reviewing the latest version.
+- Exchange messages as the coordinator and a booked adult. Verify the adult can see their own progress but cannot edit it. Remove or cancel the adult booking and confirm access is revoked.
+
 ## 2026-11-23 - Slice 25 printable QR sheets
 
 Added separate US Letter signup and station check-in print actions for the assigned approved coordinator. The sheets use the Bushel onboarding mark and wordmark, shift and station details, instructions, and expiration. Signup QR links resolve through Firebase Hosting and preserve the target through sign-in and profile setup. Firestore authorizes issuance and expires signup-link reads at 24 hours. New real and mock check-in QR credentials last 24 hours, and real attendance keeps the original shift window. Printing an available check-in credential preserves it. Existing codes retain their stored expiration.

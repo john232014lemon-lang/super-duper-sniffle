@@ -25,6 +25,7 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:bushel/screens/shifts_screen.dart';
 import 'package:bushel/screens/live_group_screen.dart';
+import 'package:bushel/screens/shift_dashboard_screen.dart';
 import 'package:bushel/widgets/family_shift_bookings.dart';
 import 'package:bushel/screens/auth_screen.dart';
 import 'package:bushel/screens/food_bank_detail_screen.dart';
@@ -43,6 +44,15 @@ import 'package:flutter_test/flutter_test.dart';
 // backend persistence, voting, capacity, or authorization in a second codebase.
 class _Auth implements AuthService {
   final changes = StreamController<String?>.broadcast();
+  int googleAttempts = 0;
+  @override
+  bool get supportsGoogleSignIn => true;
+  @override
+  Future<void> signInWithGoogle() async {
+    googleAttempts++;
+    changes.add('google-adult');
+  }
+
   @override
   Stream<String?> get userIds => changes.stream;
   @override
@@ -280,9 +290,21 @@ void main() {
         hash ?? CheckInToken.verifier(token.code),
         token.expiresAt,
         start,
+        manualHash: hash == null ? token.manualVerifier : next.manualVerifier,
         now: now ?? start,
       );
       expect(validate(token.code), isNull);
+      expect(token.manualCode, hasLength(10));
+      expect(validate(' ${token.manualCode.toLowerCase()} '), isNull);
+      expect(validate(token.manualCode, sid: 'other'), isNotNull);
+      expect(
+        validate(token.manualCode, hash: CheckInToken.verifier(next.code)),
+        contains('rotated'),
+      );
+      expect(
+        validate(token.manualCode, now: token.expiresAt),
+        'This is an old qr code',
+      );
       expect(token.expiresAt, start.add(const Duration(hours: 24)));
       final opens = start.subtract(const Duration(hours: 24));
       final earlyToken = CheckInToken.generate('shift', start, now: opens);
@@ -371,9 +393,17 @@ void main() {
       sid,
       hash ?? CheckInToken.verifier(token.code),
       token.expiresAt,
+      manualHash: token.manualVerifier,
       now: at ?? now,
     );
     expect(validate(token.code), isNull);
+    expect(validate(token.manualCode), isNull);
+    expect(
+      CheckInToken.submissionProof(token.manualCode, 'shift'),
+      isNot(
+        CheckInToken.submissionProof(token.manualCode, 'shift', mock: true),
+      ),
+    );
     expect(validate(token.code, sid: 'other'), isNotNull);
     expect(validate(token.code, at: token.expiresAt), isNotNull);
     expect(
@@ -890,6 +920,25 @@ void main() {
     expect(find.text('Local demo'), findsNothing);
   });
 
+  testWidgets(
+    'Google sign-in bypasses the email form and opens the auth gate',
+    (tester) async {
+      final auth = _Auth();
+      addTearDown(auth.changes.close);
+      await tester.pumpWidget(
+        AuthGate(auth: auth, signedInHome: const Text('Signed in')),
+      );
+      auth.changes.add(null);
+      await tester.pumpAndSettle();
+      final google = find.text('Sign in with Google');
+      await tester.ensureVisible(google);
+      await tester.tap(google);
+      await tester.pumpAndSettle();
+      expect(auth.googleAttempts, 1);
+      expect(find.text('Signed in'), findsOneWidget);
+    },
+  );
+
   testWidgets('logout removes private state and old navigation', (
     tester,
   ) async {
@@ -981,6 +1030,30 @@ void main() {
     repository.access.add({'bank'});
     await tester.pumpAndSettle();
     expect(find.text('Add shift'), findsOneWidget);
+  });
+
+  testWidgets('Kid Mode cannot open the booked adult shift dashboard', (
+    tester,
+  ) async {
+    final repository = _Catalog(kidMode: true);
+    addTearDown(repository.access.close);
+    await tester.pumpWidget(
+      CatalogSession(
+        uid: 'adult',
+        repository: repository,
+        child: const BushelApp(
+          home: ShiftDashboardScreen(shiftId: 'parent-shift'),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      find.text(
+        'This dashboard is for the shift coordinator and booked adults.',
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('Shift messages'), findsNothing);
   });
 
   testWidgets('Kid Mode uses child bookings and blocks independent signup', (

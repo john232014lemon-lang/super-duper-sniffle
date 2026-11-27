@@ -1,5 +1,7 @@
 import 'dart:async';
+
 import 'package:material_ui/material_ui.dart';
+
 import '../models/check_in_token.dart';
 import 'station_qr_code.dart';
 
@@ -50,7 +52,8 @@ class _StationTokenDisplayState extends State<StationTokenDisplay> {
       children: [
         StationQrCode(code: widget.token.code),
         const SizedBox(height: 8),
-        SelectableText(widget.token.code),
+        const Text('Manual check-in code'),
+        SelectableText(widget.token.manualCode),
         Text('Expires: ${widget.token.expiresAt.toLocal()}'),
       ],
     );

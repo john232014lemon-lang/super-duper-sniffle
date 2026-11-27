@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+
 import '../demo_config.dart';
 
 import '../data/mock_food_banks.dart';
@@ -358,9 +359,8 @@ class ShiftStore extends ChangeNotifier {
     }
     if (!isSignedUp(shift) ||
         (participantId != 'parent' &&
-            !shiftsForChild(
-              participantId,
-            ).any((entry) => _sameShift(entry.shift, shift)))) {
+            !shiftsForChild(participantId)
+                .any((entry) => _sameShift(entry.shift, shift)))) {
       throw const CatalogException(
         'You need a current booking for this participant.',
       );
@@ -381,6 +381,7 @@ class ShiftStore extends ChangeNotifier {
       token == null ? null : CheckInToken.verifier(token.code),
       token?.expiresAt,
       start,
+      manualHash: token?.manualVerifier,
     );
     if (error != null) throw CatalogException(error);
     final accountId = participantId;
@@ -389,9 +390,8 @@ class ShiftStore extends ChangeNotifier {
       name: name ?? SessionStore.instance.userName,
     );
     for (final child in SessionStore.instance.children) {
-      if (shiftsForChild(
-            child.id,
-          ).any((entry) => _sameShift(entry.shift, shift)) &&
+      if (shiftsForChild(child.id)
+              .any((entry) => _sameShift(entry.shift, shift)) &&
           !hasAttendance(shift, child.id)) {
         _pendingAttendance[shift]![child.id] = AttendanceRecord(
           accountId: child.id,
@@ -419,9 +419,8 @@ class ShiftStore extends ChangeNotifier {
     _pointsByAccount[accountId] = (_pointsByAccount[accountId] ?? 0) + 100;
     if (accountId == 'parent') {
       for (final child in SessionStore.instance.children) {
-        if (shiftsForChild(
-          child.id,
-        ).any((entry) => _sameShift(entry.shift, shift))) {
+        if (shiftsForChild(child.id)
+            .any((entry) => _sameShift(entry.shift, shift))) {
           confirmAttendance(shift, child.id);
         }
       }

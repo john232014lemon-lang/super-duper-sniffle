@@ -67,6 +67,8 @@ dart pub global run flutterfire_cli:flutterfire configure --project=bushel-volun
 
 If FlutterFire skips writing the iOS plist on Windows, download it with `firebase apps:sdkconfig IOS <ios-app-id> --out ios/Runner/GoogleService-Info.plist` and keep that file in the Runner target resources. `lib/firebase_options.dart` includes Android, iOS, and Web. Other platforms intentionally report unsupported configuration. The Firebase client identifiers are not admin credentials; never commit service-account files or login tokens.
 
+**Google authentication:** Choose **Sign in with Google** or **Sign up with Google** on the corresponding email screen. Google opens its own account picker and first-time users continue to Bushel profile setup. Rebuild the iPhone IPA with the current Firebase plist and Runner callback. On Android, register the installed build's signing-certificate SHA-1 in the existing Firebase Android app and refresh `android/app/google-services.json`. Authorize the web app's domain in Firebase Authentication.
+
 **Authentication status:** Slices 12–13 are complete based on developer manual verification on Web (Edge/Chrome) and Android emulator (Pixel 7): sign-in works, sessions persist across app restart, logout returns to sign-in, and invalid passwords show an error without opening the app.
 
 Web and Android emulator authentication were manually verified by the developer. Native Windows is not configured for Firebase.

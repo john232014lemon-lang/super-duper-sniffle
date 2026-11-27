@@ -27,32 +27,58 @@ class CheckInToken {
     );
   }
 
+  static const _manualAlphabet = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
+  static final _manualPattern = RegExp(r'^[' + _manualAlphabet + r']{10}$');
+
+  String get manualCode {
+    final bytes = sha256.convert(utf8.encode('manual:$code')).bytes;
+    return List.generate(10, (i) {
+      final offset = i * 5;
+      final index = offset ~/ 8;
+      final pair = (bytes[index] << 8) | bytes[index + 1];
+      return _manualAlphabet[(pair >> (11 - offset % 8)) & 31];
+    }).join();
+  }
+
+  static String submissionProof(
+    String code,
+    String shiftId, {
+    bool mock = false,
+  }) {
+    final normalized = code.trim().toUpperCase();
+    if (!_manualPattern.hasMatch(normalized)) return proof(code);
+    return proof(
+      'BUSHELMANUAL:${mock ? 'mock' : 'real'}:${Uri.encodeComponent(shiftId)}:$normalized',
+    );
+  }
+
+  String get manualVerifier {
+    final parts = code.split(':');
+    return digest(
+      submissionProof(
+        manualCode,
+        Uri.decodeComponent(parts[1]),
+        mock: parts[0] == 'BUSHELMOCK',
+      ),
+    );
+  }
+
   static String? validateMock(
     String code,
     String shiftId,
     String? hash,
     DateTime? expiry, {
+    String? manualHash,
     DateTime? now,
-  }) {
-    final clock = now ?? DateTime.now();
-    // Keep mock proofs separate from real token proofs, even for the same secret.
-    if (!code.startsWith('BUSHELMOCK:')) {
-      return 'Use a coordinator-generated mock code.';
-    }
-    final formatError = validate(
-      code.replaceFirst('BUSHELMOCK:', 'BUSHEL1:'),
-      shiftId,
-      verifier(code.replaceFirst('BUSHELMOCK:', 'BUSHEL1:')),
-      expiry,
-      clock,
-      now: clock,
-    );
-    if (formatError != null) return formatError;
-    if (hash == null || verifier(code) != hash) {
-      return 'This mock code is wrong or has been rotated. Ask the leader for the newest code.';
-    }
-    return null;
-  }
+  }) => _validate(
+    code,
+    shiftId,
+    hash,
+    expiry,
+    manualHash: manualHash,
+    mock: true,
+    now: now,
+  );
 
   static CheckInToken generate(
     String shiftId,
@@ -84,27 +110,51 @@ class CheckInToken {
     String? hash,
     DateTime? expiry,
     DateTime start, {
+    String? manualHash,
     DateTime? now,
+  }) => _validate(
+    code,
+    shiftId,
+    hash,
+    expiry,
+    manualHash: manualHash,
+    start: start,
+    now: now,
+  );
+
+  static String? _validate(
+    String code,
+    String shiftId,
+    String? hash,
+    DateTime? expiry, {
+    String? manualHash,
+    DateTime? start,
+    DateTime? now,
+    bool mock = false,
   }) {
+    final manual = _manualPattern.hasMatch(code.trim().toUpperCase());
     final parts = code.split(':');
-    if (parts.length != 3 ||
-        parts[0] != 'BUSHEL1' ||
-        parts[1] != Uri.encodeComponent(shiftId) ||
-        !RegExp(r'^[0-9a-f]{64}$').hasMatch(parts[2])) {
-      return 'This code is invalid or belongs to another shift. Scan the selected shift’s QR.';
+    if (!manual &&
+        (parts.length != 3 ||
+            parts[0] != (mock ? 'BUSHELMOCK' : 'BUSHEL1') ||
+            parts[1] != Uri.encodeComponent(shiftId) ||
+            !RegExp(r'^[0-9a-f]{64}$').hasMatch(parts[2]))) {
+      return mock
+          ? 'Use a coordinator-generated mock code.'
+          : 'This code is invalid or belongs to another shift. Scan the selected shift?s QR.';
     }
     if (hash == null || expiry == null) {
       return 'Ask the assigned leader to generate a new QR.';
     }
     final clock = now ?? DateTime.now();
-    if (!clock.isBefore(expiry)) {
-      return 'This is an old qr code';
-    }
-    if (clock.isBefore(start.subtract(earlyWindow)) ||
-        !clock.isBefore(start.add(lateWindow))) {
+    if (!clock.isBefore(expiry)) return 'This is an old qr code';
+    if (start != null &&
+        (clock.isBefore(start.subtract(earlyWindow)) ||
+            !clock.isBefore(start.add(lateWindow)))) {
       return 'The shift check-in window is closed. Ask the leader for a new QR.';
     }
-    if (verifier(code) != hash) {
+    if (digest(submissionProof(code, shiftId, mock: mock)) !=
+        (manual ? manualHash : hash)) {
       return 'This code is wrong or has been rotated. Scan the newest QR.';
     }
     return null;
